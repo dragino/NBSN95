@@ -1,4 +1,6 @@
 #MicroXplorer Configuration settings - do not modify
+ADC.ClockPrescaler=ADC_CLOCK_SYNC_PCLK_DIV4
+ADC.IPParameters=ClockPrescaler
 Dma.LPUART1_RX.0.Direction=DMA_PERIPH_TO_MEMORY
 Dma.LPUART1_RX.0.Instance=DMA1_Channel3
 Dma.LPUART1_RX.0.MemDataAlignment=DMA_MDATAALIGN_BYTE
@@ -115,7 +117,7 @@ PC14-OSC32_IN.Signal=RCC_OSC32_IN
 PC15-OSC32_OUT.Mode=LSE-External-Oscillator
 PC15-OSC32_OUT.Signal=RCC_OSC32_OUT
 PinOutPanel.RotationAngle=0
-ProjectManager.AskForMigrate=true
+ProjectManager.AskForMigrate=false
 ProjectManager.BackupPrevious=false
 ProjectManager.CompilerOptimize=6
 ProjectManager.ComputerToolchain=false
@@ -137,6 +139,7 @@ ProjectManager.PreviousToolchain=
 ProjectManager.ProjectBuild=false
 ProjectManager.ProjectFileName=NBSN95.ioc
 ProjectManager.ProjectName=NBSN95
+ProjectManager.RegisterCallBack=
 ProjectManager.StackSize=0x400
 ProjectManager.TargetToolchain=MDK-ARM V5.27
 ProjectManager.ToolChainLocation=

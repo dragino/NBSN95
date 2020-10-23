@@ -97,9 +97,13 @@ ATEerror_t at_mod_set(const char *param)
 	}
 	else if(sys.mod == model5)
 	{
-		user_main_printf("\r\nweiget mode\r\n");
+		user_main_printf("\r\nWeiget mode\r\n");
 	}
-
+	else if(sys.mod == model6)
+	{
+		user_main_printf("\r\nCounting mode\r\n");
+	}
+	
 	else
 	{
 		user_main_printf("%s",ATError_description[AT_PARAM_ERROR]);
@@ -296,7 +300,7 @@ ATEerror_t at_weight_get(const char *param)
 	}
 	if(keep)
 		printf("AT+WEIGRE=");
-	printf("%0.1f",sensor.GapValue);
+	printf("%0.1f\r\n",sensor.GapValue);
 	
 	return AT_OK;
 }
@@ -339,6 +343,29 @@ ATEerror_t at_weight_GapValue_get(const char *param)
 	
   return AT_OK;		
 }
+/************** 			AT+CNTFAC		**************/
+ATEerror_t at_cntfac_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	sensor.factor=atof((param+(pos-param)+1));
+	pos = strchr(param,'.');
+	if(pos == NULL)
+		sensor.factor_number = 0;
+	else
+	{
+		sensor.factor_number = strlen(param) - (pos-param)-1;
+	}
+
+	return AT_OK;
+}
+
+ATEerror_t at_cntfac_get(const char *param)
+{
+	if(keep)
+		printf(AT CNTFAC"=");
+	printf("%0.2f\r\n",sensor.factor);
+	return AT_OK;
+}
 
 char *rtrim(char *str)
 {
@@ -347,7 +374,7 @@ char *rtrim(char *str)
 		if(str[i]=='\r' || str[i]=='\n')
 			str[i] = 0;
 	}
- 
+  
 	return str;
 }
 
@@ -367,9 +394,11 @@ void config_Set(void)
 		config_data[10+j]=user.uri[i+0]<<24 | user.uri[i+1]<<16 | user.uri[i+2]<<8 | user.uri[i+3];
 	
 	config_data[27]= sensor.GapValue*10 ;
+	config_data[28]= sensor.factor_number;
+	config_data[29]= sensor.factor*pow(10,sensor.factor_number);
 	
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,1);	
-	FLASH_program(FLASH_USER_START_ADDR_CONFIG,config_data, 28);
+	FLASH_program(FLASH_USER_START_ADDR_CONFIG,config_data, 30);
 }
 
 void config_Get(void)
@@ -385,7 +414,7 @@ void config_Get(void)
 	}
 
 	sys.mod = FLASH_read(add+8) >>24;
-	if(sys.mod == 0 || sys.mod > model5)
+	if(sys.mod == 0 || sys.mod > model6)
 		sys.mod = model1;
 		
 	sys.tdc = FLASH_read(add+8)  & 0x00FFFFFF;
@@ -395,6 +424,7 @@ void config_Get(void)
 	sys.inmod = FLASH_read(add+12)>>24;
 	if(sys.inmod != '0' && sys.inmod != '1' && sys.inmod != '2' && sys.inmod != '3')
 		sys.inmod = '0';
+	EX_GPIO_Init(sys.inmod-0x30);
 		
 	sys.power_time = FLASH_read(add+12) & 0x00FFFFFF;
 	
@@ -428,4 +458,9 @@ void config_Get(void)
 	sensor.GapValue = FLASH_read(0x0801906C)/10;
 	if(sensor.GapValue == 0)
 		sensor.GapValue = 400.0;
+	
+	sensor.factor_number = FLASH_read(0x08019070);
+	sensor.factor = (float)FLASH_read(0x08019074) / pow(10,sensor.factor_number);
+	if(sensor.factor == 0.0)
+		sensor.factor = 1.0;
 }

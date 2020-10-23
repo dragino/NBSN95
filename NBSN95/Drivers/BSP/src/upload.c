@@ -77,7 +77,7 @@ NBState sockCreat(void)
 	for(int i =0;i<(pch2 - pch1)-1;i++)
 		sprintf(singalBuff+strlen(singalBuff), "%c", nb.recieve_data[7+i]);
 	
-	int singal = atoi(singalBuff);
+	uint8_t singal = atoi(singalBuff);
 	
 	char singalbuff[3]={0};
 	sprintf(singalbuff+strlen(singalbuff), "%.2x", singal);

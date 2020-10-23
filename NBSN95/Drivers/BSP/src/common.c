@@ -45,7 +45,7 @@ void EX_GPIO_Init(uint8_t state)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
 	__HAL_RCC_GPIOB_CLK_ENABLE();
-	  /*Configure GPIO pin : PB14 */
+	/*Configure GPIO pin : PB14 */
   GPIO_InitStruct.Pin = GPIO_PIN_14;
 	if(state == 0)
 	{
@@ -60,12 +60,12 @@ void EX_GPIO_Init(uint8_t state)
 	else if(state == 2)
 	{
 		GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		GPIO_InitStruct.Pull = GPIO_PULLUP;
 	}
 	else if(state == 3)
   {
 		GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		GPIO_InitStruct.Pull = GPIO_PULLDOWN;
 	}
 	
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -76,6 +76,10 @@ void EX_GPIO_Init(uint8_t state)
 		HAL_NVIC_SetPriority(EXTI4_15_IRQn, 2, 0);
 		HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 	}
+	else
+	{
+		HAL_NVIC_DisableIRQ(EXTI4_15_IRQn);
+	}
 }
 
 void led_on(uint16_t time)
@@ -85,153 +89,6 @@ void led_on(uint16_t time)
 
 	HAL_GPIO_WritePin(GPIOA,GPIO_PIN_8,GPIO_PIN_RESET);
 	HAL_Delay(10);
-}
-
-void MyRtcInit(void)
-{
-	user_main_printf("Wait for calibration time");
-	
-	nb_send(nb.recieve_data,AT CCLK"?\n");
-	
-	char* colon = strchr(nb.recieve_data,':');
-	char* comma = strchr(nb.recieve_data,',');
-	char* carriage = strchr(nb.recieve_data,'O');
-	
-	char datebuff[10] = {0};
-	char timebuff[15] = {0};
-	char snapbuff[3] = {0};
-	
-	int year = 0,mounth = 0,date = 0;
-	int hour = 0,min = 0,		sec = 0 ;
-	int jet_lag = 0;
-	
-	for(int i = 0;i<(comma - colon)-1;i++)
-	{
-		datebuff[i] = nb.recieve_data[(comma - colon) +i-1];
-	}
-		
-	for(int i=0;i<3;i++)
-	{
-		memset(snapbuff,0,sizeof(snapbuff));
-		if(i == 0)
-		{
-			snapbuff[0]=datebuff[0];
-			snapbuff[1]=datebuff[1];
-			year = atoi(snapbuff);
-		}
-		else if(i == 1)
-		{
-			snapbuff[0]=datebuff[3];
-			snapbuff[1]=datebuff[4];
-			mounth = atoi(snapbuff);
-		}
-		else if(i == 2)
-		{
-			snapbuff[0]=datebuff[6];
-			snapbuff[1]=datebuff[7];
-			date = atoi(snapbuff);
-		}
-	}
-
-	for(int i = 0;i<(carriage - comma)-5;i++)
-	{
-		timebuff[i] = nb.recieve_data[(carriage - comma) +i+1];
-	}
-		
-	for(int i=0;i<4;i++)
-	{
-		memset(snapbuff,0,sizeof(snapbuff));
-		if(i == 0)
-		{
-			snapbuff[0]=timebuff[0];
-			snapbuff[1]=timebuff[1];
-			hour = atoi(snapbuff);
-		}
-		else if(i == 1)
-		{
-			snapbuff[0]=timebuff[3];
-			snapbuff[1]=timebuff[4];
-			min = atoi(snapbuff);
-		}
-		else if(i == 2)
-		{
-			snapbuff[0]=timebuff[6];
-			snapbuff[1]=timebuff[7];
-			sec = atoi(snapbuff);
-		}
-		else if(i == 3)
-		{
-			char* zheng = strchr(timebuff,'+');
-			char* fu = strchr(timebuff,'-');
-			if(zheng != NULL)
-				sprintf(snapbuff+strlen(snapbuff), "%s", &timebuff[zheng-timebuff +1]);
-			else if(fu != NULL)
-				sprintf(snapbuff+strlen(snapbuff), "%s", &timebuff[fu-timebuff +1]);
-			
-			jet_lag = atoi(snapbuff);
-			if(jet_lag > 0)
-			{
-				if(zheng != NULL)
-				{
-					hour = hour + jet_lag/4;
-					if(hour >= 24)
-						hour = hour - 24;
-				}
-				else if(fu != NULL)
-				{
-					hour = hour - jet_lag/4;
-					if(hour < 0)
-						hour =  24 + hour ;
-				}
-			}
-		}		
-	}
-	
-	RTC_TimeTypeDef sTime = {0};
-  RTC_DateTypeDef sDate = {0};
-
-  /** Initialize RTC Only 
-  */
-  hrtc.Instance = RTC;
-  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
-  hrtc.Init.AsynchPrediv = 127;
-  hrtc.Init.SynchPrediv = 255;
-  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
-  hrtc.Init.OutPutRemap = RTC_OUTPUT_REMAP_NONE;
-  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
-  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
-  if (HAL_RTC_Init(&hrtc) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /* USER CODE BEGIN Check_RTC_BKUP */
-    
-  /* USER CODE END Check_RTC_BKUP */
-
-  /** Initialize RTC and set the Time and Date 
-  */
-  sTime.Hours = (hour )%10+(hour )/10*16;
-  sTime.Minutes = (min )%10+(min )/10*16;
-  sTime.Seconds = (sec )%10+(sec )/10*16;
-  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
-  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
-  sDate.Month = (mounth )%10+(mounth )/10*16;;
-  sDate.Date = (date )%10+(date )/10*16;;
-  sDate.Year = (year )%10+(year )/10*16;;
-
-  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
-  {
-    Error_Handler();
-  }
-	user_main_printf("Calibration time completed");
-	HAL_IWDG_Refresh(&hiwdg);
-	My_AlarmInit(18,1);
 }
 
 void i2cDetection(void)
@@ -287,6 +144,12 @@ char* payLoadDeal(uint8_t model,char* payload)
 	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_RESET);
 	HAL_Delay(500+sys.power_time);
 	
+	if(model != model6)
+	{
+		if(sensor.exit_count>255)
+			sensor.exit_count = 255;
+	}
+	
 	if(model == model1)
 	{
 		sensor.batteryLevel_mV = getVoltage();
@@ -303,10 +166,11 @@ char* payLoadDeal(uint8_t model,char* payload)
 		sprintf(payload+strlen(payload), "%.2x", 0xFF);
 		sprintf(payload+strlen(payload), "%.2x", sys.mod - 0x30);
 		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_1);		
-		sprintf(payload+strlen(payload), "%.2x", sensor.exit_count);
+		sprintf(payload+strlen(payload), "%.2x", sensor.exit_flag);
 		sprintf(payload+strlen(payload), "%.4x", sensor.adc0);
 		sprintf(payload+strlen(payload), "%.4x", sensor.temSHT);
 		sprintf(payload+strlen(payload), "%.4x", sensor.humSHT);
+		sprintf(payload+strlen(payload), "%.8x", sensor.exit_count);
 	}
 	else if(model == model2)
 	{
@@ -327,7 +191,7 @@ char* payLoadDeal(uint8_t model,char* payload)
 		sprintf(payload+strlen(payload), "%.2x", 0xFF);
 		sprintf(payload+strlen(payload), "%.2x", sys.mod - 0x30);		
 		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_1);
-		sprintf(payload+strlen(payload), "%.2x", sensor.exit_count);
+		sprintf(payload+strlen(payload), "%.2x", sensor.exit_flag);
 		sprintf(payload+strlen(payload), "%.4x", sensor.adc0);		
 		sprintf(payload+strlen(payload), "%.4x", sensor.distance);
 	}
@@ -349,7 +213,7 @@ char* payLoadDeal(uint8_t model,char* payload)
 		sprintf(payload+strlen(payload), "%.2x", sys.mod - 0x30);		
 		
 		sprintf(payload+strlen(payload), "%.4x", sensor.adc0);
-		sprintf(payload+strlen(payload), "%.2x", sensor.exit_count);
+		sprintf(payload+strlen(payload), "%.2x", sensor.exit_flag);
 		sprintf(payload+strlen(payload), "%.4x", sensor.adc1);
 		sprintf(payload+strlen(payload), "%.4x", sensor.temSHT);
 		sprintf(payload+strlen(payload), "%.4x", sensor.humSHT);
@@ -369,7 +233,7 @@ char* payLoadDeal(uint8_t model,char* payload)
 				
 		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_1);
 		sprintf(payload+strlen(payload), "%.4x", sensor.adc0);
-		sprintf(payload+strlen(payload), "%.2x", sensor.exit_count);
+		sprintf(payload+strlen(payload), "%.2x", sensor.exit_flag);
 		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_2);
 		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_3);
 	}
@@ -392,10 +256,22 @@ char* payLoadDeal(uint8_t model,char* payload)
 		sprintf(payload+strlen(payload), "%.2x", sys.mod - 0x30);
 		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_1);
 		sprintf(payload+strlen(payload), "%.4x", sensor.adc0);
-		sprintf(payload+strlen(payload), "%.2x", sensor.exit_count);
+		sprintf(payload+strlen(payload), "%.2x", sensor.exit_flag);
 		sprintf(payload+strlen(payload), "%.4x", Weight);
 	}
+	else if(model == model6)
+	{
+		sensor.batteryLevel_mV = getVoltage();
+		
+		sprintf(payload+strlen(payload), "%.4x", sensor.batteryLevel_mV);
+		sprintf(payload+strlen(payload), "%.2x", 0xFF);
+		sprintf(payload+strlen(payload), "%.2x", sys.mod - 0x30);
+		sprintf(payload+strlen(payload), "%.2x", (int)(sensor.factor*pow(10,sensor.factor_number)));
+		sprintf(payload+strlen(payload), "%.2x", sensor.factor_number);
+		sprintf(payload+strlen(payload), "%.8x", sensor.exit_count);
+	}
 	
+	sensor.exit_flag = 0;
 	user_main_debug("payload:%s\r\n",(payload));
 
 	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_SET);

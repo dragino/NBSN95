@@ -41,6 +41,7 @@ typedef enum
 #define CPSMS		"+CPSMS"										/* PSM Setting. */
 #define CCLK		"+CCLK"										  /* GET time. */
 #define CGPADDR "+CGPADDR"									/* GET IP. */
+#define CGSN 		"+CGSN"											/* GET IMEI. */
 
 #define NSOCL		"+NSOCL"										/* closed socked */
 #define NSOCR		"+NSOCR"										/* Create SOCKET */
@@ -71,5 +72,6 @@ NBState nb_Init(void);
 NBState nb_netAccess(void);
 NBState nb_CIMI(void);
 NBState nb_Reboot(void);
+NBState nb_CGSN(void);
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
