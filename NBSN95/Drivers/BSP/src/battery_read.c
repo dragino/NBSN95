@@ -60,7 +60,7 @@ uint16_t ADCModel(uint32_t channel)
 		user_main_printf("adc_mV(2):%.2f",adc_mV);
 	else if(channel == ADC_CHANNEL_4)
 		user_main_printf("adc_mV(3):%.2f",adc_mV);
-
+//	return adc_mV*100;
 	uint16_t adc_mV_=adc_mV;
 	return adc_mV_;
 }

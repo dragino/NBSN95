@@ -29,9 +29,8 @@
 #define _5VT    	 "+5VT"
 #define WEIGRE     "+WEIGRE"
 #define WEIGAP     "+WEIGAP"
-#define CNTFAC     "+CNTFAC"
 /**********************************************/
-#define addressDefault     "120.24.4.116:5683"	//Test server
+#define addressDefault     "120.24.4.116:5683"
 
 typedef enum
 {
@@ -76,8 +75,6 @@ ATEerror_t at_weight_reset(const char *param);
 ATEerror_t at_weight_get(const char *param);
 ATEerror_t at_weight_GapValue_set(const char *param);
 ATEerror_t at_weight_GapValue_get(const char *param);
-ATEerror_t at_cntfac_set(const char *param);
-ATEerror_t at_cntfac_get(const char *param);
 
 ATEerror_t at_return_error(const char *param);
 
@@ -220,17 +217,6 @@ static const struct ATCommand_s ATCommand[] =
     .get = at_weight_get,
     .set = at_return_error,
     .run = at_weight_reset,
-  },
-			/** AT+CNTFAC **/	
-	{
-    .string = AT CNTFAC,
-		.size_string = sizeof(CNTFAC) - 1,
-#ifndef NO_HELP
-    .help_string = AT CNTFAC "  : Get or set counting parameters",
-#endif
-    .get = at_cntfac_get,
-    .set = at_cntfac_set,
-    .run = at_return_error,
   },
 			/** AT+WEIGAP **/	
 	{

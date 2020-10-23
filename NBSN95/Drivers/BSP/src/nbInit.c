@@ -36,15 +36,6 @@ NBState nb_Init(void)
 	
 	HAL_Delay(500);
 	
-	if(nb_CGSN() == success)
-	{
-		char buff[20]={0};
-		char *pch = strchr(nb.recieve_data,':');
-		char *pch1 = strchr(nb.recieve_data,'O');
-		strncpy(buff, pch +1,pch1 - pch -5);
-		user_main_printf("The IMEI number is:%s.",buff);
-	}
-	
 	if(nb_CIMI() == fail)
 	{
 		user_main_printf("No card detected");
@@ -52,7 +43,7 @@ NBState nb_Init(void)
 	}
 	else
 	{
-		user_main_printf("The IMSI number is:%s.",nb.imei);
+		user_main_printf("The IMSI number is:%s",nb.imei);
 	}
 	
 	user_main_printf("BC95 initialized successfully\r\n");
@@ -85,7 +76,6 @@ NBState nb_CIMI(void)
 NBState nb_netAccess(void)
 {	
 	uint8_t errorNum=0;
-	user_main_printf("Connecting to the network, please do not operate......");
 	do
 	{
 		nb_send(nb.recieve_data,AT CSQ"\n");
@@ -131,9 +121,4 @@ NBState nb_netAccess(void)
 NBState nb_Reboot(void)
 {	
 	return nb_send(nb.recieve_data,AT NRB"\n");
-}
-
-NBState nb_CGSN(void)
-{
-	return nb_send(nb.recieve_data,AT CGSN"=1\n");
 }

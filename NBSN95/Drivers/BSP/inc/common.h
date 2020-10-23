@@ -3,7 +3,6 @@
 #define __COMMON_H__
 
 #include "stm32l0xx_hal.h"
-#include "math.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
@@ -41,7 +40,7 @@
  * @retval None
  */
 
-#define version "v1.0.1"
+#define version "v1.0.0"
 #define stack 	"D-BC95-001"
 
 typedef enum
@@ -51,7 +50,6 @@ typedef enum
  model3 ,
  model4 ,
  model5 ,
- model6 ,	
 }MODEL;
 
 typedef struct
@@ -61,8 +59,8 @@ typedef struct
 	uint8_t  mod;				   //mode
 	uint8_t  uplink_flag;  //Send flag
 	uint8_t  inmod;			   //Interrupt mode
-	int 		 tdc;				   //Send cycle
-	int 		 power_time;	 //Power on time 
+	int      tdc;				   //Send cycle
+	int      power_time;	 //Power on time
 	uint16_t uplink_count; //Number of postings
 }SYSTEM;
 
@@ -74,10 +72,8 @@ typedef struct
 
 typedef struct
 {
-	uint8_t  exit_flag;
-	uint8_t  factor_number;
-	float    factor;
-	uint32_t exit_count;
+//	uint8_t  signal;
+	uint16_t exit_count;
 	uint16_t temDs18b20_1;
 	uint16_t temDs18b20_2;
 	uint16_t temDs18b20_3;
@@ -89,7 +85,7 @@ typedef struct
 	uint16_t adc4;
 	uint16_t distance;
 	float GapValue;
-	char data[37];
+	char data[32];
 }SENSOR;
 
 
@@ -105,7 +101,7 @@ void product_information_print(void);
 void EX_GPIO_Init(uint8_t state);
 void led_on(uint16_t time);
 uint8_t uplink(void);
-
+void MyRtcInit(void);
 char* payLoadDeal(uint8_t model,char* payload);
 void i2cDetection(void);
 
