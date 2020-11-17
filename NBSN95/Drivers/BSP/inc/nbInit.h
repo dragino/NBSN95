@@ -32,6 +32,7 @@ typedef enum
 #define NRB			"+NRB"											/* restart */
 #define CIMI		"+CIMI"											/* CIMI */
 #define NABND		"+NBAND"										/* Frequency band */
+#define ATE  		"ATE"                     	/* Print echo */
 
 #define CGATT		"+CGATT"										/* Connect to the network*/
 #define CFUN		"+CFUN"											/* Set the UE function */
@@ -41,6 +42,7 @@ typedef enum
 #define CPSMS		"+CPSMS"										/* PSM Setting. */
 #define CCLK		"+CCLK"										  /* GET time. */
 #define CGPADDR "+CGPADDR"									/* GET IP. */
+#define CGSN 		"+CGSN"											/* GET IMEI. */
 
 #define NSOCL		"+NSOCL"										/* closed socked */
 #define NSOCR		"+NSOCR"										/* Create SOCKET */
@@ -71,5 +73,7 @@ NBState nb_Init(void);
 NBState nb_netAccess(void);
 NBState nb_CIMI(void);
 NBState nb_Reboot(void);
+NBState nb_CGSN(void);
+NBState nb_ATE(void);
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -32,6 +32,6 @@ typedef struct TimerEvent_s
 } TimerEvent_t;
 
 void My_AlarmInit(uint16_t timer,uint8_t alarmX);
-
+void MyRtcInit(void);
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -65,6 +65,7 @@ static uint8_t pwd_time_count = 0;
 
 static uint8_t inter_access_status = 0;
 
+static uint8_t interrupt_flag = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -101,7 +102,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-	HAL_Delay(3000);
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -113,18 +114,28 @@ int main(void)
   MX_RTC_Init();
   MX_ADC_Init();
   /* USER CODE BEGIN 2 */
-	HAL_Delay(100);
+	product_information_print();
+	user_main_printf("Waiting for BC95 response......");
+	led_on(100);	
+	
+	//Skip BC95 to start printing data
+	HAL_Delay(3000);	
+	for(uint8_t i=0;i<4;i++)
+	{
+		HAL_Delay(500);
+		while((hlpuart1.Instance->ISR & (uint32_t)0x10) == 0x0) 
+			HAL_Delay(10);
+	}
+	
 	HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
 	HAL_UART_Receive_DMA(&hlpuart1,(uint8_t*)&rxbuf_lp,RXSIZE);
 	My_UARTEx_StopModeWakeUp(&huart2);		//Enable serial port wake up
-	led_on(100);
-	
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	product_information_print();
-	
+		
 	if(nb_Init()==fail)
 	{
 		user_main_printf("BC95 failed to initialize, try to restart after 10 seconds\r\n");
@@ -178,7 +189,6 @@ int main(void)
 		{
 			rxlen = 0;
 			uart2_recieve_flag = 0;
-			UART2_ENABLE_RE();
 			HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
 			memset(rxDATA,0,sizeof(rxDATA));
 		}
@@ -198,7 +208,7 @@ int main(void)
 				
 				nb_send(nb.recieve_data,AT CGPADDR "\n");	//Get IP address			
 				char *pch = strchr(nb.recieve_data,',');
-				if(pch != NULL)			
+				if(pch != NULL)
 				{
 					printf("The IP address of the module:");		
 					for(;pch[1]!='O';pch++)
@@ -207,7 +217,6 @@ int main(void)
 				
 				nb_send(nb.recieve_data,AT CPSMS "=1,,,01000001,00000000\n");	//Closed T3324
 				nb.net_flag = success;
-				MyRtcInit();
 				led_on(3000);
 			}
 		}
@@ -219,7 +228,8 @@ int main(void)
 			if(uplink() == success)
 			{
 				led_on(500);
-				My_AlarmInit(sys.tdc,0);
+				if(interrupt_flag == 0)
+					My_AlarmInit(sys.tdc,0);
 			}
 			else 
 			{
@@ -227,7 +237,8 @@ int main(void)
 				My_AlarmInit(180,0);
 			}
 			
-			sys.uplink_flag =1;
+			sys.uplink_flag = 1;
+			interrupt_flag = 0;
 		}
 #endif
 		
@@ -313,8 +324,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	{			
 		rxDATA[rxlen++] = rxbuf;
 		if(rxbuf == '\r' || rxbuf == '\n')
-		{		
-			UART2_DISABLE_RE(); 			
+		{			
 			uart2_recieve_flag = 1;		
 		}
 		HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
@@ -350,6 +360,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == GPIO_PIN_14)
 	{
+		interrupt_flag = 1;
+		sensor.exit_flag=1;
 		sensor.exit_count++;
 		sys.uplink_flag = 0;
 		LPM_DisableStopMode();
@@ -399,6 +411,48 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
     }
 		MX_LPUART1_UART_Init();
 		HAL_UART_Receive_DMA(&hlpuart1,(uint8_t*)&rxbuf_lp,RXSIZE);
+	}
+	else if(huart == &huart2)
+	{
+		uint32_t isrflags = READ_REG(huart->Instance->ISR);
+		switch(huart->ErrorCode)
+    {
+				case HAL_UART_ERROR_NONE:
+						user_main_error("HAL_UART_ERROR_NONE\r\n");
+						break;
+				case HAL_UART_ERROR_PE:
+						user_main_error("HAL_UART_ERROR_PE\r\n");
+						READ_REG(huart->Instance->RDR);//PE清标志，第二步读DR
+						READ_REG(huart->Instance->TDR);
+						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_PE);//清标志
+						break;
+				case HAL_UART_ERROR_NE:
+						user_main_error("HAL_UART_ERROR_NE\r\n");
+						READ_REG(huart->Instance->RDR);//NE清标志，第二步读DR
+						READ_REG(huart->Instance->TDR);
+						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_NE);//清标志
+						break;
+				case HAL_UART_ERROR_FE:
+						user_main_error("HAL_UART_ERROR_FE\r\n");
+						READ_REG(huart->Instance->RDR);//FE清标志，第二步读DR
+						READ_REG(huart->Instance->TDR);
+						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_FE);//清标志
+						break;
+				case HAL_UART_ERROR_ORE:
+						user_main_error("HAL_UART_ERROR_ORE\r\n");
+						READ_REG(huart->Instance->RDR);//ORE清标志，第二步读DR
+						READ_REG(huart->Instance->TDR);
+						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_ORE);//清标志
+						break;
+				case HAL_UART_ERROR_DMA:
+						user_main_error("HAL_UART_ERROR_DMA\r\n");
+						break;
+				default:
+						user_main_error("other\r\n");
+						break;
+    }
+		MX_USART2_UART_Init();
+		HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
 	}
 }
 /* USER CODE END 4 */

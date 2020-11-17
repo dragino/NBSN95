@@ -47,13 +47,9 @@ void MX_USART2_UART_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
-#define user_main_printf(format, ...) do{																								\
-																				RTC_DateTypeDef sdatestructureget;			\
-																				RTC_TimeTypeDef stimestructureget;			\
-																				HAL_RTC_GetTime(&hrtc, &stimestructureget, RTC_FORMAT_BIN);	\
-																				HAL_RTC_GetDate(&hrtc, &sdatestructureget, RTC_FORMAT_BIN);	\
-																				printf("[%.2d-%.2d-%.2d ", sdatestructureget.Year,sdatestructureget.Month, sdatestructureget.Date);	\
-																				printf(" %.2d:%.2d:%.2d]", stimestructureget.Hours, stimestructureget.Minutes, stimestructureget.Seconds);		\
+#define user_main_printf(format, ...) do{																							\
+																				uint32_t time = HAL_GetTick();								\
+																				printf("[%d]", time);													\
 																				printf( format "\r\n", ##__VA_ARGS__);				\
 																			}while(0)
 

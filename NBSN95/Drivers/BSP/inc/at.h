@@ -29,8 +29,11 @@
 #define _5VT    	 "+5VT"
 #define WEIGRE     "+WEIGRE"
 #define WEIGAP     "+WEIGAP"
+#define CNTFAC     "+CNTFAC"
+#define PRO     	 "+PRO"
+#define CFM     	 "+CFM"
 /**********************************************/
-#define addressDefault     "120.24.4.116:5683"
+#define addressDefault     "120.24.4.116:5683"	//Test server
 
 typedef enum
 {
@@ -75,6 +78,12 @@ ATEerror_t at_weight_reset(const char *param);
 ATEerror_t at_weight_get(const char *param);
 ATEerror_t at_weight_GapValue_set(const char *param);
 ATEerror_t at_weight_GapValue_get(const char *param);
+ATEerror_t at_cntfac_set(const char *param);
+ATEerror_t at_cntfac_get(const char *param);
+ATEerror_t at_pro_set(const char *param);
+ATEerror_t at_pro_get(const char *param);
+ATEerror_t at_cfm_set(const char *param);
+ATEerror_t at_cfm_get(const char *param);
 
 ATEerror_t at_return_error(const char *param);
 
@@ -218,6 +227,17 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_return_error,
     .run = at_weight_reset,
   },
+			/** AT+CNTFAC **/	
+	{
+    .string = AT CNTFAC,
+		.size_string = sizeof(CNTFAC) - 1,
+#ifndef NO_HELP
+    .help_string = AT CNTFAC "  : Get or set counting parameters",
+#endif
+    .get = at_cntfac_get,
+    .set = at_cntfac_set,
+    .run = at_return_error,
+  },
 			/** AT+WEIGAP **/	
 	{
     .string = AT WEIGAP,
@@ -227,6 +247,28 @@ static const struct ATCommand_s ATCommand[] =
 #endif
     .get = at_weight_GapValue_get,
     .set = at_weight_GapValue_set,
+    .run = at_return_error,
+  },
+			/** AT+PRO **/	
+	{
+    .string = AT PRO,
+		.size_string = sizeof(PRO) - 1,
+#ifndef NO_HELP
+    .help_string = AT PRO "     : Get or set usage agreement(1:COAP,2:UDP,3:MQTT)",
+#endif
+    .get = at_pro_get,
+    .set = at_pro_set,
+    .run = at_return_error,
+  },
+			/** AT+CFM **/	
+	{
+    .string = AT CFM,
+		.size_string = sizeof(CFM) - 1,
+#ifndef NO_HELP
+    .help_string = AT CFM "     : Get or set confirmation mode(0: Off 1: On)",
+#endif
+    .get = at_cfm_get,
+    .set = at_cfm_set,
     .run = at_return_error,
   },
 };
