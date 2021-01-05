@@ -84,11 +84,11 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
   /* USER CODE END LPUART1_MspInit 0 */
     /* LPUART1 clock enable */
     __HAL_RCC_LPUART1_CLK_ENABLE();
-  
+
     __HAL_RCC_GPIOB_CLK_ENABLE();
-    /**LPUART1 GPIO Configuration    
+    /**LPUART1 GPIO Configuration
     PB10     ------> LPUART1_RX
-    PB11     ------> LPUART1_TX 
+    PB11     ------> LPUART1_TX
     */
     GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -146,11 +146,11 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
   /* USER CODE END USART2_MspInit 0 */
     /* USART2 clock enable */
     __HAL_RCC_USART2_CLK_ENABLE();
-  
+
     __HAL_RCC_GPIOA_CLK_ENABLE();
-    /**USART2 GPIO Configuration    
+    /**USART2 GPIO Configuration
     PA2     ------> USART2_TX
-    PA3     ------> USART2_RX 
+    PA3     ------> USART2_RX
     */
     GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -178,10 +178,10 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
   /* USER CODE END LPUART1_MspDeInit 0 */
     /* Peripheral clock disable */
     __HAL_RCC_LPUART1_CLK_DISABLE();
-  
-    /**LPUART1 GPIO Configuration    
+
+    /**LPUART1 GPIO Configuration
     PB10     ------> LPUART1_RX
-    PB11     ------> LPUART1_TX 
+    PB11     ------> LPUART1_TX
     */
     HAL_GPIO_DeInit(GPIOB, GPIO_PIN_10|GPIO_PIN_11);
 
@@ -202,10 +202,10 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
   /* USER CODE END USART2_MspDeInit 0 */
     /* Peripheral clock disable */
     __HAL_RCC_USART2_CLK_DISABLE();
-  
-    /**USART2 GPIO Configuration    
+
+    /**USART2 GPIO Configuration
     PA2     ------> USART2_TX
-    PA3     ------> USART2_RX 
+    PA3     ------> USART2_RX
     */
     HAL_GPIO_DeInit(GPIOA, GPIO_PIN_2|GPIO_PIN_3);
 
@@ -215,7 +215,7 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 
   /* USER CODE END USART2_MspDeInit 1 */
   }
-} 
+}
 
 /* USER CODE BEGIN 1 */
 
@@ -247,7 +247,7 @@ PUTCHAR_PROTOTYPE
   /* Place your implementation of fputc here */
   /* e.g. write a character to the USART2 and Loop until the end of transmission */
   HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 0xFF);
-	__HAL_UART_CLEAR_IDLEFLAG(&huart2);//清除标志位
+	__HAL_UART_CLEAR_IDLEFLAG(&huart2);
   return ch;
 }
 

@@ -13,27 +13,33 @@
 #define AT      	 "AT"
 #define RESET      "Z"
 #define CFGMOD     "+CFGMOD"
+#define DEUI     	 "+DEUI"
 
 #define SERVADDR   "+SERVADDR"
 #define URI   		 "+URI"
 
 #define FDR        "+FDR"
-#define DADDR      "+DADDR"
 #define TDC        "+TDC"
 #define PWORD      "+PWORD"
 #define CFG        "+CFG"
 #define INTMOD		 "+INTMOD"
 
+#define CLIENT	 	 "+CLIENT"
+#define UNAME			 "+UNAME"
+#define PWD				 "+PWD"
+#define PUBTOPIC	 "+PUBTOPIC"
+#define SUBTOPIC	 "+SUBTOPIC"
+
 #define CLRCOUNT   "+CLRCOUNT"
-#define COUTIME    "+COUTIME"
 #define _5VT    	 "+5VT"
+
+#define PRO     	 "+PRO"
+#define CFM     	 "+CFM"
+#define RXDL     	 "+RXDL"
 #define WEIGRE     "+WEIGRE"
 #define WEIGAP     "+WEIGAP"
 #define CNTFAC     "+CNTFAC"
-#define PRO     	 "+PRO"
-#define CFM     	 "+CFM"
 /**********************************************/
-#define addressDefault     "120.24.4.116:5683"	//Test server
 
 typedef enum
 {
@@ -64,31 +70,54 @@ ATEerror_t at_pword_get(const char *param);
 ATEerror_t at_pword_set(const char *param);
 ATEerror_t at_fdr_run(const char *param);
 ATEerror_t at_cfg_run(const char *param);
+
+ATEerror_t at_deui_set(const char *param);
+ATEerror_t at_deui_get(const char *param);
+
 ATEerror_t at_servaddr_get(const char *param);
 ATEerror_t at_servaddr_set(const char *param);
+
 ATEerror_t at_uri_get(const char *param);
 ATEerror_t at_uri_set(const char *param);
+
+ATEerror_t at_client_get(const char *param);
+ATEerror_t at_client_set(const char *param);
+ATEerror_t at_uname_get(const char *param);
+ATEerror_t at_uname_set(const char *param);
+ATEerror_t at_pwd_get(const char *param);
+ATEerror_t at_pwd_set(const char *param);
+ATEerror_t at_pubtopic_get(const char *param);
+ATEerror_t at_pubtopic_set(const char *param);
+ATEerror_t at_subtopic_get(const char *param);
+ATEerror_t at_subtopic_set(const char *param);
 ATEerror_t at_tdc_get(const char *param);
 ATEerror_t at_tdc_set(const char *param);
 ATEerror_t at_inmod_set(const char *param);
 ATEerror_t at_inmod_get(const char *param);
 ATEerror_t at_5vt_set(const char *param);
 ATEerror_t at_5vt_get(const char *param);
-ATEerror_t at_weight_reset(const char *param);
-ATEerror_t at_weight_get(const char *param);
-ATEerror_t at_weight_GapValue_set(const char *param);
-ATEerror_t at_weight_GapValue_get(const char *param);
 ATEerror_t at_cntfac_set(const char *param);
 ATEerror_t at_cntfac_get(const char *param);
 ATEerror_t at_pro_set(const char *param);
 ATEerror_t at_pro_get(const char *param);
 ATEerror_t at_cfm_set(const char *param);
 ATEerror_t at_cfm_get(const char *param);
+ATEerror_t at_rxdl_set(const char *param);
+ATEerror_t at_rxdl_get(const char *param);
+
+ATEerror_t at_weight_reset(const char *param);
+ATEerror_t at_weight_get(const char *param);
+ATEerror_t at_weight_GapValue_set(const char *param);
+ATEerror_t at_weight_GapValue_get(const char *param);
+
+ATEerror_t at_cntfac_set(const char *param);
+ATEerror_t at_cntfac_get(const char *param);
 
 ATEerror_t at_return_error(const char *param);
 
 /*Other*/
 char *rtrim(char *str);
+uint8_t hexDetection(char* str);
 void config_Set(void);
 void config_Get(void);
 
@@ -128,7 +157,18 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_mod_set,
     .run = at_return_error,
   },
-	/** AT+PWORD **/	
+	/** AT+DEUI **/	
+  {
+    .string = AT DEUI,
+		.size_string = sizeof(DEUI) - 1,
+#ifndef NO_HELP
+    .help_string = AT DEUI "    : Get or set the Device ID",
+#endif
+    .get = at_deui_get,
+    .set = at_deui_set,
+    .run = at_return_error,
+  },
+	/** AT+PWORD **/
 	{
     .string = AT PWORD,
 		.size_string = sizeof(PWORD) - 1,
@@ -172,15 +212,70 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_servaddr_set,
     .run = at_return_error,
   },
-		/** AT+URI **/	
+			/** AT+URI **/	
 	{
     .string = AT URI,
 		.size_string = sizeof(URI) - 1,
 #ifndef NO_HELP
-    .help_string = AT URI "     : Get or Set the Resource parameters",
+    .help_string = AT URI "   : Get or set CoAP options",
 #endif
     .get = at_uri_get,
     .set = at_uri_set,
+    .run = at_return_error,
+  },
+		/** AT+CLIENT **/	
+	{
+    .string = AT CLIENT,
+		.size_string = sizeof(CLIENT) - 1,
+#ifndef NO_HELP
+    .help_string = AT CLIENT "  : Get or Set the MQTT clientID",
+#endif
+    .get = at_client_get,
+    .set = at_client_set,
+    .run = at_return_error,
+  },	
+	/** AT+UNAME **/	
+	{
+    .string = AT UNAME,
+		.size_string = sizeof(UNAME) - 1,
+#ifndef NO_HELP
+    .help_string = AT UNAME "   : Get or Set the MQTT Username",
+#endif
+    .get = at_uname_get,
+    .set = at_uname_set,
+    .run = at_return_error,
+  },
+	/** AT+PWD **/	
+	{
+    .string = AT PWD,
+		.size_string = sizeof(PWD) - 1,
+#ifndef NO_HELP
+    .help_string = AT PWD "     : Get or Set the MQTT password",
+#endif
+    .get = at_pwd_get,
+    .set = at_pwd_set,
+    .run = at_return_error,
+  },
+	/** AT+PUBTOPIC **/	
+	{
+    .string = AT PUBTOPIC,
+		.size_string = sizeof(PUBTOPIC) - 1,
+#ifndef NO_HELP
+    .help_string = AT PUBTOPIC ": Get or set MQTT publishing topic",
+#endif
+    .get = at_pubtopic_get,
+    .set = at_pubtopic_set,
+    .run = at_return_error,
+  },
+	/** AT+SUBTOPIC **/	
+	{
+    .string = AT SUBTOPIC,
+		.size_string = sizeof(SUBTOPIC) - 1,
+#ifndef NO_HELP
+    .help_string = AT SUBTOPIC ": Get or set MQTT subscription topic",
+#endif
+    .get = at_subtopic_get,
+    .set = at_subtopic_set,
     .run = at_return_error,
   },
 		/** AT+TDC **/	
@@ -194,18 +289,18 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_tdc_set,
     .run = at_return_error,
   },
-		/** AT+INMOD **/	
+		/** AT+INTMOD **/	
 	{
     .string = AT INTMOD,
 		.size_string = sizeof(INTMOD) - 1,
 #ifndef NO_HELP
-    .help_string = AT INTMOD "  : Get or Set the trigger interrupt mode\r\n(0:Disable,1:falling or rising,2:falling,3:rising)",
+    .help_string = AT INTMOD "  : Get or Set the trigger interrupt mode (0:Disable,1:falling or rising,2:falling,3:rising)",
 #endif
     .get = at_inmod_get,
     .set = at_inmod_set,
     .run = at_return_error,
   },
-			/** AT+5VT **/	
+	/** AT+5VT **/	
 	{
     .string = AT _5VT,
 		.size_string = sizeof(_5VT) - 1,
@@ -216,12 +311,56 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_5vt_set,
     .run = at_return_error,
   },
+			/** AT+PRO **/	
+	{
+    .string = AT PRO,
+		.size_string = sizeof(PRO) - 1,
+#ifndef NO_HELP
+    .help_string = AT PRO "     : Get or Set usage agreement (1:COAP,2:UDP,3:MQTT,4:TCP)",
+#endif
+    .get = at_pro_get,
+    .set = at_pro_set,
+    .run = at_return_error,
+  },
+			/** AT+CFM **/	
+	{
+    .string = AT CFM,
+		.size_string = sizeof(CFM) - 1,
+#ifndef NO_HELP
+    .help_string = AT CFM "     : Get or Set confirmation mode (0: Off 1: On)",
+#endif
+    .get = at_cfm_get,
+    .set = at_cfm_set,
+    .run = at_return_error,
+  },
+			/** AT+RXDL **/	
+	{
+    .string = AT RXDL,
+		.size_string = sizeof(RXDL) - 1,
+#ifndef NO_HELP
+    .help_string = AT RXDL "    : Get or Set the receiving time",
+#endif
+    .get = at_rxdl_get,
+    .set = at_rxdl_set,
+    .run = at_return_error,
+  },
+			/** AT+WEIGAP **/	
+	{
+    .string = AT WEIGAP,
+		.size_string = sizeof(WEIGAP) - 1,
+#ifndef NO_HELP
+    .help_string = AT WEIGAP "  : Get or Set the GapValue of weight",
+#endif
+    .get = at_weight_GapValue_get,
+    .set = at_weight_GapValue_set,
+    .run = at_return_error,
+  },
 			/** AT+WEIGRE **/	
 	{
     .string = AT WEIGRE,
 		.size_string = sizeof(WEIGRE) - 1,
 #ifndef NO_HELP
-    .help_string = AT WEIGRE "  : Set the weight to 0g",
+    .help_string = AT WEIGRE "  : Get weight or set weight to 0g",
 #endif
     .get = at_weight_get,
     .set = at_return_error,
@@ -236,39 +375,6 @@ static const struct ATCommand_s ATCommand[] =
 #endif
     .get = at_cntfac_get,
     .set = at_cntfac_set,
-    .run = at_return_error,
-  },
-			/** AT+WEIGAP **/	
-	{
-    .string = AT WEIGAP,
-		.size_string = sizeof(WEIGAP) - 1,
-#ifndef NO_HELP
-    .help_string = AT WEIGAP "  : Get or Set the GapValue of weight",
-#endif
-    .get = at_weight_GapValue_get,
-    .set = at_weight_GapValue_set,
-    .run = at_return_error,
-  },
-			/** AT+PRO **/	
-	{
-    .string = AT PRO,
-		.size_string = sizeof(PRO) - 1,
-#ifndef NO_HELP
-    .help_string = AT PRO "     : Get or set usage agreement(1:COAP,2:UDP,3:MQTT)",
-#endif
-    .get = at_pro_get,
-    .set = at_pro_set,
-    .run = at_return_error,
-  },
-			/** AT+CFM **/	
-	{
-    .string = AT CFM,
-		.size_string = sizeof(CFM) - 1,
-#ifndef NO_HELP
-    .help_string = AT CFM "     : Get or set confirmation mode(0: Off 1: On)",
-#endif
-    .get = at_cfm_get,
-    .set = at_cfm_set,
     .run = at_return_error,
   },
 };

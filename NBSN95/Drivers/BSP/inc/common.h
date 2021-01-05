@@ -14,15 +14,13 @@
 #include "nbInit.h"
 #include "at.h"
 #include "time_server.h"
+#include "battery_read.h"
 #include "ds18b20.h"
 #include "sht20.h"
 #include "sht31.h"
-#include "ultrasound.h"
 #include "lidar.h"
+#include "ultrasound.h"
 #include "weight.h"
-#include "battery_read.h"
-
-#include "upload.h"
 
 #ifdef __cplusplus
  extern "C" {
@@ -41,12 +39,14 @@
  * @retval None
  */
 
-#define version "v1.0.2"
-#define stack 	"D-BC95-001"
+#define version 	"v1.1.0"
+#define version_s "110"
+#define stack 		"D-BC95-002"
 
 #define COAP_PRO  0x01
 #define UDP_PRO   0x02
 #define MQTT_PRO  0x03
+#define TCP_PRO   0x04
 
 typedef enum
 {
@@ -63,26 +63,31 @@ typedef struct
 	uint32_t pwd[3];		   //System password
 	uint8_t  pwd_flag;		 //Password correct flag
 	uint8_t  mod;				   //mode
-	uint8_t  uplink_flag;  //Send flag
 	uint8_t  inmod;			   //Interrupt mode
 	int 		 tdc;				   //Send cycle
 	int 		 power_time;	 //Power on time 
 	uint16_t uplink_count; //Number of postings
 	uint8_t  protocol;		 //protocol
 	uint8_t  cfm;					 //Confirm mode flag
+	uint16_t rxdl;				 //Receiving time
 }SYSTEM;
 
 typedef struct
 {
+	uint8_t  deui[15];
 	uint8_t  add[25];
-	uint8_t  uri[65];	
+	uint8_t  uri[128];
+	uint8_t  client[41];	
+	uint8_t  uname[41];
+	uint8_t  pwd[41];
+	uint8_t  pubtopic[65];
+	uint8_t  subtopic[65];
 }USER;
 
 typedef struct
 {
 	uint8_t  exit_flag;
-	uint8_t  factor_number;
-	float    factor;
+	uint8_t  singal;
 	uint32_t exit_count;
 	uint16_t temDs18b20_1;
 	uint16_t temDs18b20_2;
@@ -95,7 +100,9 @@ typedef struct
 	uint16_t adc4;
 	uint16_t distance;
 	float GapValue;
-	char data[37];
+	float    factor;
+	char data[250];	
+	int  data_len;
 }SENSOR;
 
 
@@ -108,12 +115,13 @@ extern SENSOR sensor;
 extern USER user;
 
 void product_information_print(void);
+void reboot_information_print(void);
 void EX_GPIO_Init(uint8_t state);
 void led_on(uint16_t time);
-uint8_t uplink(void);
+void i2c_device_detection(void);
 
-char* payLoadDeal(uint8_t model,char* payload);
-void i2cDetection(void);
-
+void txPayLoadDeal(SENSOR* Sensor);
+void rxPayLoadDeal(char* payload);
+int hexToint(char *str);
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

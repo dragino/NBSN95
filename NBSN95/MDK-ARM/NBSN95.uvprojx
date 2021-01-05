@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32L072xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Inc;../Drivers/STM32L0xx_HAL_Driver/Inc;../Drivers/STM32L0xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32L0xx/Include;../Drivers/CMSIS/Include;..\Drivers\BSP\inc;..\Drivers\COAP\inc</IncludePath>
+              <IncludePath>../Inc;      ../Drivers/STM32L0xx_HAL_Driver/Inc;      ../Drivers/STM32L0xx_HAL_Driver/Inc/Legacy;      ../Drivers/CMSIS/Device/ST/STM32L0xx/Include;      ../Drivers/CMSIS/Include;      ..\Drivers\BSP\inc;      ..\Drivers\LWM2M</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -464,24 +464,29 @@
               <FilePath>..\Drivers\BSP\src\common.c</FilePath>
             </File>
             <File>
-              <FileName>ds18b20.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Drivers\BSP\src\ds18b20.c</FilePath>
-            </File>
-            <File>
               <FileName>flash_eraseprogram.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Drivers\BSP\src\flash_eraseprogram.c</FilePath>
             </File>
             <File>
-              <FileName>lidar.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Drivers\BSP\src\lidar.c</FilePath>
-            </File>
-            <File>
               <FileName>lowpower.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Drivers\BSP\src\lowpower.c</FilePath>
+            </File>
+            <File>
+              <FileName>time_server.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\BSP\src\time_server.c</FilePath>
+            </File>
+            <File>
+              <FileName>ds18b20.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\BSP\src\ds18b20.c</FilePath>
+            </File>
+            <File>
+              <FileName>lidar.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\BSP\src\lidar.c</FilePath>
             </File>
             <File>
               <FileName>sht20.c</FileName>
@@ -492,11 +497,6 @@
               <FileName>sht31.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Drivers\BSP\src\sht31.c</FilePath>
-            </File>
-            <File>
-              <FileName>time_server.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Drivers\BSP\src\time_server.c</FilePath>
             </File>
             <File>
               <FileName>ultrasound.c</FileName>
@@ -519,29 +519,24 @@
               <FilePath>..\Drivers\BSP\src\nbInit.c</FilePath>
             </File>
             <File>
-              <FileName>upload.c</FileName>
+              <FileName>nb_mqtt.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Drivers\BSP\src\upload.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>Drivers/COAP</GroupName>
-          <Files>
-            <File>
-              <FileName>COAP_Get.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Drivers\COAP\src\COAP_Get.c</FilePath>
+              <FilePath>..\Drivers\BSP\src\nb_mqtt.c</FilePath>
             </File>
             <File>
-              <FileName>COAP_Msgback.c</FileName>
+              <FileName>nb_udp.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Drivers\COAP\src\COAP_Msgback.c</FilePath>
+              <FilePath>..\Drivers\BSP\src\nb_udp.c</FilePath>
             </File>
             <File>
-              <FileName>COAP_PUT.c</FileName>
+              <FileName>nb_coap.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Drivers\COAP\src\COAP_PUT.c</FilePath>
+              <FilePath>..\Drivers\BSP\src\nb_coap.c</FilePath>
+            </File>
+            <File>
+              <FileName>nb_tcp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\BSP\src\nb_tcp.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -667,6 +662,21 @@
               <FileName>system_stm32l0xx.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Src/system_stm32l0xx.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>NOTES</GroupName>
+          <Files>
+            <File>
+              <FileName>recording.txt</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\NOTES\recording.txt</FilePath>
+            </File>
+            <File>
+              <FileName>readMe.txt</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\NOTES\readMe.txt</FilePath>
             </File>
           </Files>
         </Group>

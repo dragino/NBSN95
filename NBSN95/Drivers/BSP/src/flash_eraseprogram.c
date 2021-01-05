@@ -35,13 +35,10 @@ void  FLASH_erase(uint32_t page_address,uint8_t page)
       User can add here some code to deal with this error.
       PAGEError will contain the faulty page and then to know the code error on this page,
       user can call function 'HAL_FLASH_GetError()'
-    */
-		
-    while (1)
-    {
+    */   
       /* indicate error in Erase operation */
-      printf("error in Erase operation\n\r");
-    }
+    printf("error in Erase operation\n\r");
+    
   }
 /* Lock the Flash to disable the flash control register access (recommended
      to protect the FLASH memory against possible unwanted operation) *********/
@@ -66,10 +63,9 @@ void  FLASH_program(uint32_t add, uint32_t *data, uint8_t count)
     else
     {
       /* Error occurred while writing data in Flash memory.*/
-      while (1)
-      {
-        printf("error in Write operation\n\r");
-      }
+      
+       printf("error in Write operation\n\r");
+       return;
     }
   }
 
@@ -91,17 +87,15 @@ void  FLASH_program_on_addr(uint32_t addr,uint32_t data)
 	}
 	else
 	{
-		/* Error occurred while writing data in Flash memory.*/
-		while (1)
-		{
-			printf("error in Write operation\n\r");
-		}
+		/* Error occurred while writing data in Flash memory.*/	
+		printf("error in Write operation\n\r");
 	}
 
   /* Lock the Flash to disable the flash control register access (recommended
      to protect the FLASH memory against possible unwanted operation) *********/
   HAL_FLASH_Lock();
 }
+
 uint32_t FLASH_read(uint32_t Address)
 {
 	  data32 = *(__IO uint32_t *)Address;

@@ -5,44 +5,46 @@ SENSOR sensor={0};
 USER user={0};
 
 static uint8_t mod5_init_flag = 0;
-static uint8_t i2cDevice = 0;
-
-uint8_t uplink(void)
-{
-	if(strlen((char*)user.add) == 0 || strlen((char*)user.uri) == 0)
-	{
-		user_main_printf("Parameter configuration error\r\n");
-		return fail;
-	}
-	
-	uint8_t state = success;
-	char payload[400]={0};
-	user_main_printf("*****Upload start:%d*****\r\n",sys.uplink_count++);
-	
-	payLoadDeal(sys.mod,sensor.data);
-
-	if(sockCreat() == fail)
-		state = fail;
-	else
-	{
-		if(sys.protocol == COAP_PRO)
-			dataSendPut(payload);
-		else if(sys.protocol == UDP_PRO)
-			dataSendUDP(payload);
-	}
-	
-	HAL_Delay(1000);
-	sockClosd();
-	user_main_printf("Send complete");
-	user_main_printf("*****End of upload*****\r\n");
-	return state;
-}
+static uint8_t i2c_device_flag=0;
 
 void product_information_print(void)
 {
-	user_main_printf("\r\nDRAGINO NBSN50-95 NB-IoT Sensor Node\r\n"
+	printf("\r\nDRAGINO NSE01 NB-IoT Sensor Node\r\n"
 										"Image Version: "version "\r\n"
-										"NB-IoT Stack : "stack	 "\r\n");
+										"NB-IoT Stack : "stack	 "\r\n"
+	                  "Protocol in Used: ");
+	if(sys.protocol == COAP_PRO)
+		printf("COAP\r\n");
+	else if(sys.protocol == UDP_PRO)
+		printf("UDP\r\n");
+	else if(sys.protocol == MQTT_PRO)
+		printf("MQTT\r\n");
+	else if(sys.protocol == TCP_PRO)
+		printf("TCP\r\n");
+}
+
+void reboot_information_print(void)
+{
+	user_main_debug("reboot flag :0x%04X",RCC->CSR);					//Print register
+//__HAL_RCC_GET_FLAG(RCC->CSR);
+	
+	/*Determine and print the reason for restart*/
+	if(RCC->CSR & ((uint32_t)1<<31))
+		user_main_printf("reboot error:Low-power!");						//Low power management
+	else if(RCC->CSR & ((uint32_t)1<<30))
+		user_main_printf("reboot error:Window watchdog!");			//Window watchdog
+	else if(RCC->CSR & ((uint32_t)1<<29))
+		user_main_printf("reboot error:Independent watchdog!");	//Independent watchdog
+	else if(RCC->CSR & ((uint32_t)1<<28))
+		user_main_printf("reboot error:Software!");							//Software reset
+	else if(RCC->CSR & ((uint32_t)1<<27))
+		user_main_printf("reboot error:POR/PDR!");							//por/pdr reset
+	else if(RCC->CSR & ((uint32_t)1<<26))
+		user_main_printf("reboot error:NRST!");									//NRST pin reset
+	else if(RCC->CSR & ((uint32_t)1<<25))
+		user_main_printf("reboot error:BOR!");									//Software writes to clear the RMVF bit
+	
+	__HAL_RCC_CLEAR_RESET_FLAGS(); 														//Clear flag
 }
 
 void EX_GPIO_Init(uint8_t state)
@@ -92,31 +94,31 @@ void led_on(uint16_t time)
 	HAL_Delay(time);
 
 	HAL_GPIO_WritePin(GPIOA,GPIO_PIN_8,GPIO_PIN_RESET);
-	HAL_Delay(10);
+	HAL_Delay(100);
 }
 
-void i2cDetection(void)
+void i2c_device_detection(void)
 {
 	uint8_t sum=0;
 	uint8_t txdata1[1]={0xE7},txdata2[2]={0xF3,0x2D};
-	i2cDevice = 0;
+	i2c_device_flag = 0;
 	sht20Init();
 	while(HAL_I2C_Master_Transmit(&hi2c1,0x80,txdata1,1,1000) != HAL_OK)
 	{
 		 sum++;
 		 if(sum>20)
 		 {
-			 i2cDevice=0;
+			 i2c_device_flag=0;
 			 break;
 		 }
 	 }
 	 if(HAL_I2C_Master_Transmit(&hi2c1,0x80,txdata1,1,1000) == HAL_OK)
 	 {
-		 i2cDevice=1;
+		 i2c_device_flag=1;
 	   user_main_printf("Use Sensor is SHT20");
 	 }
 	 
-	 if(i2cDevice==0)
+	 if(i2c_device_flag==0)
 	 {	 
 		sum=0;		 			 
 		sht31Init();	 
@@ -125,63 +127,64 @@ void i2cDetection(void)
 		 sum++;
 		 if(sum>20)
 		 {
-			 i2cDevice=0;
+			 i2c_device_flag=0;
 			 break;
 		 }
 		}
 	  if(HAL_I2C_Master_Transmit(&hi2c1,0x88,txdata2,2,1000) == HAL_OK)
 	  {
-			 i2cDevice=2;
+			 i2c_device_flag=2;
 			 user_main_printf("Use Sensor is SHT31");
 	  }
    }
-	 if(i2cDevice==0)
+	 if(i2c_device_flag==0)
 	 {
 //		 HAL_I2C_MspDeInit(&hi2c1);	 
 		 user_main_printf("No I2C device detected");
 	 }	
 }
 
-char* payLoadDeal(uint8_t model,char* payload)
+void txPayLoadDeal(SENSOR* Sensor)
 {	
-	memset(payload,0,sizeof((char*)payload));
+	memset(Sensor->data,0,sizeof(Sensor->data));
+	Sensor->data_len = 0;
+	Sensor->singal = nb.singal;
+	
 	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_RESET);
 	HAL_Delay(500+sys.power_time);
 	
-	if(model != model6)
-	{
-		if(sensor.exit_count>255)
-			sensor.exit_count = 255;
-	}
+	Sensor->batteryLevel_mV = getVoltage();
+
+	for(int i=0;i<strlen((char*)user.deui);i++)
+		sprintf(Sensor->data+strlen(Sensor->data), "%c",  user.deui[i]);
 	
-	if(model == model1)
+	sprintf(Sensor->data+strlen(Sensor->data), "%.4x", atoi(version_s));
+	sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->batteryLevel_mV);
+	sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->singal);
+	sprintf(Sensor->data+strlen(Sensor->data), "%.2x", sys.mod-0x30);
+	
+	if(sys.mod == model1)
 	{
-		sensor.batteryLevel_mV = getVoltage();
 		sensor.temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
 		sensor.adc0 = ADCModel(ADC_CHANNEL_0);
 		
-		i2cDetection();
-		if(i2cDevice == 1)
+		i2c_device_detection();
+		if(i2c_device_flag == 1)
 			sht20Data();
-		else if(i2cDevice == 2)
+		else if(i2c_device_flag == 2)
 			sht31Data();
 		
-		sprintf(payload+strlen(payload), "%.4x", sensor.batteryLevel_mV);
-		sprintf(payload+strlen(payload), "%.2x", 0xFF);
-		sprintf(payload+strlen(payload), "%.2x", sys.mod - 0x30);
-		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_1);		
-		sprintf(payload+strlen(payload), "%.2x", sensor.exit_flag);
-		sprintf(payload+strlen(payload), "%.4x", sensor.adc0);
-		sprintf(payload+strlen(payload), "%.4x", sensor.temSHT);
-		sprintf(payload+strlen(payload), "%.4x", sensor.humSHT);
-		sprintf(payload+strlen(payload), "%.8x", sensor.exit_count);
+		sprintf(Sensor->data+strlen(Sensor->data)+strlen(Sensor->data+strlen(Sensor->data)), "%.4x", Sensor->temDs18b20_1);		
+		sprintf(Sensor->data+strlen(Sensor->data)+strlen(Sensor->data+strlen(Sensor->data)), "%.2x", Sensor->exit_flag);
+		sprintf(Sensor->data+strlen(Sensor->data)+strlen(Sensor->data+strlen(Sensor->data)), "%.4x", Sensor->adc0);
+		sprintf(Sensor->data+strlen(Sensor->data)+strlen(Sensor->data+strlen(Sensor->data)), "%.4x", Sensor->temSHT);
+		sprintf(Sensor->data+strlen(Sensor->data)+strlen(Sensor->data+strlen(Sensor->data)), "%.4x", Sensor->humSHT);
 	}
-	else if(model == model2)
+	else if(sys.mod == model2)
 	{
-		sensor.batteryLevel_mV = getVoltage();
-		sensor.temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
-		sensor.adc0 = ADCModel(ADC_CHANNEL_0);
-		sensor.distance = LidarLite();
+		Sensor->temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
+		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
+		Sensor->distance = LidarLite();
 		if(sensor.distance == 4095)
 		{
 			sensor.distance = 0;
@@ -191,57 +194,44 @@ char* payLoadDeal(uint8_t model,char* payload)
 			GPIO_ULT_OUTPUT_DeInit();
 		}
 		
-		sprintf(payload+strlen(payload), "%.4x", sensor.batteryLevel_mV);
-		sprintf(payload+strlen(payload), "%.2x", 0xFF);
-		sprintf(payload+strlen(payload), "%.2x", sys.mod - 0x30);		
-		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_1);
-		sprintf(payload+strlen(payload), "%.2x", sensor.exit_flag);
-		sprintf(payload+strlen(payload), "%.4x", sensor.adc0);		
-		sprintf(payload+strlen(payload), "%.4x", sensor.distance);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temDs18b20_1);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_flag);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);		
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->distance);
 	}
-	else if(model == model3)
+	else if(sys.mod == model3)
 	{
-		sensor.batteryLevel_mV = getVoltage();
-		sensor.adc0 = ADCModel(ADC_CHANNEL_0);
-		sensor.adc1 = ADCModel(ADC_CHANNEL_1);
-		sensor.adc4 = ADCModel(ADC_CHANNEL_4);
+		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
+		Sensor->adc1 = ADCModel(ADC_CHANNEL_1);
+		Sensor->adc4 = ADCModel(ADC_CHANNEL_4);
 	
-		i2cDetection();
-		if(i2cDevice == 1)
+		i2c_device_detection();
+		if(i2c_device_flag == 1)
 			sht20Data();
-		else if(i2cDevice == 2)
-			sht31Data();
+		else if(i2c_device_flag == 2)
+			sht31Data();	
 		
-		sprintf(payload+strlen(payload), "%.4x", sensor.batteryLevel_mV);
-		sprintf(payload+strlen(payload), "%.2x", 0xFF);
-		sprintf(payload+strlen(payload), "%.2x", sys.mod - 0x30);		
-		
-		sprintf(payload+strlen(payload), "%.4x", sensor.adc0);
-		sprintf(payload+strlen(payload), "%.2x", sensor.exit_flag);
-		sprintf(payload+strlen(payload), "%.4x", sensor.adc1);
-		sprintf(payload+strlen(payload), "%.4x", sensor.temSHT);
-		sprintf(payload+strlen(payload), "%.4x", sensor.humSHT);
-		sprintf(payload+strlen(payload), "%.4x", sensor.adc4);			
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_flag);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temSHT);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->humSHT);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc4);			
 	}
-	else if(model == model4)
+	else if(sys.mod == model4)
 	{
-		sensor.batteryLevel_mV = getVoltage();
-		sensor.adc0 = ADCModel(ADC_CHANNEL_0);
-		sensor.temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;DS18B20_IoDeInit(1);
-		sensor.temDs18b20_2 = DS18B20_GetTemp_SkipRom(2)*10;DS18B20_IoDeInit(2);
-		sensor.temDs18b20_3 = DS18B20_GetTemp_SkipRom(3)*10;DS18B20_IoDeInit(3);
-		
-		sprintf(payload+strlen(payload), "%.4x", sensor.batteryLevel_mV);
-		sprintf(payload+strlen(payload), "%.2x", 0xFF);
-		sprintf(payload+strlen(payload), "%.2x", sys.mod - 0x30);
+		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
+		Sensor->temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;DS18B20_IoDeInit(1);
+		Sensor->temDs18b20_2 = DS18B20_GetTemp_SkipRom(2)*10;DS18B20_IoDeInit(2);
+		Sensor->temDs18b20_3 = DS18B20_GetTemp_SkipRom(3)*10;DS18B20_IoDeInit(3);
 				
-		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_1);
-		sprintf(payload+strlen(payload), "%.4x", sensor.adc0);
-		sprintf(payload+strlen(payload), "%.2x", sensor.exit_flag);
-		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_2);
-		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_3);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temDs18b20_1);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_flag);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temDs18b20_2);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temDs18b20_3);
 	}
-	else if(model == model5)
+	else if(sys.mod == model5)
 	{
 		if(mod5_init_flag == 0)
 		{
@@ -249,36 +239,81 @@ char* payLoadDeal(uint8_t model,char* payload)
 			mod5_init_flag =1;
 		}
 		
-		sensor.batteryLevel_mV = getVoltage();
 		sensor.temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
 		sensor.adc0 = ADCModel(ADC_CHANNEL_0);
 		int32_t Weight = Get_Weight();		
 		user_main_printf("Weight is %d g",Weight);
 		
-		sprintf(payload+strlen(payload), "%.4x", sensor.batteryLevel_mV);
-		sprintf(payload+strlen(payload), "%.2x", 0xFF);
-		sprintf(payload+strlen(payload), "%.2x", sys.mod - 0x30);
-		sprintf(payload+strlen(payload), "%.4x", sensor.temDs18b20_1);
-		sprintf(payload+strlen(payload), "%.4x", sensor.adc0);
-		sprintf(payload+strlen(payload), "%.2x", sensor.exit_flag);
-		sprintf(payload+strlen(payload), "%.4x", Weight);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temDs18b20_1);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_flag);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Weight);
 	}
-	else if(model == model6)
+	else if(sys.mod == model6)
 	{
-		sensor.batteryLevel_mV = getVoltage();
-		
-		sprintf(payload+strlen(payload), "%.4x", sensor.batteryLevel_mV);
-		sprintf(payload+strlen(payload), "%.2x", 0xFF);
-		sprintf(payload+strlen(payload), "%.2x", sys.mod - 0x30);
-		sprintf(payload+strlen(payload), "%.2x", (int)(sensor.factor*pow(10,sensor.factor_number)));
-		sprintf(payload+strlen(payload), "%.2x", sensor.factor_number);
-		sprintf(payload+strlen(payload), "%.8x", sensor.exit_count);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", (int)(sensor.factor*100));
+		sprintf(Sensor->data+strlen(Sensor->data), "%.8x", sensor.exit_count);
 	}
 	
-	sensor.exit_flag = 0;
-	user_main_debug("payload:%s\r\n",(payload));
-
-	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_SET);
+	Sensor->data_len = strlen(Sensor->data)/2;	
+	if(sys.protocol == MQTT_PRO || sys.protocol == COAP_PRO)
+	{
+		Sensor->data[strlen(Sensor->data)]=0x1A;
+		Sensor->data_len = Sensor->data_len*2+1;
+	}
 	
-	return payload;
+	user_main_debug("Sensor->data:%s",Sensor->data);
+	user_main_debug("Sensor->data_len:%d",Sensor->data_len);
+	Sensor->exit_flag = 0;	
+	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_SET);
+}
+
+void rxPayLoadDeal(char* payload)
+{
+	char dataCom[10]={0};
+	if(payload[0]=='0' && payload[1]=='2' &&	strlen(payload) == 8)
+	{
+		memcpy(dataCom,(payload)+2,6);
+		int tdc = hexToint(dataCom);
+		if(tdc <= 0xFFFFFF || tdc >= 30)
+		{
+			sys.tdc = tdc;
+			sys.tdc = hexToint(dataCom);
+			config_Set();
+		}
+	}
+	else if(payload[0]=='0' && payload[1]=='4' &&	strlen(payload) == 4)
+	{
+		if(payload[2]=='F' && payload[3]=='F')
+			NVIC_SystemReset();
+	}
+	else if(payload[0]=='0' && payload[1]=='6' &&	strlen(payload) == 8)
+	{
+		memcpy(dataCom,(payload)+2,6);
+		uint8_t inmod = hexToint(dataCom);
+		if(inmod >= '0' && inmod <= '3')
+		{
+			sys.inmod = inmod;
+			EX_GPIO_Init(sys.inmod - 0x30);
+			config_Set();
+		}
+	}
+}
+
+int hexToint(char *str)  
+{  
+    int i;  
+    int n = 0;  
+    if (str[0] == '0' && (str[1]=='x' || str[1]=='X'))   
+			i = 2;   
+    else  
+			i = 0;  
+    for (; (str[i] >= '0' && str[i] <= '9') || (str[i] >= 'a' && str[i] <= 'z') || (str[i] >='A' && str[i] <= 'Z');++i)  
+    {  
+			if (tolower(str[i]) > '9')  
+				n = 16 * n + (10 + tolower(str[i]) - 'a');  
+			else  
+				n = 16 * n + (tolower(str[i]) - '0');  
+    }  
+    return n;  
 }

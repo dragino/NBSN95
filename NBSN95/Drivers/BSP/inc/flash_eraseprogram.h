@@ -21,11 +21,13 @@
  * @note
  * @retval None
  */
-#define FLASH_USER_START_ADDR_CONFIG   (FLASH_BASE + FLASH_PAGE_SIZE * 800)        /* Start @ of user Flash area store config */
-#define FLASH_USER_END_ADDR            (FLASH_USER_START_ADDR_CONFIG + FLASH_PAGE_SIZE)   /* End @ of user Flash area store key*/
+#define FLASH_USER_START_ADDR_CONFIG   (FLASH_BASE + FLASH_PAGE_SIZE * 800)        					/* Start @ of user Flash area store config */
+#define FLASH_USER_END_ADDR            (FLASH_USER_START_ADDR_CONFIG + FLASH_PAGE_SIZE*4)   /* End @ of user Flash area store key*/
 
-#define FLASH_USER_START_USER_KEY      (FLASH_USER_START_ADDR_CONFIG + 0x10)
-
+#define FLASH_USER_START_SERVER_ADD    (FLASH_USER_START_ADDR_CONFIG + 0x04*25)
+#define FLASH_USER_START_COAP      		 (FLASH_USER_START_ADDR_CONFIG + FLASH_PAGE_SIZE*1)
+#define FLASH_USER_START_MQTT_BASIC    (FLASH_USER_START_ADDR_CONFIG + FLASH_PAGE_SIZE*2)
+#define FLASH_USER_START_MQTT_TOPIC    (FLASH_USER_START_ADDR_CONFIG + FLASH_PAGE_SIZE*3)
 
 void  FLASH_erase(uint32_t page_address,uint8_t page);
 void  FLASH_program(uint32_t add, uint32_t *data, uint8_t count);

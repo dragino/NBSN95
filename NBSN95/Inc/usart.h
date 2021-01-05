@@ -52,8 +52,6 @@ void MX_USART2_UART_Init(void);
 																				printf("[%d]", time);													\
 																				printf( format "\r\n", ##__VA_ARGS__);				\
 																			}while(0)
-
-//	#define user_main_printf(format, ...) printf(format "\r\n", ##__VA_ARGS__)
 			
 //#define USER_MAIN_DEBUG			
 																			

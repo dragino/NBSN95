@@ -34,8 +34,6 @@ nbsn95\upload.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_pwr.h
 nbsn95\upload.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_pwr_ex.h
 nbsn95\upload.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_rtc.h
 nbsn95\upload.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_rtc_ex.h
-nbsn95\upload.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_tim.h
-nbsn95\upload.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_tim_ex.h
 nbsn95\upload.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_uart.h
 nbsn95\upload.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_uart_ex.h
 nbsn95\upload.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
@@ -53,17 +51,6 @@ nbsn95\upload.o: ..\Drivers\BSP\inc\common.h
 nbsn95\upload.o: ..\Drivers\BSP\inc\flash_eraseprogram.h
 nbsn95\upload.o: ..\Drivers\BSP\inc\time_server.h
 nbsn95\upload.o: ../Inc/rtc.h
-nbsn95\upload.o: ..\Drivers\BSP\inc\ds18b20.h
-nbsn95\upload.o: ..\Drivers\BSP\inc\sht20.h
-nbsn95\upload.o: ..\Drivers\BSP\inc\sht31.h
-nbsn95\upload.o: ..\Drivers\BSP\inc\ultrasound.h
-nbsn95\upload.o: ../Inc/tim.h
-nbsn95\upload.o: ..\Drivers\BSP\inc\lidar.h
-nbsn95\upload.o: ..\Drivers\BSP\inc\weight.h
+nbsn95\upload.o: ..\Drivers\BSP\inc\soil.h
 nbsn95\upload.o: ..\Drivers\BSP\inc\battery_read.h
 nbsn95\upload.o: ..\Drivers\BSP\inc\upload.h
-nbsn95\upload.o: ..\Drivers\COAP\inc\COAP_Statck.h
-nbsn95\upload.o: ..\Drivers\COAP\inc\COAP_PUT.h
-nbsn95\upload.o: ..\Drivers\COAP\inc\COAP_Statck.h
-nbsn95\upload.o: ..\Drivers\COAP\inc\COAP_Msgback.h
-nbsn95\upload.o: ..\Drivers\COAP\inc\COAP_Get.h

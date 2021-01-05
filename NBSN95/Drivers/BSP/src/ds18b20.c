@@ -491,6 +491,6 @@ float DS18B20_GetTemp_SkipRom (uint8_t num)
 	else
 			f_tem = s_tem * 0.0625;
 	
-	user_main_printf("DS18B20(%d) temp is %.2f ¡ãC",num,f_tem);
+	user_main_printf("DS18B20(%d) temp is %.2f ",num,f_tem);
 	return f_tem;         
 }

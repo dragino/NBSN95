@@ -17,7 +17,6 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
@@ -37,8 +36,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define send
-#define access_net
+#define NBIOT
 #define lowpower_enter
 /* USER CODE END PTD */
 
@@ -61,11 +59,15 @@ static uint8_t uart2_recieve_flag = 0;
 
 static uint8_t rxbuf_lp = 0;
 
-static uint8_t pwd_time_count = 0;
+static uint8_t pwd_time_count = 0;			//Password time count times
 
-static uint8_t inter_access_status = 0;
+//static uint8_t iwdg_flag = 0;					//Feed the dog flag
 
-static uint8_t interrupt_flag = 0;
+static uint8_t task_num = _AT_IDLE;			//NB task directory
+
+static uint8_t error_num = 0;				    //Error count
+
+static uint8_t _tanchuang_flag = 0;			//NBIOT uncontrolled connection information
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -114,47 +116,55 @@ int main(void)
   MX_RTC_Init();
   MX_ADC_Init();
   /* USER CODE BEGIN 2 */
+	config_Get();
+	reboot_information_print();
 	product_information_print();
-	user_main_printf("Waiting for BC95 response......");
-	led_on(100);	
-	
-	//Skip BC95 to start printing data
-	HAL_Delay(3000);	
-	for(uint8_t i=0;i<4;i++)
-	{
-		HAL_Delay(500);
-		while((hlpuart1.Instance->ISR & (uint32_t)0x10) == 0x0) 
-			HAL_Delay(10);
-	}
-	
+	led_on(1000);		
+	HAL_Delay(3000);
 	HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
 	HAL_UART_Receive_DMA(&hlpuart1,(uint8_t*)&rxbuf_lp,RXSIZE);
-	My_UARTEx_StopModeWakeUp(&huart2);		//Enable serial port wake up
-
+	My_UARTEx_StopModeWakeUp(&huart2);		//Enable serial port wake up		
   /* USER CODE END 2 */
-
+	
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-		
-	if(nb_Init()==fail)
-	{
-		user_main_printf("BC95 failed to initialize, try to restart after 10 seconds\r\n");
-		HAL_Delay(10000);
-		at_reset_run(NULL);
-	}
-	config_Get();
-		
+#ifdef NBIOT
+	task_num = _AT;
+#endif
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+		
+#ifdef NBIOT
+		if(task_num != _AT_IDLE)
+		{
+			if(NBTASK(&task_num) == _AT_ERROR)
+			{
+				HAL_Delay(1000);
+				error_num++;		
+			}
+			else
+			{
+				HAL_Delay(1000);
+				error_num = 0;
+			}
+	  }
+		
+		if(error_num > 3)
+		{
+			task_num = _AT_NRB;
+			error_num = 0;
+			nb.net_flag = no_status;
+		}
+#endif
 		if(sys.pwd_flag == 0 && uart2_recieve_flag)
 		{
 			uint32_t p[3]={0};
 			rtrim((char*)rxDATA);
 			p[0] = rxDATA[3]<<24 |  rxDATA[2]<<16 | rxDATA[1]<<8 | rxDATA[0];
-			p[1] = rxDATA[7]<<24 |  rxDATA[6]<<16 | rxDATA[5]<<8 | rxDATA[4];	
+			p[1] = rxDATA[7]<<24 |  rxDATA[6]<<16 | rxDATA[5]<<8 | rxDATA[4];
 			if(strcmp((char*)p,(char*)sys.pwd) == 0 && strlen((char*)rxDATA) < 9)
 			{
 				user_main_printf("Password Correct");
@@ -193,58 +203,12 @@ int main(void)
 			memset(rxDATA,0,sizeof(rxDATA));
 		}
 
-#ifdef access_net			
-		if(nb.net_flag == fail && inter_access_status == 0 && nb.imei_flag == success)
-		{
-			if(nb_netAccess() == fail)
-			{
-				user_main_printf("BC95 failed to initialize, try automatically after 1 hour");
-				inter_access_status = 1;
-				My_AlarmInit(3600,0);
-			}
-			else
-			{
-				user_main_printf("Register to the network.");
-				
-				nb_send(nb.recieve_data,AT CGPADDR "\n");	//Get IP address			
-				char *pch = strchr(nb.recieve_data,',');
-				if(pch != NULL)
-				{
-					printf("The IP address of the module:");		
-					for(;pch[1]!='O';pch++)
-						printf("%c",pch[1]);
-				}
-				
-				nb_send(nb.recieve_data,AT CPSMS "=1,,,01000001,00000000\n");	//Closed T3324
-				nb.net_flag = success;
-				led_on(3000);
-			}
-		}
-#endif
-		
-#ifdef send		
-		if(sys.uplink_flag == 0 && nb.net_flag == success)
-		{
-			if(uplink() == success)
-			{
-				led_on(500);
-				if(interrupt_flag == 0)
-					My_AlarmInit(sys.tdc,0);
-			}
-			else 
-			{
-				user_main_printf("\r\nTry again in 3 minutes");
-				My_AlarmInit(180,0);
-			}
-			
-			sys.uplink_flag = 1;
-			interrupt_flag = 0;
-		}
-#endif
-		
 #ifdef lowpower_enter
-		LPM_EnterStopMode();
-		SystemClock_Config();
+		if(task_num == _AT_IDLE && uart2_recieve_flag==0)
+		{
+			LPM_EnterStopMode();
+			SystemClock_Config();
+		}
 #endif
   }
   /* USER CODE END 3 */
@@ -260,14 +224,15 @@ void SystemClock_Config(void)
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
   RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
-  /** Configure the main internal regulator output voltage 
+  /** Configure the main internal regulator output voltage
   */
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-  /** Configure LSE Drive Capability 
+  /** Configure LSE Drive Capability
   */
   HAL_PWR_EnableBkUpAccess();
   __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI
                               |RCC_OSCILLATORTYPE_LSE;
@@ -283,7 +248,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -311,31 +276,49 @@ void SystemClock_Config(void)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if(huart == &hlpuart1)
-	{	
-		if(nb.recieve_flag == 1)
+	{
+		if(nb.recieve_flag == NB_BUSY)
 		{
 			nb.recieve_data[nb.rxlen++] = rxbuf_lp;
+			if(rxbuf_lp == 'K' || rxbuf_lp == '>')
+				nb.recieve_flag = NB_CMD_SUCC;
+		}
+		else if(task_num >= _AT_COAP_OPEN && task_num <= _AT_TCP_CLOSE)
+		{
+			memcpy(nb.recieve_data_server+strlen(nb.recieve_data_server),(char*)&rxbuf_lp,1);
+			if(rxbuf_lp=='+')
+				_tanchuang_flag = 1;
+			if(_tanchuang_flag == 1)
+			{
+				if(rxbuf_lp=='\n')
+				{
+					_tanchuang_flag = 0;
+					nb.recieve_flag = NB_RECIEVE;
+				}
+			}
 		}
 		else
 			HAL_UART_Transmit(&huart2,(uint8_t*)&rxbuf_lp,RXSIZE,1);
 		HAL_UART_Receive_DMA(&hlpuart1,(uint8_t*)&rxbuf_lp,RXSIZE);
 	}
 	else if(huart == &huart2)
-	{			
+	{
 		rxDATA[rxlen++] = rxbuf;
 		if(rxbuf == '\r' || rxbuf == '\n')
-		{			
+		{					
 			uart2_recieve_flag = 1;		
 		}
 		HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
 	}
 }
 
-
 void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
 {
-	inter_access_status = 0;
-	sys.uplink_flag = 0;
+	if(nb.net_flag == no_status)
+		task_num = _AT;
+	else if(nb.net_flag == success)
+		task_num = _AT_CSQ;
+
 	LPM_DisableStopMode();
 }
 
@@ -343,15 +326,21 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 {
 	HAL_IWDG_Refresh(&hiwdg);
 	
+#ifdef NBIOT	
 	if(sys.pwd_flag)
 	{
 		pwd_time_count++;
-		if(pwd_time_count == 10)
+		if(pwd_time_count == 17)
 		{
 			sys.pwd_flag = 0;
 			pwd_time_count = 0;
+			HAL_UART_Transmit(&huart2,(uint8_t*)"Password timeout\r\n",20,20);
 		}
 	}
+#endif	
+	
+	if(nb.net_flag == fail)
+		task_num = _AT_CSQ;
 	
 	My_AlarmInit(18,1);
 }
@@ -360,11 +349,13 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == GPIO_PIN_14)
 	{
-		interrupt_flag = 1;
 		sensor.exit_flag=1;
-		sensor.exit_count++;
-		sys.uplink_flag = 0;
-		LPM_DisableStopMode();
+		if(sys.mod == model6)
+			sensor.exit_count++;
+		if(nb.net_flag == success && sys.mod != model6)
+			task_num = _AT_CSQ;
+		if(sys.mod != model6)
+			LPM_DisableStopMode();
 	}
 }
 
@@ -372,6 +363,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
 	if(huart == (&hlpuart1))
 	{
+		user_main_error("hlpuart1 ERROR");
 		uint32_t isrflags = READ_REG(huart->Instance->ISR);
 		switch(huart->ErrorCode)
     {
@@ -412,8 +404,9 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 		MX_LPUART1_UART_Init();
 		HAL_UART_Receive_DMA(&hlpuart1,(uint8_t*)&rxbuf_lp,RXSIZE);
 	}
-	else if(huart == &huart2)
+	else	if(huart == (&huart2))
 	{
+		user_main_error("huart2 ERROR");
 		uint32_t isrflags = READ_REG(huart->Instance->ISR);
 		switch(huart->ErrorCode)
     {
@@ -478,7 +471,7 @@ void Error_Handler(void)
   * @retval None
   */
 void assert_failed(uint8_t *file, uint32_t line)
-{ 
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */

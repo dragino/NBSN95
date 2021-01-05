@@ -31,7 +31,7 @@ void MX_ADC_Init(void)
 {
   ADC_ChannelConfTypeDef sConfig = {0};
 
-  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion) 
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
   */
   hadc.Instance = ADC1;
   hadc.Init.OversamplingMode = DISABLE;
@@ -54,9 +54,9 @@ void MX_ADC_Init(void)
   {
     Error_Handler();
   }
-  /** Configure for the selected ADC regular channel to be converted. 
+  /** Configure for the selected ADC regular channel to be converted.
   */
-  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Channel = ADC_CHANNEL_VREFINT;
   sConfig.Rank = ADC_RANK_CHANNEL_NUMBER;
   if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
   {
@@ -68,7 +68,6 @@ void MX_ADC_Init(void)
 void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
 {
 
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
   if(adcHandle->Instance==ADC1)
   {
   /* USER CODE BEGIN ADC1_MspInit 0 */
@@ -76,16 +75,6 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
   /* USER CODE END ADC1_MspInit 0 */
     /* ADC1 clock enable */
     __HAL_RCC_ADC1_CLK_ENABLE();
-  
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-    /**ADC GPIO Configuration    
-    PA0     ------> ADC_IN0 
-    */
-    GPIO_InitStruct.Pin = GPIO_PIN_0;
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
   /* USER CODE BEGIN ADC1_MspInit 1 */
 
   /* USER CODE END ADC1_MspInit 1 */
@@ -102,17 +91,11 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
   /* USER CODE END ADC1_MspDeInit 0 */
     /* Peripheral clock disable */
     __HAL_RCC_ADC1_CLK_DISABLE();
-  
-    /**ADC GPIO Configuration    
-    PA0     ------> ADC_IN0 
-    */
-    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_0);
-
   /* USER CODE BEGIN ADC1_MspDeInit 1 */
 
   /* USER CODE END ADC1_MspDeInit 1 */
   }
-} 
+}
 
 /* USER CODE BEGIN 1 */
 
