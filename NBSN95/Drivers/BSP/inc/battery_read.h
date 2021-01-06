@@ -9,4 +9,5 @@
 uint16_t HW_AdcReadChannel( uint32_t Channel );
 uint16_t getVoltage(void);
 uint16_t ADCModel(uint32_t channel);
+void stob(uint16_t* buf,int len);
 #endif
