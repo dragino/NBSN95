@@ -51,16 +51,55 @@ uint16_t getVoltage(void)
 
 uint16_t ADCModel(uint32_t channel)
 {
-	uint16_t measuredLevel = HW_AdcReadChannel( channel );
-	float adc_mV= measuredLevel*sensor.batteryLevel_mV/4096;
-	HAL_Delay(100);
-	if(channel == ADC_CHANNEL_0)
-		user_main_printf("adc_mV(1):%.2f",adc_mV);
-	else if(channel == ADC_CHANNEL_1)
-		user_main_printf("adc_mV(2):%.2f",adc_mV);
-	else if(channel == ADC_CHANNEL_4)
-		user_main_printf("adc_mV(3):%.2f",adc_mV);
+//	uint16_t measuredLevel = HW_AdcReadChannel( channel );
+//	float adc_mV= measuredLevel*sensor.batteryLevel_mV/4096;
+//	HAL_Delay(100);
+//	if(channel == ADC_CHANNEL_0)
+//		user_main_printf("adc_mV(1):%.2f",adc_mV);
+//	else if(channel == ADC_CHANNEL_1)
+//		user_main_printf("adc_mV(2):%.2f",adc_mV);
+//	else if(channel == ADC_CHANNEL_4)
+//		user_main_printf("adc_mV(3):%.2f",adc_mV);
 
-	uint16_t adc_mV_=adc_mV;
+//	uint16_t adc_mV_=adc_mV;
+//	return adc_mV_;
+	
+	uint16_t buff[10]={0};
+	for(uint8_t i=0;i<6;i++)
+	{
+		uint16_t measuredLevel = HW_AdcReadChannel( channel );
+		float adc_mV= measuredLevel*sensor.batteryLevel_mV/4096;
+		buff[i] = adc_mV;
+		HAL_Delay(10);
+	}
+
+	stob(buff,6);
+
+	float adc_mV_average = (buff[1]+buff[2]+buff[3]+buff[4])/4;
+	if(channel == ADC_CHANNEL_0)
+		user_main_printf("adc_mV(1):%.2f",adc_mV_average);
+	else if(channel == ADC_CHANNEL_1)
+		user_main_printf("adc_mV(2):%.2f",adc_mV_average);
+	else if(channel == ADC_CHANNEL_4)
+		user_main_printf("adc_mV(3):%.2f",adc_mV_average);
+
+	uint16_t adc_mV_= adc_mV_average;
 	return adc_mV_;
+}
+
+void stob(uint16_t* buf,int len)
+{
+	int t=0;
+	for(int i=0;i<len;i++)
+	{
+		for(int j=i+1;j<len;j++)
+		{
+			if(buf[i]>buf[j])
+			{
+				t = buf[i];
+				buf[i] = buf[j];
+				buf[j] = t;
+			}
+		}
+	}
 }
