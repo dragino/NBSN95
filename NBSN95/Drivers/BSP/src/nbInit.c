@@ -14,7 +14,7 @@ NB_TaskStatus nb_at_send(struct NBTASK *NB_Task)
 	memset(nb.recieve_data,0,sizeof(nb.recieve_data));
 	
 	HAL_UART_Transmit_DMA(&hlpuart1,(uint8_t*)NB_Task->ATSendStr,NB_Task->len_string);
-	
+
 	uint32_t time = HAL_GetTick();
 	while(HAL_GetTick() - time < NB_Task->time_out && nb.recieve_flag != NB_CMD_SUCC)
 	{
@@ -289,7 +289,7 @@ case _AT_CSQ:
 				at_state = _AT_ERROR;
 				nb.net_flag = fail;
 			}
-			else 
+			else
 				at_state = _AT_ERROR;
 			break;
 			

@@ -9,7 +9,7 @@ static uint8_t i2c_device_flag=0;
 
 void product_information_print(void)
 {
-	printf("\r\nDRAGINO NSE01 NB-IoT Sensor Node\r\n"
+	printf("\r\nDRAGINO NBSN95 NB-IoT Sensor Node\r\n"
 										"Image Version: "version "\r\n"
 										"NB-IoT Stack : "stack	 "\r\n"
 	                  "Protocol in Used: ");
@@ -162,23 +162,26 @@ void txPayLoadDeal(SENSOR* Sensor)
 	sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->batteryLevel_mV);
 	sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->singal);
 	sprintf(Sensor->data+strlen(Sensor->data), "%.2x", sys.mod-0x30);
+	sprintf(Sensor->data+strlen(Sensor->data), "%.4x", sys.uplink_count);
 	
 	if(sys.mod == model1)
 	{
-		sensor.temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
-		sensor.adc0 = ADCModel(ADC_CHANNEL_0);
+		Sensor->temDs18b20_1 = (int)(DS18B20_GetTemp_SkipRom(1)*10);
+		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
 		
 		i2c_device_detection();
 		if(i2c_device_flag == 1)
 			sht20Data();
 		else if(i2c_device_flag == 2)
 			sht31Data();
-		
-		sprintf(Sensor->data+strlen(Sensor->data)+strlen(Sensor->data+strlen(Sensor->data)), "%.4x", Sensor->temDs18b20_1);		
-		sprintf(Sensor->data+strlen(Sensor->data)+strlen(Sensor->data+strlen(Sensor->data)), "%.2x", Sensor->exit_flag);
-		sprintf(Sensor->data+strlen(Sensor->data)+strlen(Sensor->data+strlen(Sensor->data)), "%.4x", Sensor->adc0);
-		sprintf(Sensor->data+strlen(Sensor->data)+strlen(Sensor->data+strlen(Sensor->data)), "%.4x", Sensor->temSHT);
-		sprintf(Sensor->data+strlen(Sensor->data)+strlen(Sensor->data+strlen(Sensor->data)), "%.4x", Sensor->humSHT);
+	
+		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
+		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_flag);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);
+		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temSHT>=0)?'0':'F');
+		sprintf(Sensor->data+strlen(Sensor->data), "%.3x", (Sensor->temSHT>=0)?Sensor->temSHT:Sensor->temSHT*(-1));
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->humSHT);
 	}
 	else if(sys.mod == model2)
 	{
@@ -194,7 +197,8 @@ void txPayLoadDeal(SENSOR* Sensor)
 			GPIO_ULT_OUTPUT_DeInit();
 		}
 		
-		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temDs18b20_1);
+		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
+		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_flag);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->distance);
@@ -214,7 +218,8 @@ void txPayLoadDeal(SENSOR* Sensor)
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_flag);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
-		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temSHT);
+		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temSHT>=0)?'0':'F');
+		sprintf(Sensor->data+strlen(Sensor->data), "%.3x", (Sensor->temSHT>=0)?Sensor->temSHT:Sensor->temSHT*(-1));
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->humSHT);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc4);			
 	}
@@ -225,11 +230,14 @@ void txPayLoadDeal(SENSOR* Sensor)
 		Sensor->temDs18b20_2 = DS18B20_GetTemp_SkipRom(2)*10;DS18B20_IoDeInit(2);
 		Sensor->temDs18b20_3 = DS18B20_GetTemp_SkipRom(3)*10;DS18B20_IoDeInit(3);
 				
-		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temDs18b20_1);
+		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
+		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_flag);
-		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temDs18b20_2);
-		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temDs18b20_3);
+		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_2>=0)?'0':'F');
+		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_2>=0)?Sensor->temDs18b20_2:Sensor->temDs18b20_2*(-1));		
+		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_3>=0)?'0':'F');
+		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_3>=0)?Sensor->temDs18b20_3:Sensor->temDs18b20_3*(-1));		
 	}
 	else if(sys.mod == model5)
 	{
@@ -239,12 +247,13 @@ void txPayLoadDeal(SENSOR* Sensor)
 			mod5_init_flag =1;
 		}
 		
-		sensor.temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
-		sensor.adc0 = ADCModel(ADC_CHANNEL_0);
+		Sensor->temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
+		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
 		int32_t Weight = Get_Weight();		
 		user_main_printf("Weight is %d g",Weight);
 		
-		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temDs18b20_1);
+		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
+		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_flag);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Weight);
@@ -271,7 +280,7 @@ void txPayLoadDeal(SENSOR* Sensor)
 void rxPayLoadDeal(char* payload)
 {
 	char dataCom[10]={0};
-	if(payload[0]=='0' && payload[1]=='2' &&	strlen(payload) == 8)
+	if(payload[0]=='0' && payload[1]=='1' &&	strlen(payload) == 8)
 	{
 		memcpy(dataCom,(payload)+2,6);
 		int tdc = hexToint(dataCom);
@@ -297,6 +306,11 @@ void rxPayLoadDeal(char* payload)
 			EX_GPIO_Init(sys.inmod - 0x30);
 			config_Set();
 		}
+	}
+	else if(payload[0]=='0' && payload[1]=='7' &&	strlen(payload) == 8)
+	{
+		memcpy(dataCom,(payload)+2,6);
+		sensor.exit_count = hexToint(dataCom);
 	}
 }
 

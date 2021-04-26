@@ -42,6 +42,7 @@
 "nbsn95\stm32l0xx_hal_pwr.o"
 "nbsn95\stm32l0xx_hal_pwr_ex.o"
 "nbsn95\stm32l0xx_hal_cortex.o"
+"nbsn95\stm32l0xx_hal_exti.o"
 "nbsn95\stm32l0xx_hal_iwdg.o"
 "nbsn95\stm32l0xx_hal_uart.o"
 "nbsn95\stm32l0xx_hal_uart_ex.o"

@@ -242,9 +242,9 @@ uint8_t DS18B20_ReadBit(uint8_t num)
 		DS18B20_Mode_IPU(1);
 		
 		if( HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_3)==SET)
-						dat = 1;
+			dat = 1;
 		else
-						dat = 0;
+			dat = 0;
 	}    
 	else if(num==2)
 	{               
@@ -255,9 +255,9 @@ uint8_t DS18B20_ReadBit(uint8_t num)
 		DS18B20_Mode_IPU(2);
 		
 		if(HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_9)==SET)
-						dat = 1;
+			dat = 1;
 		else
-						dat = 0;
+			dat = 0;
 	}  
 	else if(num==3)
 	{               
@@ -268,9 +268,9 @@ uint8_t DS18B20_ReadBit(uint8_t num)
 		DS18B20_Mode_IPU(3);
 		
 		if(HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_10)==SET)
-						dat = 1;
+			dat = 1;
 		else
-						dat = 0;
+			dat = 0;
 	}  
 
 	DS18B20_delay(45);

@@ -61,8 +61,6 @@ static uint8_t rxbuf_lp = 0;
 
 static uint8_t pwd_time_count = 0;			//Password time count times
 
-//static uint8_t iwdg_flag = 0;					//Feed the dog flag
-
 static uint8_t task_num = _AT_IDLE;			//NB task directory
 
 static uint8_t error_num = 0;				    //Error count
@@ -115,6 +113,7 @@ int main(void)
   MX_IWDG_Init();
   MX_RTC_Init();
   MX_ADC_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 	config_Get();
 	reboot_information_print();
@@ -125,11 +124,13 @@ int main(void)
 	HAL_UART_Receive_DMA(&hlpuart1,(uint8_t*)&rxbuf_lp,RXSIZE);
 	My_UARTEx_StopModeWakeUp(&huart2);		//Enable serial port wake up		
   /* USER CODE END 2 */
-	
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 #ifdef NBIOT
 	task_num = _AT;
+#else
+	task_num = _AT_IDLE;
 #endif
   while (1)
   {
@@ -157,6 +158,7 @@ int main(void)
 			task_num = _AT_NRB;
 			error_num = 0;
 			nb.net_flag = no_status;
+			My_AlarmInit(sys.tdc,0);
 		}
 #endif
 		if(sys.pwd_flag == 0 && uart2_recieve_flag)

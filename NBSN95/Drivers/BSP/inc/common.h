@@ -39,8 +39,8 @@
  * @retval None
  */
 
-#define version 	"v1.1.0"
-#define version_s "110"
+#define version 	"v1.1.1"
+#define version_s "111"
 #define stack 		"D-BC95-002"
 
 #define COAP_PRO  0x01
@@ -89,18 +89,18 @@ typedef struct
 	uint8_t  exit_flag;
 	uint8_t  singal;
 	uint32_t exit_count;
-	uint16_t temDs18b20_1;
-	uint16_t temDs18b20_2;
-	uint16_t temDs18b20_3;
-	uint16_t humSHT;
-	uint16_t temSHT;
+	int temDs18b20_1;
+	int temDs18b20_2;
+	int temDs18b20_3;
+	int humSHT;
+	int temSHT;
 	uint16_t batteryLevel_mV;
 	uint16_t adc0;
 	uint16_t adc1;
 	uint16_t adc4;
 	uint16_t distance;
 	float GapValue;
-	float    factor;
+	float factor;
 	char data[250];	
 	int  data_len;
 }SENSOR;
