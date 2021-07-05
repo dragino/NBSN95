@@ -521,7 +521,7 @@ I (..\Drivers\BSP\inc\sht31.h)(0x60CDB768)
 I (..\Drivers\BSP\inc\lidar.h)(0x5F097964)
 I (..\Drivers\BSP\inc\ultrasound.h)(0x60B051C4)
 I (..\Drivers\BSP\inc\weight.h)(0x5F097ADA)
-F (..\Drivers\BSP\src\common.c)(0x60DE875E)(--c99 -c --cpu Cortex-M0+ -D__MICROLIB -g -O3 --apcs=interwork --split_sections -I ../Inc -I ../Drivers/STM32L0xx_HAL_Driver/Inc -I ../Drivers/STM32L0xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32L0xx/Include -I ../Drivers/CMSIS/Include -I ..\Drivers\BSP\inc -I ..\Drivers\LWM2M-I.\RTE\_NBSN95-IE:\Keil_v5\Arm\Packs\ARM\CMSIS\5.7.0\CMSIS\Core\Include-IE:\Keil_v5\Arm\Packs\Keil\STM32L0xx_DFP\2.1.0\Drivers\CMSIS\Device\ST\STM32L0xx\Include-D__UVISION_VERSION="533" -D_RTE_ -DSTM32L072xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32L072xx-o nbsn95\common.o --omf_browse nbsn95\common.crf --depend nbsn95\common.d)
+F (..\Drivers\BSP\src\common.c)(0x60E271A8)(--c99 -c --cpu Cortex-M0+ -D__MICROLIB -g -O3 --apcs=interwork --split_sections -I ../Inc -I ../Drivers/STM32L0xx_HAL_Driver/Inc -I ../Drivers/STM32L0xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32L0xx/Include -I ../Drivers/CMSIS/Include -I ..\Drivers\BSP\inc -I ..\Drivers\LWM2M-I.\RTE\_NBSN95-IE:\Keil_v5\Arm\Packs\ARM\CMSIS\5.7.0\CMSIS\Core\Include-IE:\Keil_v5\Arm\Packs\Keil\STM32L0xx_DFP\2.1.0\Drivers\CMSIS\Device\ST\STM32L0xx\Include-D__UVISION_VERSION="533" -D_RTE_ -DSTM32L072xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32L072xx-o nbsn95\common.o --omf_browse nbsn95\common.crf --depend nbsn95\common.d)
 I (..\Drivers\BSP\inc\common.h)(0x60DAC3B7)
 I (../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal.h)(0x5FEA9515)
 I (../Inc/stm32l0xx_hal_conf.h)(0x60CDA94E)

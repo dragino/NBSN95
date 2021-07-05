@@ -71,30 +71,64 @@ void reboot_information_print(void)
 void EX_GPIO_Init(uint8_t state)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	__HAL_RCC_GPIOB_CLK_ENABLE();
-	/*Configure GPIO pin : PB14 */
-  GPIO_InitStruct.Pin = GPIO_PIN_14;
+	
 	if(state == 0)
 	{
+		__HAL_RCC_GPIOA_CLK_ENABLE();
+		__HAL_RCC_GPIOB_CLK_ENABLE();
+		GPIO_InitStruct.Pin = GPIO_PIN_14;
+		GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+		
+		GPIO_InitStruct.Pin = GPIO_PIN_12;
 		GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
 		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 	}
 	else if(state == 1)
 	{
+		__HAL_RCC_GPIOA_CLK_ENABLE();
+		__HAL_RCC_GPIOB_CLK_ENABLE();
+		GPIO_InitStruct.Pin = GPIO_PIN_14;
 		GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
 		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+		
+		GPIO_InitStruct.Pin = GPIO_PIN_12;
+		GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);		
 	}
 	else if(state == 2)
 	{
+		__HAL_RCC_GPIOA_CLK_ENABLE();
+		__HAL_RCC_GPIOB_CLK_ENABLE();
+		GPIO_InitStruct.Pin = GPIO_PIN_14;
 		GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
 		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+		
+		GPIO_InitStruct.Pin = GPIO_PIN_12;
+		GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);		
 	}
 	else if(state == 3)
   {
+		__HAL_RCC_GPIOA_CLK_ENABLE();
+		__HAL_RCC_GPIOB_CLK_ENABLE();
+		GPIO_InitStruct.Pin = GPIO_PIN_14;
 		GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
 		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+		
+		GPIO_InitStruct.Pin = GPIO_PIN_12;
+		GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);	
+		
 	}
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 	
 	if(state!=0)
 	{
@@ -166,7 +200,10 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 	
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
-		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		if(sys.inmod =='0')
+			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_12));
+		else
+			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temSHT>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x", (Sensor->temSHT>=0)?Sensor->temSHT:Sensor->temSHT*(-1));
@@ -188,7 +225,10 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 		
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
-		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		if(sys.inmod =='0')
+			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_12));
+		else
+			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->distance);
 	}
@@ -205,7 +245,10 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 			sht31Data();	
 		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);
-		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		if(sys.inmod =='0')
+			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_12));
+		else
+			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temSHT>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x", (Sensor->temSHT>=0)?Sensor->temSHT:Sensor->temSHT*(-1));
@@ -222,7 +265,10 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);
-		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		if(sys.inmod =='0')
+			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_12));
+		else
+			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_2>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_2>=0)?Sensor->temDs18b20_2:Sensor->temDs18b20_2*(-1));		
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_3>=0)?'0':'F');
@@ -244,7 +290,10 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc0);
-		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		if(sys.inmod =='0')
+			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_12));
+		else
+			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Weight);
 	}
 	else if(sys.mod == model6)
