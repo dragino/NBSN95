@@ -21,10 +21,10 @@
 #include "main.h"
 #include "adc.h"
 #include "dma.h"
+#include "i2c.h"
 #include "iwdg.h"
 #include "usart.h"
 #include "rtc.h"
-#include "tim.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -36,8 +36,16 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+
+/* debug macro definition ----------------------------------------------------*/
+//#define ST_DEBUG	
+
+/* NBIOT task macro definition, the task in NBTASK will not be executed after commenting out -*/
 #define NBIOT
-#define lowpower_enter
+
+#ifndef ST_DEBUG
+	#define lowpower_enter
+#endif
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -52,12 +60,13 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-static uint8_t rxbuf = 0;
-static uint8_t rxlen = 0;
-static uint8_t rxDATA[300]={0};
-static uint8_t uart2_recieve_flag = 0;
+static uint8_t  rxbuf = 0;			
+static uint16_t rxlen = 0;
+static uint8_t  rxDATA[300]={0};
+static uint8_t  uart2_recieve_flag = 0;
 
-static uint8_t rxbuf_lp = 0;
+static uint8_t rxbuf_lp[5] = {0};
+static uint8_t lpuart_recieve_flag = 0;
 
 static uint8_t pwd_time_count = 0;			//Password time count times
 
@@ -65,13 +74,12 @@ static uint8_t task_num = _AT_IDLE;			//NB task directory
 
 static uint8_t error_num = 0;				    //Error count
 
-static uint8_t _tanchuang_flag = 0;			//NBIOT uncontrolled connection information
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+static void USERTASK(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -110,25 +118,38 @@ int main(void)
   MX_DMA_Init();
   MX_USART2_UART_Init();
   MX_LPUART1_UART_Init();
+#ifndef ST_DEBUG
   MX_IWDG_Init();
+#endif
   MX_RTC_Init();
   MX_ADC_Init();
-  MX_TIM2_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
+	new_firmware_update();
 	config_Get();
 	reboot_information_print();
 	product_information_print();
-	led_on(1000);		
+	List_Init(sys.list);
+	led_on(1000);
 	HAL_Delay(3000);
 	HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
-	HAL_UART_Receive_DMA(&hlpuart1,(uint8_t*)&rxbuf_lp,RXSIZE);
-	My_UARTEx_StopModeWakeUp(&huart2);		//Enable serial port wake up		
+	HAL_UART_Receive_IT(&hlpuart1,rxbuf_lp,RXSIZE);
+	My_UARTEx_StopModeWakeUp(&huart2);				//Enable serial port wake up
+	My_UARTEx_StopModeWakeUp(&hlpuart1);			//Enable serial port wake up
   /* USER CODE END 2 */
-
+	
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 #ifdef NBIOT
-	task_num = _AT;
+	if((*(__IO uint8_t *)EEPROM_USER_START_FDR_FLAG) == 0x01)
+	{
+		task_num = _AT_IDLE;
+		HAL_FLASHEx_DATAEEPROM_Unlock();
+		HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_FDR_FLAG,0x00);
+		HAL_FLASHEx_DATAEEPROM_Lock();
+	}
+	else
+		task_num = _AT_FLAG_INIT;
 #else
 	task_num = _AT_IDLE;
 #endif
@@ -138,78 +159,37 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 		
-#ifdef NBIOT
+#ifdef NBIOT		
+		
 		if(task_num != _AT_IDLE)
 		{
+			HAL_Delay(1000);
+			
 			if(NBTASK(&task_num) == _AT_ERROR)
 			{
-				HAL_Delay(1000);
-				error_num++;		
-			}
-			else
-			{
-				HAL_Delay(1000);
-				error_num = 0;
+				error_num++;
 			}
 	  }
-		
-		if(error_num > 3)
+		if(error_num > 3 && nb.uplink_flag == no_status)
 		{
+			user_main_printf("Restart the module...");
 			task_num = _AT_NRB;
 			error_num = 0;
-			nb.net_flag = no_status;
-			My_AlarmInit(sys.tdc,0);
+		}
+		
+		if(nb.recieve_flag == NB_RECIEVE && nb.uplink_flag == send)
+		{
+			task_num = _AT_URI;
+			nb.recieve_flag = NB_IDIE;
 		}
 #endif
-		if(sys.pwd_flag == 0 && uart2_recieve_flag)
-		{
-			uint32_t p[3]={0};
-			rtrim((char*)rxDATA);
-			p[0] = rxDATA[3]<<24 |  rxDATA[2]<<16 | rxDATA[1]<<8 | rxDATA[0];
-			p[1] = rxDATA[7]<<24 |  rxDATA[6]<<16 | rxDATA[5]<<8 | rxDATA[4];
-			if(strcmp((char*)p,(char*)sys.pwd) == 0 && strlen((char*)rxDATA) < 9)
-			{
-				user_main_printf("Password Correct");
-				sys.pwd_flag = 1;
-			}
-			else
-			{
-				user_main_printf("Password Incorrect");
-			}
-		}
-		else if(sys.pwd_flag == 1 && uart2_recieve_flag)		
-		{
-			ATEerror_t AT_State = ATInsPro((char*)rxDATA);
-			if(AT_State == AT_OK)
-				printf("%s\r\n",ATError_description[AT_OK]);
-			else if(AT_State == AT_PARAM_ERROR)
-				printf("%s",ATError_description[AT_PARAM_ERROR]);
-			else if(AT_State == AT_BUSY_ERROR)
-				printf("%s",ATError_description[AT_BUSY_ERROR]);
-			else if(AT_State == AT_TEST_PARAM_OVERFLOW)
-				printf("%s",ATError_description[AT_TEST_PARAM_OVERFLOW]);
-			else if(AT_State == AT_RX_ERROR)
-				printf("%s",ATError_description[AT_RX_ERROR]);
-			else if(AT_State == AT_ERROR)
-			{
-				rxDATA[strlen((char*)rxDATA)] = '\n';
-				HAL_UART_Transmit_DMA(&hlpuart1,(uint8_t*)rxDATA,strlen((char*)rxDATA));		
-				HAL_Delay(500);
-			}
-		}
-		if(uart2_recieve_flag)
-		{
-			rxlen = 0;
-			uart2_recieve_flag = 0;
-			HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
-			memset(rxDATA,0,sizeof(rxDATA));
-		}
+		
+		USERTASK();
 
 #ifdef lowpower_enter
 		if(task_num == _AT_IDLE && uart2_recieve_flag==0)
 		{
-			LPM_EnterStopMode();
-			SystemClock_Config();
+			LPM_EnterStopMode(SystemClock_Config);
 		}
 #endif
   }
@@ -264,9 +244,10 @@ void SystemClock_Config(void)
     Error_Handler();
   }
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_LPUART1
-                              |RCC_PERIPHCLK_RTC;
+                              |RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_RTC;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_HSI;
   PeriphClkInit.Lpuart1ClockSelection = RCC_LPUART1CLKSOURCE_HSI;
+  PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_PCLK1;
   PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
@@ -275,39 +256,79 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+static void USERTASK(void)
+{
+	if(sys.pwd_flag == 0 && uart2_recieve_flag)
+	{
+		rtrim((char*)rxDATA);
+		if(strcmp((char*)rxDATA,(char*)sys.pwd) == 0 && strlen((char*)rxDATA) < 9)
+		{
+			user_main_printf("Password Correct");
+			sys.pwd_flag = 1;
+		}
+		else
+		{
+			user_main_printf("Password Incorrect");
+		}
+	}
+	else if(sys.pwd_flag != 0 && uart2_recieve_flag)
+	{
+		ATEerror_t AT_State = ATInsPro((char*)rxDATA);
+		if(AT_State == AT_OK)
+			printf("%s\r\n",ATError_description[AT_OK]);
+		else if(AT_State == AT_PARAM_ERROR)
+			printf("%s",ATError_description[AT_PARAM_ERROR]);
+		else if(AT_State == AT_BUSY_ERROR)
+			printf("%s",ATError_description[AT_BUSY_ERROR]);
+		else if(AT_State == AT_TEST_PARAM_OVERFLOW)
+			printf("%s",ATError_description[AT_TEST_PARAM_OVERFLOW]);
+		else if(AT_State == AT_RX_ERROR)
+			printf("%s",ATError_description[AT_RX_ERROR]);
+		else if(AT_State == AT_ERROR)
+		{
+			nb.usart.len = 0;
+			memset(nb.usart.data,0,NB_RX_SIZE);
+			rxDATA[strlen((char*)rxDATA)] = '\n';
+			HAL_UART_Transmit_DMA(&hlpuart1,(uint8_t*)rxDATA,strlen((char*)rxDATA));		
+			HAL_Delay(500);					//Waiting to Send
+		}
+	}
+		
+	if(uart2_recieve_flag == 1)
+	{
+		rxlen = 0;
+		uart2_recieve_flag = 0;
+		memset(rxDATA,0,sizeof(rxDATA));
+	}
+	if(lpuart_recieve_flag == 1)
+	{
+		printf("%s",nb.usart.data);
+		nb.usart.len = 0;
+		lpuart_recieve_flag = 0;
+		memset(nb.usart.data,0,NB_RX_SIZE);
+	}
+}
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if(huart == &hlpuart1)
 	{
-		if(nb.recieve_flag == NB_BUSY)
+		nb.usart.data[nb.usart.len++] = rxbuf_lp[0];	
+		if(task_num == _AT_IDLE)
 		{
-			nb.recieve_data[nb.rxlen++] = rxbuf_lp;
-			if(rxbuf_lp == 'K' || rxbuf_lp == '>')
-				nb.recieve_flag = NB_CMD_SUCC;
-		}
-		else if(task_num >= _AT_COAP_OPEN && task_num <= _AT_TCP_CLOSE)
-		{
-			memcpy(nb.recieve_data_server+strlen(nb.recieve_data_server),(char*)&rxbuf_lp,1);
-			if(rxbuf_lp=='+')
-				_tanchuang_flag = 1;
-			if(_tanchuang_flag == 1)
+			if(rxbuf_lp[1] == '\r' && rxbuf_lp[0] == '\n')
 			{
-				if(rxbuf_lp=='\n')
-				{
-					_tanchuang_flag = 0;
-					nb.recieve_flag = NB_RECIEVE;
-				}
+				lpuart_recieve_flag = 1;
 			}
 		}
-		else
-			HAL_UART_Transmit(&huart2,(uint8_t*)&rxbuf_lp,RXSIZE,1);
-		HAL_UART_Receive_DMA(&hlpuart1,(uint8_t*)&rxbuf_lp,RXSIZE);
+		rxbuf_lp[1] = rxbuf_lp[0];
+		HAL_UART_Receive_IT(&hlpuart1,rxbuf_lp,RXSIZE);		
 	}
 	else if(huart == &huart2)
 	{
 		rxDATA[rxlen++] = rxbuf;
 		if(rxbuf == '\r' || rxbuf == '\n')
-		{					
+		{
 			uart2_recieve_flag = 1;		
 		}
 		HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
@@ -317,7 +338,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
 {
 	if(nb.net_flag == no_status)
-		task_num = _AT;
+		task_num = _AT_FLAG_INIT;
 	else if(nb.net_flag == success)
 		task_num = _AT_CSQ;
 
@@ -329,7 +350,7 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 	HAL_IWDG_Refresh(&hiwdg);
 	
 #ifdef NBIOT	
-	if(sys.pwd_flag)
+	if(sys.pwd_flag==1)
 	{
 		pwd_time_count++;
 		if(pwd_time_count == 17)
@@ -340,7 +361,7 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 		}
 	}
 #endif	
-	
+
 	if(nb.net_flag == fail)
 		task_num = _AT_CSQ;
 	
@@ -348,16 +369,23 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
+{	
 	if(GPIO_Pin == GPIO_PIN_14)
-	{
-		sensor.exit_flag=1;
+	{		
 		if(sys.mod == model6)
 			sensor.exit_count++;
-		if(nb.net_flag == success && sys.mod != model6)
+		else if(nb.net_flag == success && sys.mod != model6 && (task_num < _AT_COAP_CONFIG || task_num > _AT_TCP_CLOSE))
+		{
 			task_num = _AT_CSQ;
-		if(sys.mod != model6)
-			LPM_DisableStopMode();
+			sys.exit_flag = 1;
+			//sensor.exit_state = HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_14)==1?1:2;
+			sensor.exit_state = 1;
+			LPM_DisableStopMode();	
+		}
+	}
+	else if(GPIO_Pin == GPIO_PIN_13)
+	{		
+		nb.recieve_flag = NB_RECIEVE;
 	}
 }
 
@@ -404,7 +432,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 						break;
     }
 		MX_LPUART1_UART_Init();
-		HAL_UART_Receive_DMA(&hlpuart1,(uint8_t*)&rxbuf_lp,RXSIZE);
+		HAL_UART_Receive_IT(&hlpuart1,rxbuf_lp,RXSIZE);
 	}
 	else	if(huart == (&huart2))
 	{

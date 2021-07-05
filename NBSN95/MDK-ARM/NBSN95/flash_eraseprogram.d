@@ -34,8 +34,6 @@ nbsn95\flash_eraseprogram.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_p
 nbsn95\flash_eraseprogram.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_pwr_ex.h
 nbsn95\flash_eraseprogram.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_rtc.h
 nbsn95\flash_eraseprogram.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_rtc_ex.h
-nbsn95\flash_eraseprogram.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_tim.h
-nbsn95\flash_eraseprogram.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_tim_ex.h
 nbsn95\flash_eraseprogram.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_uart.h
 nbsn95\flash_eraseprogram.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_uart_ex.h
 nbsn95\flash_eraseprogram.o: ../Inc/usart.h

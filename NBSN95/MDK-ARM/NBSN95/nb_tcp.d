@@ -36,8 +36,6 @@ nbsn95\nb_tcp.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_pwr.h
 nbsn95\nb_tcp.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_pwr_ex.h
 nbsn95\nb_tcp.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_rtc.h
 nbsn95\nb_tcp.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_rtc_ex.h
-nbsn95\nb_tcp.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_tim.h
-nbsn95\nb_tcp.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_tim_ex.h
 nbsn95\nb_tcp.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_uart.h
 nbsn95\nb_tcp.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_uart_ex.h
 nbsn95\nb_tcp.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
@@ -48,7 +46,7 @@ nbsn95\nb_tcp.o: ../Inc/usart.h
 nbsn95\nb_tcp.o: ../Inc/main.h
 nbsn95\nb_tcp.o: ../Inc/adc.h
 nbsn95\nb_tcp.o: ../Inc/iwdg.h
-nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\nbInit.h
+nbsn95\nb_tcp.o: ../Inc/i2c.h
 nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\at.h
 nbsn95\nb_tcp.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\ctype.h
 nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\common.h
@@ -61,5 +59,4 @@ nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\sht20.h
 nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\sht31.h
 nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\lidar.h
 nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\ultrasound.h
-nbsn95\nb_tcp.o: ../Inc/tim.h
 nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\weight.h

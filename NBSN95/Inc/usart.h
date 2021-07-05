@@ -29,6 +29,7 @@ extern "C" {
 
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
+//#include "stdarg.h"
 /* USER CODE END Includes */
 
 extern UART_HandleTypeDef hlpuart1;
@@ -48,19 +49,15 @@ void MX_USART2_UART_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
-#define user_main_printf(format, ...) do{																							\
-																				uint32_t time = HAL_GetTick();								\
-																				printf("[%d]", time);													\
-																				printf( format "\r\n", ##__VA_ARGS__);				\
-																			}while(0)
+#define user_main_printf(format, ...) 	printf("[%d]" format "\r\n",HAL_GetTick(),##__VA_ARGS__)
 			
 //#define USER_MAIN_DEBUG			
-																			
+
 #ifdef USER_MAIN_DEBUG
 	#define user_main_info(format, ...) 	printf("[main info]" format "\r\n", ##__VA_ARGS__)
 	#define user_main_debug(format, ...)  printf("[main debug]" format "\r\n", ##__VA_ARGS__)
 	#define user_main_error(format, ...)  printf("[main error]" format "\r\n",##__VA_ARGS__)
-#else	
+#else
 	#define user_main_info(format, ...)
 	#define user_main_debug(format, ...)
 	#define user_main_error(format, ...)

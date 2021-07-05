@@ -1,6 +1,5 @@
 nbsn95\sht31.o: ..\Drivers\BSP\src\sht31.c
 nbsn95\sht31.o: ..\Drivers\BSP\inc\sht31.h
-nbsn95\sht31.o: ..\Drivers\BSP\inc\sht20.h
 nbsn95\sht31.o: ..\Drivers\BSP\inc\common.h
 nbsn95\sht31.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal.h
 nbsn95\sht31.o: ../Inc/stm32l0xx_hal_conf.h
@@ -36,8 +35,6 @@ nbsn95\sht31.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_pwr.h
 nbsn95\sht31.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_pwr_ex.h
 nbsn95\sht31.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_rtc.h
 nbsn95\sht31.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_rtc_ex.h
-nbsn95\sht31.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_tim.h
-nbsn95\sht31.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_tim_ex.h
 nbsn95\sht31.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_uart.h
 nbsn95\sht31.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_uart_ex.h
 nbsn95\sht31.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
@@ -48,10 +45,10 @@ nbsn95\sht31.o: ../Inc/usart.h
 nbsn95\sht31.o: ../Inc/main.h
 nbsn95\sht31.o: ../Inc/adc.h
 nbsn95\sht31.o: ../Inc/iwdg.h
-nbsn95\sht31.o: ..\Drivers\BSP\inc\nbInit.h
-nbsn95\sht31.o: ..\Drivers\BSP\inc\common.h
+nbsn95\sht31.o: ../Inc/i2c.h
 nbsn95\sht31.o: ..\Drivers\BSP\inc\at.h
 nbsn95\sht31.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\ctype.h
+nbsn95\sht31.o: ..\Drivers\BSP\inc\common.h
 nbsn95\sht31.o: ..\Drivers\BSP\inc\flash_eraseprogram.h
 nbsn95\sht31.o: ..\Drivers\BSP\inc\time_server.h
 nbsn95\sht31.o: ../Inc/rtc.h
@@ -61,5 +58,4 @@ nbsn95\sht31.o: ..\Drivers\BSP\inc\sht20.h
 nbsn95\sht31.o: ..\Drivers\BSP\inc\sht31.h
 nbsn95\sht31.o: ..\Drivers\BSP\inc\lidar.h
 nbsn95\sht31.o: ..\Drivers\BSP\inc\ultrasound.h
-nbsn95\sht31.o: ../Inc/tim.h
 nbsn95\sht31.o: ..\Drivers\BSP\inc\weight.h

@@ -11,6 +11,7 @@
 
 /* AT Command strings. Commands start with AT */
 #define AT      	 "AT"
+#define MODEL			 "+MODEL"
 #define RESET      "Z"
 #define CFGMOD     "+CFGMOD"
 #define DEUI     	 "+DEUI"
@@ -32,13 +33,15 @@
 
 #define CLRCOUNT   "+CLRCOUNT"
 #define _5VT    	 "+5VT"
-
+#define EXT      	 "+EXT"
 #define PRO     	 "+PRO"
 #define CFM     	 "+CFM"
 #define RXDL     	 "+RXDL"
 #define WEIGRE     "+WEIGRE"
 #define WEIGAP     "+WEIGAP"
-#define CNTFAC     "+CNTFAC"
+#define CDP     	 "+CDP"
+#define LDATA      "+LDATA"
+#define CUM      	 "+CUM" 	//Cache upload mechanism 
 /**********************************************/
 
 typedef enum
@@ -63,6 +66,7 @@ static const char *const ATError_description[] =
 
 ATEerror_t at(const char *param);
 ATEerror_t at_que(const char *param);
+ATEerror_t at_model_get(const char *param);
 ATEerror_t at_reset_run(const char *param);
 ATEerror_t at_mod_set(const char *param);
 ATEerror_t at_mod_get(const char *param);
@@ -102,6 +106,8 @@ ATEerror_t at_pro_set(const char *param);
 ATEerror_t at_pro_get(const char *param);
 ATEerror_t at_cfm_set(const char *param);
 ATEerror_t at_cfm_get(const char *param);
+ATEerror_t at_cum_set(const char *param);
+ATEerror_t at_cum_get(const char *param);
 ATEerror_t at_rxdl_set(const char *param);
 ATEerror_t at_rxdl_get(const char *param);
 
@@ -109,9 +115,12 @@ ATEerror_t at_weight_reset(const char *param);
 ATEerror_t at_weight_get(const char *param);
 ATEerror_t at_weight_GapValue_set(const char *param);
 ATEerror_t at_weight_GapValue_get(const char *param);
+ATEerror_t at_ext_get(const char *param);
+ATEerror_t at_ext_set(const char *param);
+ATEerror_t at_cdp_run(const char *param);
+ATEerror_t at_cdp_set(const char *param);
 
-ATEerror_t at_cntfac_set(const char *param);
-ATEerror_t at_cntfac_get(const char *param);
+ATEerror_t at_ldata_get(const char *param);
 
 ATEerror_t at_return_error(const char *param);
 
@@ -134,9 +143,20 @@ struct ATCommand_s
 };
 
 static const struct ATCommand_s ATCommand[] =
-{	
-	/** ATZ **/	
+{
+	/** AT+MODEL **/	
   {		
+    .string = AT MODEL,
+		.size_string = sizeof(MODEL) - 1,
+#ifndef NO_HELP
+    .help_string = AT MODEL "   : Get module information",
+#endif
+    .get = at_model_get,
+    .set = at_return_error,
+    .run = at_return_error,
+  },
+	/** ATZ **/	
+  {
     .string = AT RESET,
 		.size_string = sizeof(RESET) - 1,
 #ifndef NO_HELP
@@ -217,7 +237,7 @@ static const struct ATCommand_s ATCommand[] =
     .string = AT URI,
 		.size_string = sizeof(URI) - 1,
 #ifndef NO_HELP
-    .help_string = AT URI "   : Get or set CoAP options",
+    .help_string = AT URI "     : Get or set CoAP options",
 #endif
     .get = at_uri_get,
     .set = at_uri_set,
@@ -294,7 +314,7 @@ static const struct ATCommand_s ATCommand[] =
     .string = AT INTMOD,
 		.size_string = sizeof(INTMOD) - 1,
 #ifndef NO_HELP
-    .help_string = AT INTMOD "  : Get or Set the trigger interrupt mode (0:Disable,1:falling or rising,2:falling,3:rising)",
+    .help_string = AT INTMOD "  : Get or Set the trigger interrupt mode (0:input,1:falling or rising,2:falling,3:rising)",
 #endif
     .get = at_inmod_get,
     .set = at_inmod_set,
@@ -333,6 +353,17 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_cfm_set,
     .run = at_return_error,
   },
+			/** AT+CUM **/	
+	{
+    .string = AT CUM,
+		.size_string = sizeof(CUM) - 1,
+#ifndef NO_HELP
+    .help_string = AT CUM "     : Get or Set cache upload mechanism (0: Off 1: On)",
+#endif
+    .get = at_cum_get,
+    .set = at_cum_set,
+    .run = at_return_error,
+  },
 			/** AT+RXDL **/	
 	{
     .string = AT RXDL,
@@ -366,15 +397,37 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_return_error,
     .run = at_weight_reset,
   },
-			/** AT+CNTFAC **/	
+			/** AT+EXT **/	
 	{
-    .string = AT CNTFAC,
-		.size_string = sizeof(CNTFAC) - 1,
+    .string = AT EXT,
+		.size_string = sizeof(EXT) - 1,
 #ifndef NO_HELP
-    .help_string = AT CNTFAC "  : Get or set counting parameters",
+    .help_string = AT EXT "     : Get or Set Count value",
 #endif
-    .get = at_cntfac_get,
-    .set = at_cntfac_set,
+    .get = at_ext_get,
+    .set = at_ext_set,
+    .run = at_return_error,
+  },
+			/** AT+CDP **/	
+	{
+    .string = AT CDP,
+		.size_string = sizeof(CDP) - 1,
+#ifndef NO_HELP
+    .help_string = AT CDP "     : Read or Clear cached data",
+#endif
+    .get = at_return_error,
+    .set = at_cdp_set,
+    .run = at_cdp_run,
+  },
+			/** AT+LDATA **/	
+	{
+    .string = AT LDATA,
+		.size_string = sizeof(LDATA) - 1,
+#ifndef NO_HELP
+    .help_string = AT LDATA "   : Get the last upload data",
+#endif
+    .get = at_ldata_get,
+    .set = at_return_error,
     .run = at_return_error,
   },
 };

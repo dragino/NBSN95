@@ -119,68 +119,64 @@ NB_TaskStatus nb_COAP_option_get(const char* param)
 	return NBTask[_AT_COAP_OPTION].nb_cmd_status;
 }
 /**
-	* @brief  COAP Send DATA
+	* @brief  COAP Send DATA Config
   * @param  Instruction parameter
   * @retval None
   */
-NB_TaskStatus nb_COAP_send_run(const char* param)
+NB_TaskStatus nb_COAP_send_config_run(const char* param)
 {
-	NBTask[_AT_COAP_SEND].try_num = 5;
-	NBTask[_AT_COAP_SEND].set(NULL);
+	NBTask[_AT_COAP_SEND_CONFIG].try_num = 2;
+	NBTask[_AT_COAP_SEND_CONFIG].set(NULL);
 	
-	if(nb_at_send(&NBTask[_AT_COAP_SEND]) == NB_CMD_SUCC)
+	if(nb_at_send(&NBTask[_AT_COAP_SEND_CONFIG]) == NB_CMD_SUCC)
 	{
-		HAL_UART_Transmit_DMA(&hlpuart1,(uint8_t*)sensor.data,sensor.data_len);
-		while(NBTask[_AT_COAP_SEND].try_num--)
-		{
-		if( NBTask[_AT_COAP_SEND].get(param) == NB_SEND_SUCC)
-			break;
-		else
-			user_main_printf("Send ACK not received...");
-		}
-	}	
-	else
-	{
-		NBTask[_AT_COAP_SEND].nb_cmd_status = NB_SEND_FAIL;
-		HAL_Delay(500);
+		NBTask[_AT_COAP_SEND_CONFIG].nb_cmd_status = NB_CMD_SUCC;
 	}
-	return NBTask[_AT_COAP_SEND].nb_cmd_status;
+	else
+		NBTask[_AT_COAP_SEND_CONFIG].nb_cmd_status = NB_CMD_FAIL;
+	
+	return NBTask[_AT_COAP_SEND_CONFIG].nb_cmd_status;
 }
 
-NB_TaskStatus nb_COAP_send_set(const char* param)
+NB_TaskStatus nb_COAP_send_config_set(const char* param)
 {
 	memset(buff,0,sizeof(buff));
 	strcat(buff,AT QCOAPSEND"=0,3,");
 	strcat(buff,(char*)user.add);
 	strcat(buff,"\n");
 	
-	NBTask[_AT_COAP_SEND].ATSendStr  = buff;
-	NBTask[_AT_COAP_SEND].len_string = strlen(NBTask[_AT_COAP_SEND].ATSendStr);
+	NBTask[_AT_COAP_SEND_CONFIG].ATSendStr  = buff;
+	NBTask[_AT_COAP_SEND_CONFIG].len_string = strlen(NBTask[_AT_COAP_SEND_CONFIG].ATSendStr);
+	user_main_debug("NBTask[_AT_COAP_SEND_CONFIG].ATSendStr:%s",NBTask[_AT_COAP_SEND_CONFIG].ATSendStr);
+	return NBTask[_AT_COAP_SEND_CONFIG].nb_cmd_status;
+}
+/**
+	* @brief  COAP Send DATA
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_COAP_send_run(const char* param)
+{
+	NBTask[_AT_COAP_SEND].try_num = 4;
+	NBTask[_AT_COAP_SEND].set(NULL);
+
+	if(nb_at_send(&NBTask[_AT_COAP_SEND]) == NB_CMD_SUCC)
+	{
+		NBTask[_AT_COAP_SEND].nb_cmd_status = NB_CMD_SUCC;
+	}
+	else
+		NBTask[_AT_COAP_SEND].nb_cmd_status = NB_CMD_FAIL;
+
+	return NBTask[_AT_COAP_SEND].nb_cmd_status;
+}
+
+NB_TaskStatus nb_COAP_send_set(const char* param)
+{
+	NBTask[_AT_COAP_SEND].ATSendStr  = sensor.data;
+	NBTask[_AT_COAP_SEND].len_string = sensor.data_len;
 	user_main_debug("NBTask[_AT_COAP_SEND].ATSendStr:%s",NBTask[_AT_COAP_SEND].ATSendStr);
 	return NBTask[_AT_COAP_SEND].nb_cmd_status;
 }
-
-NB_TaskStatus nb_COAP_send_get(const char* param)
-{
-	uint32_t time = HAL_GetTick();
-	while(HAL_GetTick() - time < 2000 && nb.recieve_flag != NB_RECIEVE )
-	{
-		user_main_info("...");
-	}
-
-	nb.recieve_flag = NB_IDIE;	
-	user_main_info("recieve_data_server:%s",nb.recieve_data_server);
-	
-	if(strstr(nb.recieve_data_server,QCOAPURC": \"rsp\",2,2.04") != NULL || strstr(nb.recieve_data,QCOAPURC": \"rsp\",2,2.04") != NULL )
-	{
-		NBTask[_AT_COAP_SEND].nb_cmd_status = NB_SEND_SUCC;	
-	}
-	else
-		NBTask[_AT_COAP_SEND].nb_cmd_status = NB_SEND_FAIL;
-	
-	return NBTask[_AT_COAP_SEND].nb_cmd_status;
-}
-
 //////////////////////////////////
 NB_TaskStatus nb_COAP_read_run(const char* param)
 {
@@ -231,4 +227,32 @@ NB_TaskStatus nb_COAP_close_set(const char* param)
 NB_TaskStatus nb_COAP_close_get(const char* param)
 {
 	return NBTask[_AT_COAP_CLOSE].nb_cmd_status;
+}
+
+/**
+	* @brief  COAP URI:Scheduling tasks via URI 
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_COAP_uri_run(const char* param)
+{
+	user_main_debug("uri:%s",nb.usart.data);
+	if(strstr((char*)nb.usart.data,QCOAPURC": \"rsp\",2,2.04") != NULL)
+	{
+		NBTask[_AT_COAP_URI].nb_cmd_status = NB_SEND_SUCC;	
+	}
+	else
+		NBTask[_AT_COAP_URI].nb_cmd_status = NB_OTHER;	
+
+////Judgment issued and received 
+//	if(strstr((char*)nb.usart.data,QCOAPURC) != NULL)
+//	{
+////		nb_COAP_data_read_set(NULL);
+//	}
+////Ask if the process has failed 
+//	if(strstr((char*)nb.usart.data,QCOAPURC) != NULL)
+//	{
+//		NBTask[_AT_COAP_URI].nb_cmd_status = NB_ERROR;
+//	}
+	return NBTask[_AT_COAP_URI].nb_cmd_status;
 }
