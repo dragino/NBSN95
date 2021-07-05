@@ -26,7 +26,6 @@
 
 UART_HandleTypeDef hlpuart1;
 UART_HandleTypeDef huart2;
-DMA_HandleTypeDef hdma_lpuart1_rx;
 DMA_HandleTypeDef hdma_lpuart1_tx;
 
 /* LPUART1 init function */
@@ -118,23 +117,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     /* LPUART1 DMA Init */
-    /* LPUART1_RX Init */
-    hdma_lpuart1_rx.Instance = DMA1_Channel3;
-    hdma_lpuart1_rx.Init.Request = DMA_REQUEST_5;
-    hdma_lpuart1_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
-    hdma_lpuart1_rx.Init.PeriphInc = DMA_PINC_DISABLE;
-    hdma_lpuart1_rx.Init.MemInc = DMA_MINC_ENABLE;
-    hdma_lpuart1_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-    hdma_lpuart1_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    hdma_lpuart1_rx.Init.Mode = DMA_CIRCULAR;
-    hdma_lpuart1_rx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
-    if (HAL_DMA_Init(&hdma_lpuart1_rx) != HAL_OK)
-    {
-      Error_Handler();
-    }
-
-    __HAL_LINKDMA(uartHandle,hdmarx,hdma_lpuart1_rx);
-
     /* LPUART1_TX Init */
     hdma_lpuart1_tx.Instance = DMA1_Channel2;
     hdma_lpuart1_tx.Init.Request = DMA_REQUEST_5;
@@ -144,7 +126,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     hdma_lpuart1_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_lpuart1_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
     hdma_lpuart1_tx.Init.Mode = DMA_NORMAL;
-    hdma_lpuart1_tx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
+    hdma_lpuart1_tx.Init.Priority = DMA_PRIORITY_HIGH;
     if (HAL_DMA_Init(&hdma_lpuart1_tx) != HAL_OK)
     {
       Error_Handler();
@@ -206,7 +188,6 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
     HAL_GPIO_DeInit(GPIOB, GPIO_PIN_10|GPIO_PIN_11);
 
     /* LPUART1 DMA DeInit */
-    HAL_DMA_DeInit(uartHandle->hdmarx);
     HAL_DMA_DeInit(uartHandle->hdmatx);
 
     /* LPUART1 interrupt Deinit */
@@ -260,7 +241,7 @@ void My_UARTEx_StopModeWakeUp(UART_HandleTypeDef* uartHandle)
 #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
 #endif /* __GNUC__ */
 
-uint8_t ch;
+uint8_t* ch;
 
 PUTCHAR_PROTOTYPE
 {
@@ -271,6 +252,16 @@ PUTCHAR_PROTOTYPE
   return ch;
 }
 
+//extern uint8_t rxDATA[300];
+//void PRINTF(const char *format,...)
+//{
+//	uint16_t len;
+//	va_list args;	
+//	va_start(args,format);
+//	len = vsnprintf((char*)rxDATA,sizeof(rxDATA)+1,(char*)format,args);
+//	va_end(args);
+//	HAL_UART_Transmit_DMA(&huart2, rxDATA, len);
+//}
 /* USER CODE END 1 */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -10,8 +10,8 @@
 #include "usart.h"
 #include "adc.h"
 #include "iwdg.h"
+#include "i2c.h"
 
-#include "nbInit.h"
 #include "at.h"
 #include "time_server.h"
 #include "battery_read.h"
@@ -39,9 +39,8 @@
  * @retval None
  */
 
-#define version 	"v1.1.1"
-#define version_s "111"
-#define stack 		"D-BC95-002"
+#define AT_VERSION_STRING 	"v1.2.0"
+#define stack 							"D-BC95-003"
 
 #define COAP_PRO  0x01
 #define UDP_PRO   0x02
@@ -55,21 +54,43 @@ typedef enum
  model3 ,
  model4 ,
  model5 ,
- model6 ,	
-}MODEL;
+ model6 ,
+}model;
+
+typedef struct Node
+{
+	uint8_t num;								//
+	uint8_t data_valid_flag;		//Data valid flag 
+	int Timestamp;							//Timestamp 
+	char* data;									//DATA
+	struct Node *next;					//Point to the next node 
+}Node,*LinkedList;
 
 typedef struct
 {
-	uint32_t pwd[3];		   //System password
-	uint8_t  pwd_flag;		 //Password correct flag
-	uint8_t  mod;				   //mode
-	uint8_t  inmod;			   //Interrupt mode
-	int 		 tdc;				   //Send cycle
-	int 		 power_time;	 //Power on time 
-	uint16_t uplink_count; //Number of postings
-	uint8_t  protocol;		 //protocol
-	uint8_t  cfm;					 //Confirm mode flag
-	uint16_t rxdl;				 //Receiving time
+	uint16_t len;
+	uint8_t* data;
+}USART;
+
+typedef struct
+{
+	uint8_t*		pwd;		   	 		//System password
+	uint8_t			pwd_flag;		 		//Password correct flag
+	uint8_t			fdr_flag;		 		//FDR flag
+	uint8_t			cum_flag;		 		//Cache upload mechanism flag
+	uint8_t  		exit_flag;		 	//System external interrupt 
+	uint8_t  		mod;				   	//mode
+	uint8_t  		inmod;			   	//Interrupt mode
+	uint32_t 		tdc;				   	//Send cycle
+	uint16_t 		power_time;	 		//Power on time 
+	uint16_t 		uplink_count; 	//Number of postings
+	uint8_t  		protocol;		 		//protocol
+	uint8_t  		cfm;					 	//Confirm mode flag
+	uint16_t 		rxdl;				 		//Receiving time
+	uint8_t    	list_flag;
+	
+	LinkedList 	list;
+	USART				usart;
 }SYSTEM;
 
 typedef struct
@@ -77,7 +98,7 @@ typedef struct
 	uint8_t  deui[15];
 	uint8_t  add[25];
 	uint8_t  uri[128];
-	uint8_t  client[41];	
+	uint8_t  client[41];
 	uint8_t  uname[41];
 	uint8_t  pwd[41];
 	uint8_t  pubtopic[65];
@@ -86,23 +107,23 @@ typedef struct
 
 typedef struct
 {
-	uint8_t  exit_flag;
-	uint8_t  singal;
-	uint32_t exit_count;
-	int temDs18b20_1;
-	int temDs18b20_2;
-	int temDs18b20_3;
-	int humSHT;
-	int temSHT;
-	uint16_t batteryLevel_mV;
-	uint16_t adc0;
-	uint16_t adc1;
-	uint16_t adc4;
-	uint16_t distance;
-	float GapValue;
-	float factor;
-	char data[250];	
-	int  data_len;
+	uint8_t  	exit_state;
+	uint8_t  	singal;
+	uint32_t 	exit_count;
+	uint32_t 	time_stamp;
+	int 			temDs18b20_1;
+	int 			temDs18b20_2;
+	int 			temDs18b20_3;
+	int 			humSHT;
+	int 			temSHT;
+	uint16_t 	batteryLevel_mV;
+	uint16_t 	adc0;
+	uint16_t 	adc1;
+	uint16_t 	adc4;
+	uint16_t  distance;
+	float 		GapValue;
+	char*  		data;	
+	uint16_t  data_len;
 }SENSOR;
 
 
@@ -118,10 +139,22 @@ void product_information_print(void);
 void reboot_information_print(void);
 void EX_GPIO_Init(uint8_t state);
 void led_on(uint16_t time);
-void i2c_device_detection(void);
+uint8_t i2c_device_detection(void);
 
-void txPayLoadDeal(SENSOR* Sensor);
+void txPayLoadDeal(SENSOR* Sensor,LinkedList L);
 void rxPayLoadDeal(char* payload);
 int hexToint(char *str);
+uint16_t string_touint(void);
+void StrToHex(char *pbDest, char *pszSrc, int nLen);
+void new_firmware_update(void);
+
+LinkedList List_Init(LinkedList L);
+LinkedList createList(void);
+LinkedList printList(LinkedList L);
+LinkedList sortList(LinkedList L);
+LinkedList upLink_flash_clear(LinkedList L);
+LinkedList txCachePayLoadDeal(SENSOR* Sensor,LinkedList L);
+LinkedList upLink_fail_write(LinkedList L);
+LinkedList upLink_fail_read(LinkedList L);
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
