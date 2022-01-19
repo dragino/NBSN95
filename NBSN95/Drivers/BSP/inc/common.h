@@ -39,7 +39,7 @@
  * @retval None
  */
 
-#define AT_VERSION_STRING 	"v1.2.0"
+#define AT_VERSION_STRING 	"v1.2.3"
 #define stack 							"D-BC95-003"
 
 #define COAP_PRO  0x01
@@ -88,6 +88,7 @@ typedef struct
 	uint8_t  		cfm;					 	//Confirm mode flag
 	uint16_t 		rxdl;				 		//Receiving time
 	uint8_t    	list_flag;
+	uint8_t     nband_flag;
 	
 	LinkedList 	list;
 	USART				usart;
@@ -146,6 +147,7 @@ void rxPayLoadDeal(char* payload);
 int hexToint(char *str);
 uint16_t string_touint(void);
 void StrToHex(char *pbDest, char *pszSrc, int nLen);
+int countchar(char *str,char a);
 void new_firmware_update(void);
 
 LinkedList List_Init(LinkedList L);

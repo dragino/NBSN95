@@ -65,7 +65,7 @@ static uint16_t rxlen = 0;
 static uint8_t  rxDATA[300]={0};
 static uint8_t  uart2_recieve_flag = 0;
 
-static uint8_t rxbuf_lp[5] = {0};
+static uint8_t rxbuf_lp;
 static uint8_t lpuart_recieve_flag = 0;
 
 static uint8_t pwd_time_count = 0;			//Password time count times
@@ -74,6 +74,7 @@ static uint8_t task_num = _AT_IDLE;			//NB task directory
 
 static uint8_t error_num = 0;				    //Error count
 
+static uint8_t uplink_time_num = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -133,11 +134,11 @@ int main(void)
 	led_on(1000);
 	HAL_Delay(3000);
 	HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
-	HAL_UART_Receive_IT(&hlpuart1,rxbuf_lp,RXSIZE);
+	HAL_UART_Receive_IT(&hlpuart1,(uint8_t*)&rxbuf_lp,RXSIZE);
 	My_UARTEx_StopModeWakeUp(&huart2);				//Enable serial port wake up
 	My_UARTEx_StopModeWakeUp(&hlpuart1);			//Enable serial port wake up
   /* USER CODE END 2 */
-	
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 #ifdef NBIOT
@@ -247,7 +248,7 @@ void SystemClock_Config(void)
                               |RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_RTC;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_HSI;
   PeriphClkInit.Lpuart1ClockSelection = RCC_LPUART1CLKSOURCE_HSI;
-  PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_PCLK1;
+  PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
   PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
@@ -258,6 +259,11 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 static void USERTASK(void)
 {
+	if(sys.pwd_flag==1 && sys.pwd_flag == 0 && pwd_time_count == 0)
+	{
+		HAL_UART_Transmit(&huart2,(uint8_t*)"Password timeout\r\n",20,20);
+	}
+	
 	if(sys.pwd_flag == 0 && uart2_recieve_flag)
 	{
 		rtrim((char*)rxDATA);
@@ -313,16 +319,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if(huart == &hlpuart1)
 	{
-		nb.usart.data[nb.usart.len++] = rxbuf_lp[0];	
+		nb.usart.data[nb.usart.len++] = rxbuf_lp;	
 		if(task_num == _AT_IDLE)
 		{
-			if(rxbuf_lp[1] == '\r' && rxbuf_lp[0] == '\n')
+			if(rxbuf_lp == '\r' || rxbuf_lp == '\n')
 			{
 				lpuart_recieve_flag = 1;
 			}
 		}
-		rxbuf_lp[1] = rxbuf_lp[0];
-		HAL_UART_Receive_IT(&hlpuart1,rxbuf_lp,RXSIZE);		
+		HAL_UART_Receive_IT(&hlpuart1,(uint8_t*)&rxbuf_lp,RXSIZE);		
 	}
 	else if(huart == &huart2)
 	{
@@ -339,9 +344,9 @@ void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
 {
 	if(nb.net_flag == no_status)
 		task_num = _AT_FLAG_INIT;
-	else if(nb.net_flag == success)
+	else if(nb.net_flag == success && nb.uplink_flag == no_status)
 		task_num = _AT_CSQ;
-
+	
 	LPM_DisableStopMode();
 }
 
@@ -357,13 +362,27 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 		{
 			sys.pwd_flag = 0;
 			pwd_time_count = 0;
-			HAL_UART_Transmit(&huart2,(uint8_t*)"Password timeout\r\n",20,20);
 		}
 	}
 #endif	
 
 	if(nb.net_flag == fail)
 		task_num = _AT_CSQ;
+	if(nb.net_flag == success && nb.uplink_flag == send)
+	{
+		uplink_time_num++;
+		if(uplink_time_num>=7)
+		{
+			uplink_time_num = 0;
+			error_num++;
+			if(sys.protocol == COAP_PRO)			{task_num = _AT_COAP_CLOSE;}
+			else if(sys.protocol == UDP_PRO)	{task_num	=	_AT_UDP_CLOSE;}
+			else if(sys.protocol == MQTT_PRO)	{task_num	=	_AT_MQTT_CLOSE;}
+			else if(sys.protocol == TCP_PRO)	{task_num	=	_AT_TCP_CLOSE;}
+		}
+	}
+	else 
+		uplink_time_num = 0;
 	
 	My_AlarmInit(18,1);
 }
@@ -386,96 +405,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	else if(GPIO_Pin == GPIO_PIN_13)
 	{		
 		nb.recieve_flag = NB_RECIEVE;
-	}
-}
-
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
-{
-	if(huart == (&hlpuart1))
-	{
-		user_main_error("hlpuart1 ERROR");
-		uint32_t isrflags = READ_REG(huart->Instance->ISR);
-		switch(huart->ErrorCode)
-    {
-				case HAL_UART_ERROR_NONE:
-						user_main_error("HAL_UART_ERROR_NONE\r\n");
-						break;
-				case HAL_UART_ERROR_PE:
-						user_main_error("HAL_UART_ERROR_PE\r\n");
-						READ_REG(huart->Instance->RDR);//PE清标志，第二步读DR
-						READ_REG(huart->Instance->TDR);
-						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_PE);//清标志
-						break;
-				case HAL_UART_ERROR_NE:
-						user_main_error("HAL_UART_ERROR_NE\r\n");
-						READ_REG(huart->Instance->RDR);//NE清标志，第二步读DR
-						READ_REG(huart->Instance->TDR);
-						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_NE);//清标志
-						break;
-				case HAL_UART_ERROR_FE:
-						user_main_error("HAL_UART_ERROR_FE\r\n");
-						READ_REG(huart->Instance->RDR);//FE清标志，第二步读DR
-						READ_REG(huart->Instance->TDR);
-						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_FE);//清标志
-						break;
-				case HAL_UART_ERROR_ORE:
-						user_main_error("HAL_UART_ERROR_ORE\r\n");
-						READ_REG(huart->Instance->RDR);//ORE清标志，第二步读DR
-						READ_REG(huart->Instance->TDR);
-						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_ORE);//清标志
-						break;
-				case HAL_UART_ERROR_DMA:
-						user_main_error("HAL_UART_ERROR_DMA\r\n");
-						break;
-				default:
-						user_main_error("other\r\n");
-						break;
-    }
-		MX_LPUART1_UART_Init();
-		HAL_UART_Receive_IT(&hlpuart1,rxbuf_lp,RXSIZE);
-	}
-	else	if(huart == (&huart2))
-	{
-		user_main_error("huart2 ERROR");
-		uint32_t isrflags = READ_REG(huart->Instance->ISR);
-		switch(huart->ErrorCode)
-    {
-				case HAL_UART_ERROR_NONE:
-						user_main_error("HAL_UART_ERROR_NONE\r\n");
-						break;
-				case HAL_UART_ERROR_PE:
-						user_main_error("HAL_UART_ERROR_PE\r\n");
-						READ_REG(huart->Instance->RDR);//PE清标志，第二步读DR
-						READ_REG(huart->Instance->TDR);
-						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_PE);//清标志
-						break;
-				case HAL_UART_ERROR_NE:
-						user_main_error("HAL_UART_ERROR_NE\r\n");
-						READ_REG(huart->Instance->RDR);//NE清标志，第二步读DR
-						READ_REG(huart->Instance->TDR);
-						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_NE);//清标志
-						break;
-				case HAL_UART_ERROR_FE:
-						user_main_error("HAL_UART_ERROR_FE\r\n");
-						READ_REG(huart->Instance->RDR);//FE清标志，第二步读DR
-						READ_REG(huart->Instance->TDR);
-						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_FE);//清标志
-						break;
-				case HAL_UART_ERROR_ORE:
-						user_main_error("HAL_UART_ERROR_ORE\r\n");
-						READ_REG(huart->Instance->RDR);//ORE清标志，第二步读DR
-						READ_REG(huart->Instance->TDR);
-						__HAL_UART_CLEAR_FLAG(huart, UART_FLAG_ORE);//清标志
-						break;
-				case HAL_UART_ERROR_DMA:
-						user_main_error("HAL_UART_ERROR_DMA\r\n");
-						break;
-				default:
-						user_main_error("other\r\n");
-						break;
-    }
-		MX_USART2_UART_Init();
-		HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
 	}
 }
 /* USER CODE END 4 */
@@ -509,4 +438,3 @@ void assert_failed(uint8_t *file, uint32_t line)
 }
 #endif /* USE_FULL_ASSERT */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -1,6 +1,7 @@
 #include "nb_coap.h"
 
 static char buff[200]={0};
+static char downlink_data[50]={0};
 /**
 	* @brief  Configure to show the CoAP option of sender
   * @param  Instruction parameter
@@ -141,7 +142,7 @@ NB_TaskStatus nb_COAP_send_config_run(const char* param)
 NB_TaskStatus nb_COAP_send_config_set(const char* param)
 {
 	memset(buff,0,sizeof(buff));
-	strcat(buff,AT QCOAPSEND"=0,3,");
+	strcat(buff,AT QCOAPSEND"=1,3,");
 	strcat(buff,(char*)user.add);
 	strcat(buff,"\n");
 	
@@ -180,16 +181,38 @@ NB_TaskStatus nb_COAP_send_set(const char* param)
 //////////////////////////////////
 NB_TaskStatus nb_COAP_read_run(const char* param)
 {
+	nb_COAP_read_set(param);
+	if(nb_COAP_read_get(param) == NB_READ_NODATA)
+	{
+		NBTask[_AT_COAP_READ].nb_cmd_status = NB_READ_NODATA;
+	}
+	else
+	{		
+		NBTask[_AT_COAP_READ].nb_cmd_status = NB_READ_DATA;
+	}
 	return NBTask[_AT_COAP_READ].nb_cmd_status;
 }
 	
 NB_TaskStatus nb_COAP_read_set(const char* param)
 {
+	memset(downlink_data,0,20);
 	return NBTask[_AT_COAP_READ].nb_cmd_status;
 }
 	
 NB_TaskStatus nb_COAP_read_get(const char* param)
-{
+{	
+	NBTask[_AT_COAP_READ].nb_cmd_status = NB_READ_NODATA;
+	char* pos_start  = strstr((char*)nb.usart.data,QCOAPURC);
+	if(pos_start != NULL)
+	{
+		if(countchar(pos_start,',')==5)
+		{
+			char* pos_end=strrchr((char*)pos_start,',');
+			memcpy(downlink_data,pos_end+1,strlen(pos_end)-1);
+			user_main_printf("Received downlink data:%s",downlink_data);
+			rxPayLoadDeal(downlink_data);
+		}
+	}
 	return NBTask[_AT_COAP_READ].nb_cmd_status;
 }
 
@@ -237,7 +260,7 @@ NB_TaskStatus nb_COAP_close_get(const char* param)
 NB_TaskStatus nb_COAP_uri_run(const char* param)
 {
 	user_main_debug("uri:%s",nb.usart.data);
-	if(strstr((char*)nb.usart.data,QCOAPURC": \"rsp\",2,2.04") != NULL)
+	if(strstr((char*)nb.usart.data,QCOAPURC": \"rsp\",2,2.0") != NULL)
 	{
 		NBTask[_AT_COAP_URI].nb_cmd_status = NB_SEND_SUCC;	
 	}
@@ -249,10 +272,11 @@ NB_TaskStatus nb_COAP_uri_run(const char* param)
 //	{
 ////		nb_COAP_data_read_set(NULL);
 //	}
-////Ask if the process has failed 
-//	if(strstr((char*)nb.usart.data,QCOAPURC) != NULL)
-//	{
-//		NBTask[_AT_COAP_URI].nb_cmd_status = NB_ERROR;
-//	}
+//Ask if the process has failed 
+	if(strstr((char*)nb.usart.data,QCOAPURC": \"rsp\",2,5") != NULL ||
+		strstr((char*)nb.usart.data,QCOAPURC": \"rsp\",2,4") != NULL )
+	{
+		NBTask[_AT_COAP_URI].nb_cmd_status = NB_ERROR;
+	}
 	return NBTask[_AT_COAP_URI].nb_cmd_status;
 }

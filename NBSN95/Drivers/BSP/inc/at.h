@@ -41,7 +41,8 @@
 #define WEIGAP     "+WEIGAP"
 #define CDP     	 "+CDP"
 #define LDATA      "+LDATA"
-#define CUM      	 "+CUM" 	//Cache upload mechanism 
+#define CUM      	 "+CUM" 		//Cache upload mechanism
+#define FBAND      "+FBAND" 	//Automatically modify the frequency band
 /**********************************************/
 
 typedef enum
@@ -119,6 +120,9 @@ ATEerror_t at_ext_get(const char *param);
 ATEerror_t at_ext_set(const char *param);
 ATEerror_t at_cdp_run(const char *param);
 ATEerror_t at_cdp_set(const char *param);
+
+ATEerror_t at_fband_get(const char *param);
+ATEerror_t at_fband_set(const char *param);
 
 ATEerror_t at_ldata_get(const char *param);
 
@@ -418,6 +422,17 @@ static const struct ATCommand_s ATCommand[] =
     .get = at_return_error,
     .set = at_cdp_set,
     .run = at_cdp_run,
+  },
+	/** AT+FBAND **/	
+	{
+    .string = AT FBAND,
+		.size_string = sizeof(FBAND) - 1,
+#ifndef NO_HELP
+    .help_string = AT FBAND "   : Get or Set whether to automatically modify the frequency band",
+#endif
+    .get = at_fband_get,
+    .set = at_fband_set,
+    .run = at_return_error,
   },
 			/** AT+LDATA **/	
 	{

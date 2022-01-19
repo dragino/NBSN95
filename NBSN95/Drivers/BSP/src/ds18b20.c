@@ -453,7 +453,7 @@ void DS18B20_SkipRom(uint8_t num)
 
 float DS18B20_GetTemp_SkipRom (uint8_t num)
 {
-	uint8_t tpmsb, tplsb;
+	uint8_t tpmsb, tplsb,ds_flag = 1;
 	short s_tem;
 	float f_tem;
 	
@@ -469,7 +469,7 @@ float DS18B20_GetTemp_SkipRom (uint8_t num)
 	tplsb = DS18B20_ReadByte(num);                 
 	tpmsb = DS18B20_ReadByte(num); 
 	
-	if((tpmsb==5)&&(tplsb==80))     //1360= 00000101 01010000,tpmsb=00000101=5,tplsb=01010000=80;  
+	if((tpmsb==5)&&(tplsb==80))     //1360= 00000101 01010000,tpmsb=00000101=5,tplsb=01010000=80;
 	{
 		DS18B20_SkipRom(num);
 		DS18B20_WriteByte(0X44,num);                                
@@ -486,11 +486,20 @@ float DS18B20_GetTemp_SkipRom (uint8_t num)
 	s_tem = tpmsb<<8;
 	s_tem = s_tem | tplsb;
 	
-	if( s_tem < 0 )                
-			f_tem = (~s_tem+1) * -0.0625;        
-	else
-			f_tem = s_tem * 0.0625;
+	if( s_tem < 0 && s_tem != -1)
+		f_tem = (~s_tem+1) * -0.0625;        
+	else if( s_tem >= 0)
+		f_tem = s_tem * 0.0625;
+	else 
+	{
+		ds_flag = 0;
+		f_tem = -409.5;
+	}
 	
-	user_main_printf("DS18B20(%d) temp is %.2f ",num,f_tem);
+	if(ds_flag)
+		user_main_printf("DS18B20(%d) temp is %.2f ",num,f_tem);
+	else
+		user_main_printf("DS18B20 error");
+	
 	return f_tem;         
 }

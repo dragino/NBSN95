@@ -159,7 +159,8 @@ uint8_t i2c_device_detection(void)
 		user_main_printf("Use Sensor is SHT3x");
 		return 2;
 	}
-	
+	sensor.humSHT = 0;
+	sensor.temSHT = 0;
 	user_main_printf("No I2C device detected");
 	return 0;
 }
@@ -197,7 +198,7 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 			sht20Data();
 		else if(i2c_device_flag == 2)
 			sht31Data();
-	
+
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
 		if(sys.inmod =='0')
@@ -303,7 +304,7 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 	
 	sprintf(Sensor->data+strlen(Sensor->data), "%.8x", sensor.time_stamp);
 	memcpy(sensor_raw_data,&Sensor->data[12],strlen(Sensor->data)-12);
-	
+
 	if(sys.list_flag ==1 && sys.cum_flag == '1')	
 	{
 		LinkedList L0 = L;
@@ -453,6 +454,19 @@ int hexToint(char *str)
 			n = 16 * n + (tolower(str[i]) - '0');  
 	}
 	return n;  
+}
+
+int countchar(char *str,char a)
+{
+    int n=0;
+    int i = 0;
+    while(*(str+i)!='\0')
+    {
+        if(*(str+i) == a)
+            n++;
+        i++;
+    }
+    return n;
 }
 //Create data storage linked list 
 LinkedList List_Init(LinkedList L)

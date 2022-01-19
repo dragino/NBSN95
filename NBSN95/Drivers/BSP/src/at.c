@@ -511,7 +511,7 @@ ATEerror_t at_cum_set(const char *param)
 	
   return AT_OK;
 }
-/************** 		AT+RXDL		 **************/
+/************** 			AT+RXDL		 **************/
 ATEerror_t at_rxdl_set(const char *param)
 {
 	char* pos = strchr(param,'=');
@@ -637,6 +637,26 @@ ATEerror_t at_ldata_get(const char *param)
 	return AT_OK;
 }
 
+/************** 			AT+FBAND		**************/
+ATEerror_t at_fband_get(const char *param)
+{
+	if(keep)
+		printf(AT FBAND"=");
+	printf("%c\r\n",sys.nband_flag);
+	return AT_OK;
+}
+
+ATEerror_t at_fband_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	if(pos[1]== '0' || pos[1]== '1')
+		sys.nband_flag = pos[1];
+	else
+		return AT_PARAM_ERROR;
+	
+	return AT_OK;
+}
+
 /************** 		Other		 **************/
 char *rtrim(char* str)
 {
@@ -669,6 +689,7 @@ void config_Set(void)
 	general_parameters[4]=sys.rxdl<<16   | sys.power_time;
 	general_parameters[5]=(int)(sensor.GapValue *10000);
 	general_parameters[6]=sensor.exit_count;
+	general_parameters[10]=sys.nband_flag<<24;
 	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.deui);i=i+4,j++)
 			general_parameters[7+j]=user.deui[i+0]<<24 | user.deui[i+1]<<16 | user.deui[i+2]<<8 | user.deui[i+3];
@@ -755,6 +776,11 @@ void config_Get(void)
 		sensor.GapValue = 400.0;
 	
 	sensor.exit_count = FLASH_read(add+24);
+	
+	sys.nband_flag = FLASH_read(add+40)>>24 &0xFF;
+	if(sys.nband_flag!='0' && sys.nband_flag!='1')
+		sys.nband_flag = '1';
+
 	
 	add = add+28;
 	for(uint8_t i=0,j=0;i<3;i++,j=j+4)

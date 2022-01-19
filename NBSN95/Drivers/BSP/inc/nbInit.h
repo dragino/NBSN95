@@ -89,7 +89,6 @@ typedef enum
 	_AT_NCONFIG,		//Configure UE Behaviour
 	_AT_NBAND,		 	//AT+NBAND
 	_AT_CCLK,				//AT+CCLK?
-	_AT_CEREG,     	//EPS Network Registration Status
 	_AT_CPSMS,     	//Power Saving ModeSetting
 	_AT_CSQ,       	//Singal
 /*COAP*/
@@ -176,6 +175,8 @@ typedef enum   //BC95-G Status flag
 	NB_CLOSE_FAIL,
 	NB_CMD_OFF,
 	NB_CMD_ON,
+	NB_NBAND_SET,
+	NB_NBAND_NOSET,
 	NB_OTHER
 }NB_TaskStatus;
 
@@ -187,16 +188,17 @@ NB_TaskStatus nb_at_run(const char* param);
 NB_TaskStatus nb_cgsn_get(const char* param);
 NB_TaskStatus nb_ate_run(const char* param);
 NB_TaskStatus nb_cimi_get(const char* param);
+NB_TaskStatus nb_cfun_run(const char* param);
 NB_TaskStatus nb_cfun_set(const char* param);
 NB_TaskStatus nb_cfun_get(const char* param);
 NB_TaskStatus nb_nconfig_run(const char* param);
+
+NB_TaskStatus nb_nband_run(const char* param);
+NB_TaskStatus nb_nband_set(const char* param);
 NB_TaskStatus nb_nband_get(const char* param);
+
 NB_TaskStatus nb_cclk_run(const char* param);
 NB_TaskStatus nb_cclk_get(const char* param);
-
-NB_TaskStatus nb_cereg_run(const char* param);
-NB_TaskStatus nb_cereg_set(const char* param);
-NB_TaskStatus nb_cereg_get(const char* param);
 
 NB_TaskStatus nb_cpsms_run(const char* param);
 NB_TaskStatus nb_cpsms_set(const char* param);
@@ -322,6 +324,7 @@ static struct NBTASK NBTask[] =
 		.cmd_num        = _AT,
 		.len_string 		= sizeof(AT  NEWLINE) - 1,
 		.time_out 			= 300,
+		.try_num        = 3,
     .run 						= nb_at_run,
 		.set						= nb_null_run,
 		.get						= nb_null_run,
@@ -368,13 +371,13 @@ static struct NBTASK NBTask[] =
   },
 /**************** CFUN	****************/
 	{		
-    .ATSendStr 			= AT CFUN,
+    .ATSendStr 			= NULL,
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_CFUN,
-		.len_string 		= sizeof(AT CFUN) - 1,
-		.time_out 			= 500,
-    .run 						= nb_null_run,
+		.len_string 		= 0,
+		.time_out 			= 2000,
+    .run 						= nb_cfun_run,
 		.set						= nb_cfun_set,
 		.get						= nb_cfun_get,
 		.nb_cmd_status  = NB_IDIE,
@@ -394,14 +397,14 @@ static struct NBTASK NBTask[] =
   },
 /**************** NBAND	****************/
 	{		
-    .ATSendStr 			= AT NBAND "?" NEWLINE,
+    .ATSendStr 			= NULL,
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_NBAND,
-		.len_string 		= sizeof(AT NBAND "?" NEWLINE) - 1,
+		.len_string 		= 0,
 		.time_out 			= 300,
-    .run 						= nb_null_run,
-		.set						= nb_null_run,
+    .run 						= nb_nband_run,
+		.set						= nb_nband_set,
 		.get						= nb_nband_get,
 		.nb_cmd_status  = NB_IDIE,
   },
@@ -416,19 +419,6 @@ static struct NBTASK NBTask[] =
     .run 						= nb_cclk_run,
 		.set						= nb_null_run,
 		.get						= nb_cclk_get,
-		.nb_cmd_status  = NB_IDIE,
-  },
-/**************** CEREG	****************/
-	{		
-    .ATSendStr 			= NULL,
-		.ATRecStrOK  		= "OK",
-		.ATRecStrError  = "ERROR",
-		.cmd_num        = _AT_CEREG,
-		.len_string 		= 0,
-		.time_out 			= 300,
-    .run 						= nb_cereg_run,
-		.set						= nb_cereg_set,
-		.get						= nb_cereg_get,
 		.nb_cmd_status  = NB_IDIE,
   },
 /**************** CPSMS	****************/
@@ -855,7 +845,7 @@ static struct NBTASK NBTask[] =
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_NRB,
 		.len_string 		= sizeof(AT NRB NEWLINE) - 1,
-		.time_out 			= 500,
+		.time_out 			= 10000,
     .run 						= nb_nrb_run,
 		.set						= nb_null_run,
 		.get						= nb_null_run,

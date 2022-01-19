@@ -54,7 +54,7 @@ void sht31Data(void)
 
   user_main_printf("Humidity =%.2f %%rh",hum);
 	user_main_printf("tem =%.2f C",tem);	
-	
+
 	sensor.temSHT = (int)(tem*10);
 	sensor.humSHT = (int)(hum*10);
 	

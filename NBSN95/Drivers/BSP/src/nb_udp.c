@@ -76,7 +76,11 @@ NB_TaskStatus nb_UDP_send_set(const char* param)
 {
 	memset(buff,0,sizeof(buff));
 	strcat(buff,AT NSOSTF "=");
-	sprintf(buff+strlen(buff), "%c", nb.socket);
+	if(nb.socket>='0' && nb.socket<='7')
+		sprintf(buff+strlen(buff), "%c", nb.socket);
+	else
+		strcat(buff,"1");
+	
 	strcat(buff,",");
 	strcat(buff,(char*)user.add);
 	strcat(buff,",");
@@ -207,7 +211,7 @@ NB_TaskStatus nb_UDP_close_get(const char* param)
   */
 NB_TaskStatus nb_UDP_uri_run(const char* param)
 {
-	user_main_printf("uri:%s",nb.usart.data);
+	user_main_debug("uri:%s",nb.usart.data);
 		
 	if(strstr((char*)nb.usart.data,NSOSTR) != NULL && strstr((char*)nb.usart.data,"100,1") != NULL)
 	{
