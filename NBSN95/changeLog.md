@@ -1,3 +1,6 @@
+TODO:
+* Use a AT command to switch on/off debug 
+
 # NBSN95 V1.2.3_DEBUG
 1.	Same as v1.2.3, except console will output a lot of debug info
 
