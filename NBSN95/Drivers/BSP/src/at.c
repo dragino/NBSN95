@@ -2,10 +2,12 @@
 
 static uint8_t  keep = 0;
 static uint32_t general_parameters[32]={0};
+static uint32_t servaddr_parameters[32]={0};
 static uint32_t coap_parameters[32]={0};
 static uint32_t mqtt_parameters_basic[32]={0};
 static uint32_t mqtt_parameters_topic[32]={0};
 
+uint8_t getsensorvalue_flag=0;
 ATEerror_t ATInsPro(char* atdata)
 {
 	uint8_t i = 0;
@@ -177,7 +179,7 @@ ATEerror_t at_deui_get(const char *param)
 ATEerror_t at_deui_set(const char *param)
 {
 	char* pos = strchr(param,'=');
-	if(strlen(param) - (pos-param)-1 !=12 || hexDetection((char*)(param+(pos-param)+1)) == 0)
+	if(strlen(param) - (pos-param)-1 !=15 || hexDetection((char*)(param+(pos-param)+1)) == 0)
 	{
 		return AT_PARAM_ERROR;
 	}
@@ -219,7 +221,10 @@ ATEerror_t at_servaddr_get(const char *param)
 	if(keep)
 		printf("AT+SERVADDR=");
 	printf("%s\r\n",user.add);
+	if(strlen((char*)user.add_ip)!=0 && strstr((char*)user.add_ip,"NULL") == NULL)
+		printf("(%s)",user.add_ip);
 	
+	printf("\r\n");
   return AT_OK;
 }
 
@@ -231,7 +236,7 @@ ATEerror_t at_servaddr_set(const char *param)
 	}
 	
 	char* pos = strchr(param,'=');
-	if(strlen(param) - (pos-param)-1 >21)
+	if(strlen(param) - (pos-param)-1 >69)
 	{
 		return AT_PARAM_ERROR;
 	}
@@ -656,7 +661,72 @@ ATEerror_t at_fband_set(const char *param)
 	
 	return AT_OK;
 }
+/************** 			AT+DNSCFG		**************/
+ATEerror_t at_dnscfg_get(const char *param)
+{
+	if(keep)
+		printf(AT DNSCFG"=");
+	printf("%s\r\n",user.dns_add);
+	return AT_OK;
+}
 
+ATEerror_t at_dnscfg_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >15)
+	{
+		return AT_PARAM_ERROR;
+	}
+	if(countchar(pos,',')!=1 || countchar(pos,'.')!=6)
+	{
+		return AT_PARAM_ERROR;
+	}
+
+	memset(user.dns_add,0,sizeof(user.dns_add));
+	memcpy(user.dns_add,(param+(pos-param)+1),strlen((param+(pos-param)+1)));		
+	return AT_OK;
+}
+/************** 			AT+APN		**************/
+ATEerror_t at_apn_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >20)
+	{
+		return AT_PARAM_ERROR;
+	}
+	memset(user.apn,0,sizeof(user.apn));
+	memcpy(user.apn,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
+	return AT_OK;
+}
+ATEerror_t at_apn_get(const char *param)
+{
+	if(keep)
+		printf(AT APN"=");
+	printf("%s\r\n",user.apn);
+	return AT_OK;
+}
+/************** 			AT+GETSENSORVALUE		 **************/
+ATEerror_t at_getsensorvalue_set(const char *param)
+{
+		char* pos = strchr(param,'=');
+	uint8_t getsensorvalue = param[(pos-param)+1];
+ 
+	if(getsensorvalue == '0' )
+	{	
+		txPayLoadDeal2(&sensor);
+	}
+	else if(getsensorvalue == '1')
+	{	
+		getsensorvalue_flag=1;
+		//task_num = _AT_CSQ;
+		//NBTASK(&task_num);	
+	}
+	else
+	{
+	return AT_PARAM_ERROR;
+	}	
+  return AT_OK;
+}
 /************** 		Other		 **************/
 char *rtrim(char* str)
 {
@@ -689,13 +759,19 @@ void config_Set(void)
 	general_parameters[4]=sys.rxdl<<16   | sys.power_time;
 	general_parameters[5]=(int)(sensor.GapValue *10000);
 	general_parameters[6]=sensor.exit_count;
-	general_parameters[10]=sys.nband_flag<<24;
+	general_parameters[20]=sys.nband_flag<<24;
 	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.deui);i=i+4,j++)
 			general_parameters[7+j]=user.deui[i+0]<<24 | user.deui[i+1]<<16 | user.deui[i+2]<<8 | user.deui[i+3];
 	
+	for(uint8_t i=0,j=0;i<strlen((char*)user.apn);i=i+4,j++)
+			general_parameters[11+j]=user.apn[i+0]<<24 | user.apn[i+1]<<16 | user.apn[i+2]<<8 | user.apn[i+3];
+	
+	for(uint8_t i=0,j=0;i<strlen((char*)user.dns_add);i=i+4,j++)
+			general_parameters[16+j]=user.dns_add[i+0]<<24 | user.dns_add[i+1]<<16 | user.dns_add[i+2]<<8 | user.dns_add[i+3];
+	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.add);i=i+4,j++)
-			general_parameters[25+j]=user.add[i+0]<<24 | user.add[i+1]<<16 | user.add[i+2]<<8 | user.add[i+3];
+			servaddr_parameters[0+j]=user.add[i+0]<<24 | user.add[i+1]<<16 | user.add[i+2]<<8 | user.add[i+3];
 	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.uri);i=i+4,j++)
 			coap_parameters[j]=user.uri[i+0]<<24 | user.uri[i+1]<<16 | user.uri[i+2]<<8 | user.uri[i+3];
@@ -717,6 +793,7 @@ void config_Set(void)
 	
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);
+	FLASH_program(FLASH_USER_START_SERVADDR_ADD,servaddr_parameters, sizeof(servaddr_parameters)/4);
 	FLASH_program(FLASH_USER_START_COAP,coap_parameters, sizeof(coap_parameters)/4);
 	FLASH_program(FLASH_USER_START_MQTT_BASIC,mqtt_parameters_basic, sizeof(mqtt_parameters_basic)/4);
 	FLASH_program(FLASH_USER_START_MQTT_TOPIC,mqtt_parameters_topic, sizeof(mqtt_parameters_topic)/4);
@@ -776,14 +853,9 @@ void config_Get(void)
 		sensor.GapValue = 400.0;
 	
 	sensor.exit_count = FLASH_read(add+24);
-	
-	sys.nband_flag = FLASH_read(add+40)>>24 &0xFF;
-	if(sys.nband_flag!='0' && sys.nband_flag!='1')
-		sys.nband_flag = '1';
 
-	
 	add = add+28;
-	for(uint8_t i=0,j=0;i<3;i++,j=j+4)
+	for(uint8_t i=0,j=0;i<4;i++,j=j+4)
 	{
 		uint32_t temp  = FLASH_read(add+i*4);
 		user.deui[j] 	 = (temp>>24) & 0x000000FF;
@@ -796,8 +868,41 @@ void config_Get(void)
 		sprintf((char*)user.deui, "%s", "NULL");
 	}
 	
+	sys.nband_flag = FLASH_read(add+80)>>24 &0xFF;
+	if(sys.nband_flag!='0' && sys.nband_flag!='1')
+		sys.nband_flag = '1';
+
+	add = FLASH_USER_START_ADDR_CONFIG + 0x04*11;
+	for(uint8_t i=0,j=0;i<5;i++,j=j+4)
+	{
+		uint32_t temp  = FLASH_read(add+i*4);
+		user.apn[j] 	 = (temp>>24) & 0x000000FF;
+		user.apn[j+1] = (temp>>16) & 0x000000FF;
+		user.apn[j+2] = (temp>>8)  & 0x000000FF;
+		user.apn[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.apn) == 0)
+	{
+		sprintf((char*)user.apn, "%s", "NULL");
+	}
+	
+		add = FLASH_USER_START_ADDR_CONFIG + 0x04*16;
+	for(uint8_t i=0,j=0;i<4;i++,j=j+4)
+	{
+		uint32_t temp  = FLASH_read(add+i*4);
+		user.dns_add[j] 	 = (temp>>24) & 0x000000FF;
+		user.dns_add[j+1] = (temp>>16) & 0x000000FF;
+		user.dns_add[j+2] = (temp>>8)  & 0x000000FF;
+		user.dns_add[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.dns_add) == 0)
+	{
+		sprintf((char*)user.dns_add, "%s", "8.8.8.8,8.8.4.4");
+	}
+	
+	
 	add = FLASH_USER_START_SERVER_ADD;
-	for(uint8_t i=0,j=0;i<6;i++,j=j+4)
+	for(uint8_t i=0,j=0;i<18;i++,j=j+4)
 	{
 		uint32_t temp = FLASH_read(add+i*4);
 		user.add[j] 	= (temp>>24) & 0x000000FF;

@@ -21,6 +21,7 @@
 #include "lidar.h"
 #include "ultrasound.h"
 #include "weight.h"
+#include "ult.h"
 
 #ifdef __cplusplus
  extern "C" {
@@ -39,7 +40,7 @@
  * @retval None
  */
 
-#define AT_VERSION_STRING 	"v1.2.3"
+#define AT_VERSION_STRING 	"v1.2.7"
 #define stack 							"D-BC95-003"
 
 #define COAP_PRO  0x01
@@ -96,8 +97,11 @@ typedef struct
 
 typedef struct
 {
-	uint8_t  deui[15];
-	uint8_t  add[25];
+	uint8_t  deui[16];
+	uint8_t  add[70];
+	uint8_t  add_ip[25];
+	uint8_t  dns_add[16];
+	uint8_t  apn[21];
 	uint8_t  uri[128];
 	uint8_t  client[41];
 	uint8_t  uname[41];
@@ -143,12 +147,15 @@ void led_on(uint16_t time);
 uint8_t i2c_device_detection(void);
 
 void txPayLoadDeal(SENSOR* Sensor,LinkedList L);
+void txPayLoadDeal2(SENSOR* Sensor);
 void rxPayLoadDeal(char* payload);
 int hexToint(char *str);
 uint16_t string_touint(void);
 void StrToHex(char *pbDest, char *pszSrc, int nLen);
 int countchar(char *str,char a);
 void new_firmware_update(void);
+uint8_t is_ipv4_addr(char *ip);
+char* Int2String(int num,char *str);
 
 LinkedList List_Init(LinkedList L);
 LinkedList createList(void);
@@ -158,5 +165,6 @@ LinkedList upLink_flash_clear(LinkedList L);
 LinkedList txCachePayLoadDeal(SENSOR* Sensor,LinkedList L);
 LinkedList upLink_fail_write(LinkedList L);
 LinkedList upLink_fail_read(LinkedList L);
+
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

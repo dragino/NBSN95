@@ -68,13 +68,23 @@ static uint8_t  uart2_recieve_flag = 0;
 static uint8_t rxbuf_lp;
 static uint8_t lpuart_recieve_flag = 0;
 
+uint8_t rxbuf_u1 = 0; 	//usart1
+uint8_t rxDATA_u1[100]={0};
+uint8_t rxlen_u1 = 0;
+extern uint8_t getsensorvalue_flag;
 static uint8_t pwd_time_count = 0;			//Password time count times
+
+static uint16_t dns_time_count = 0;			//DNS time count times
 
 static uint8_t task_num = _AT_IDLE;			//NB task directory
 
 static uint8_t error_num = 0;				    //Error count
 
 static uint8_t uplink_time_num = 0;
+
+extern uint8_t dns_id_flags;
+extern uint8_t 	bc35tobc95_flags;   //Switch module flag
+static uint8_t dns_reset_num;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -125,6 +135,7 @@ int main(void)
   MX_RTC_Init();
   MX_ADC_Init();
   MX_I2C1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 	new_firmware_update();
 	config_Get();
@@ -144,7 +155,7 @@ int main(void)
 #ifdef NBIOT
 	if((*(__IO uint8_t *)EEPROM_USER_START_FDR_FLAG) == 0x01)
 	{
-		task_num = _AT_IDLE;
+		task_num = _AT_FLAG_INIT;
 		HAL_FLASHEx_DATAEEPROM_Unlock();
 		HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_FDR_FLAG,0x00);
 		HAL_FLASHEx_DATAEEPROM_Lock();
@@ -171,17 +182,27 @@ int main(void)
 				error_num++;
 			}
 	  }
-		if(error_num > 3 && nb.uplink_flag == no_status)
+		if((error_num > 3 && nb.uplink_flag == no_status)||(error_num > 6))
 		{
 			user_main_printf("Restart the module...");
 			task_num = _AT_NRB;
 			error_num = 0;
 		}
-		
+		if(dns_reset_num > 2 )
+		{
+		NVIC_SystemReset();	
+		dns_reset_num=0;
+		}
 		if(nb.recieve_flag == NB_RECIEVE && nb.uplink_flag == send)
 		{
 			task_num = _AT_URI;
 			nb.recieve_flag = NB_IDIE;
+		}
+		if(getsensorvalue_flag == 1)
+		{
+			task_num = _AT_CSQ;
+			NBTASK(&task_num);
+			getsensorvalue_flag = 0;
 		}
 #endif
 		
@@ -214,6 +235,7 @@ void SystemClock_Config(void)
   */
   HAL_PWR_EnableBkUpAccess();
   __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
+
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
@@ -244,8 +266,9 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_LPUART1
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_LPUART1
                               |RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_RTC;
+  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_HSI;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_HSI;
   PeriphClkInit.Lpuart1ClockSelection = RCC_LPUART1CLKSOURCE_HSI;
   PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
@@ -296,7 +319,7 @@ static void USERTASK(void)
 			memset(nb.usart.data,0,NB_RX_SIZE);
 			rxDATA[strlen((char*)rxDATA)] = '\n';
 			HAL_UART_Transmit_DMA(&hlpuart1,(uint8_t*)rxDATA,strlen((char*)rxDATA));		
-			HAL_Delay(500);					//Waiting to Send
+			HAL_Delay(700);					//Waiting to Send
 		}
 	}
 		
@@ -312,6 +335,30 @@ static void USERTASK(void)
 		nb.usart.len = 0;
 		lpuart_recieve_flag = 0;
 		memset(nb.usart.data,0,NB_RX_SIZE);
+	}
+	
+	
+	if(nb.recieve_flag == NB_RECIEVE && nb.dns_flag == running)
+	{
+		int dns_num=3;
+		nb.recieve_flag = NB_IDIE;
+		nb.dns_flag = no_status;
+		while(dns_num--)
+		{
+		HAL_Delay(1500);
+		if(NBTask[_AT_QDNS].get(NULL) == NB_CMD_SUCC)
+		{
+			task_num = _AT_UPLOAD_START;
+			dns_reset_num=0;
+			break;
+		}
+		else
+		{
+			task_num = _AT_NRB;
+			if(dns_num==0)
+		  dns_reset_num++;
+		}
+	  }
 	}
 }
 
@@ -337,6 +384,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 			uart2_recieve_flag = 1;		
 		}
 		HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);
+	}
+	else if(huart == &huart1)
+	{
+		if(rxlen_u1 < 40)
+			rxDATA_u1[rxlen_u1++] = rxbuf_u1;
+		HAL_UART_Receive_IT(&huart1,(uint8_t*)&rxbuf_u1,RXSIZE);
 	}
 }
 
@@ -375,7 +428,15 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 		{
 			uplink_time_num = 0;
 			error_num++;
-			if(sys.protocol == COAP_PRO)			{task_num = _AT_COAP_CLOSE;}
+			if(sys.protocol == COAP_PRO)			
+       {
+				 if(bc35tobc95_flags==0)
+					{
+				  	task_num=_AT_COAP_CLOSE;
+						}else{
+						task_num=_AT_COAP_CLOSE_BC95GV;
+						}
+       }
 			else if(sys.protocol == UDP_PRO)	{task_num	=	_AT_UDP_CLOSE;}
 			else if(sys.protocol == MQTT_PRO)	{task_num	=	_AT_MQTT_CLOSE;}
 			else if(sys.protocol == TCP_PRO)	{task_num	=	_AT_TCP_CLOSE;}
@@ -383,6 +444,17 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 	}
 	else 
 		uplink_time_num = 0;
+	
+	if(dns_id_flags==1)
+	{
+		dns_time_count++;
+		if(dns_time_count == 2400)
+		{
+      if(sys.protocol == COAP_PRO)			{task_num = _AT_QDNS;}
+			else if(sys.protocol == UDP_PRO)	{task_num	=	_AT_QDNS;}
+			dns_time_count=0;
+		}
+	}
 	
 	My_AlarmInit(18,1);
 }

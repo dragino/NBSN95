@@ -7,6 +7,7 @@ typedef enum
 	fail = 0,
 	success ,
 	send,
+	running,
 	no_status,
 	invalid,
 	effective 
@@ -41,6 +42,7 @@ typedef enum
 #define NRB					"+NRB"											/* restart */
 #define CIMI				"+CIMI"											/* IMSI number */
 #define NBAND				"+NBAND"										/* Frequency band */
+#define CGMM			  "+CGMM"										  /* Request Manufacturer Model */
 
 #define CGATT				"+CGATT"										/* Connect to the network*/
 #define CFUN				"+CFUN"											/* Set the UE function */
@@ -50,8 +52,11 @@ typedef enum
 #define CSCON				"+CSCON"										/* Whether to connect to the network. */
 #define CPSMS				"+CPSMS"										/* PSM Setting. */
 #define CCLK				"+CCLK"										  /* GET time. */
+#define CGDCONT			"+CGDCONT"									/* Define a PDP Context. */
 #define CGPADDR 		"+CGPADDR"									/* GET IP. */
 #define CGSN 				"+CGSN=1"										/* GET IMEI. */
+#define QDNS 				"+QDNS"											/* QDNS. */
+#define QIDNSCFG		"+QIDNSCFG"									/* QDNS config. */
 
 #define NSOCL				"+NSOCL"										/* closed socked */
 #define NSOCLI			"+NSOCLI"										/* Socket Close Indicator(Response Only),TCP only  */
@@ -79,6 +84,8 @@ typedef enum
 #define QCOAPDEL    "+QCOAPDEL"									/* Delete the CoAP context */
 #define QCOAPURC		"+QCOAPURC"
 
+#define QCOAPOPEN   "+QCOAPOPEN"							/* COAP Configure server address. */
+#define QCOAPCLOSE  "+QCOAPCLOSE"							/* Delete a CoAP Context. */
 typedef enum
 {
 	_AT = 0,					 	//
@@ -88,9 +95,13 @@ typedef enum
 	_AT_CFUN,			 	//AT+CFUN
 	_AT_NCONFIG,		//Configure UE Behaviour
 	_AT_NBAND,		 	//AT+NBAND
+	_AT_CGMM,       // Request Manufacturer Model 
 	_AT_CCLK,				//AT+CCLK?
+	_AT_CGDCONT,		//SET APN
 	_AT_CPSMS,     	//Power Saving ModeSetting
 	_AT_CSQ,       	//Singal
+	_AT_QDNSCFG,    //DNSCFG
+	_AT_QDNS,       //DNS
 /*COAP*/
 	_AT_COAP_CONFIG,//CoAP Configuration Command
 	_AT_COAP_OPEN,	//OPEN COAP PORT
@@ -100,6 +111,12 @@ typedef enum
 	_AT_COAP_READ,  //READ DATA	
 	_AT_COAP_CLOSE, //CLOSE UDP PORT
 	_AT_COAP_URI,
+/*COAP BC95-GV*/
+  _AT_COAP_OPEN_CONFIG_95GV,
+	_AT_COAP_OPTION_95GV,
+	_AT_COAP_SEND_CONFIG_95GV,
+	_AT_COAP_CLOSE_BC95GV,
+	_AT_COAP_URI_95GV,
 /*UDP*/
 	_AT_UDP_OPEN,		//OPEN UDP PORT
 	_AT_UDP_SEND,   //SEND DATA
@@ -142,7 +159,10 @@ typedef struct
 	uint8_t 	singal;											 //Signal strength, always less than 99 
 	uint8_t  	net_flag;						 				 //Network access flag
 	uint8_t  	uplink_flag;								 //Send flag 
+	uint8_t   dns_flag;										 //DNS flag 
 	uint8_t  	recieve_flag;				 				 //Serial reception completion flag
+	uint8_t		recieve_ack_flag;
+	uint8_t   resend_count;
 	uint8_t		imsi[20];						 				 //IMSI number
 	uint8_t		imei[20];						 				 //IMEI number
 	USART			usart;
@@ -164,6 +184,7 @@ typedef enum   //BC95-G Status flag
 	NB_CONN_SUCC,
 	NB_CONN_FAIL,
 	NB_SEND_SUCC,
+  NB_NSOCO_SUCC,
 	NB_SEND_FAIL,
 	NB_SUB_SUCC,
 	NB_SUB_FAIL,
@@ -177,7 +198,13 @@ typedef enum   //BC95-G Status flag
 	NB_CMD_ON,
 	NB_NBAND_SET,
 	NB_NBAND_NOSET,
-	NB_OTHER
+	NB_OTHER,
+	NB_STA_SUCC,
+	NB_35_SUCC,
+	NB_95g_SUCC,
+	NB_95_SUCC,
+	NB_QCOAPOPEN_SUCC,
+	NB_QCOAPCLOSE_SUCC
 }NB_TaskStatus;
 
 
@@ -197,12 +224,26 @@ NB_TaskStatus nb_nband_run(const char* param);
 NB_TaskStatus nb_nband_set(const char* param);
 NB_TaskStatus nb_nband_get(const char* param);
 
+NB_TaskStatus nb_cgmm_run(const char* param);
+NB_TaskStatus nb_cgmm_get(const char* param);
+
 NB_TaskStatus nb_cclk_run(const char* param);
 NB_TaskStatus nb_cclk_get(const char* param);
+
+NB_TaskStatus nb_cgdcont_run(const char* param);
+NB_TaskStatus nb_cgdcont_set(const char* param);
+NB_TaskStatus nb_cgdcont_get(const char* param);
 
 NB_TaskStatus nb_cpsms_run(const char* param);
 NB_TaskStatus nb_cpsms_set(const char* param);
 NB_TaskStatus nb_cpsms_get(const char* param);
+
+NB_TaskStatus nb_qdnscfg_run(const char* param);
+NB_TaskStatus nb_qdnscfg_set(const char* param);
+
+NB_TaskStatus nb_qdns_run(const char* param);
+NB_TaskStatus nb_qdns_set(const char* param);
+NB_TaskStatus nb_qdns_get(const char* param);
 
 NB_TaskStatus nb_csq_get(const char* param);
 NB_TaskStatus nb_nrb_run(const char* param);
@@ -234,6 +275,22 @@ NB_TaskStatus nb_COAP_close_set(const char* param);
 NB_TaskStatus nb_COAP_close_get(const char* param);
 
 NB_TaskStatus nb_COAP_uri_run(const char* param);
+
+NB_TaskStatus nb_COAP_open_config95gv_run(const char* param);
+NB_TaskStatus nb_COAP_open_config95gv_set(const char* param);
+
+NB_TaskStatus nb_COAP_option95gv_run(const char* param);
+NB_TaskStatus nb_COAP_option95gv_set(const char* param);
+NB_TaskStatus nb_COAP_option95gv_get(const char* param);
+
+NB_TaskStatus nb_COAP_send_config95gv_run(const char* param);
+NB_TaskStatus nb_COAP_send_config95gv_set(const char* param);
+
+NB_TaskStatus nb_COAP_closebc95gv_run(const char* param);
+NB_TaskStatus nb_COAP_closebc95gv_set(const char* param);
+NB_TaskStatus nb_COAP_closebc95gv_get(const char* param);
+
+NB_TaskStatus nb_COAP_uri95gv_run(const char* param);
 
 NB_TaskStatus nb_UDP_open_run(const char* param);
 NB_TaskStatus nb_UDP_open_set(const char* param);
@@ -408,6 +465,19 @@ static struct NBTASK NBTask[] =
 		.get						= nb_nband_get,
 		.nb_cmd_status  = NB_IDIE,
   },
+/**************** CGMM	****************/
+	{		
+    .ATSendStr 			=  AT CGMM NEWLINE,
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_CGMM,
+		.len_string 		= sizeof(AT CGMM  NEWLINE) - 1,
+		.time_out 			= 300,
+    .run 						= nb_cgmm_run,
+		.set						= nb_null_run,
+		.get						= nb_cgmm_get,
+		.nb_cmd_status  = NB_IDIE,
+  },	
 /**************** CCLK	****************/
 	{		
     .ATSendStr 			= AT CCLK "?" NEWLINE,
@@ -419,6 +489,19 @@ static struct NBTASK NBTask[] =
     .run 						= nb_cclk_run,
 		.set						= nb_null_run,
 		.get						= nb_cclk_get,
+		.nb_cmd_status  = NB_IDIE,
+  },
+/**************** CGDCONT	****************/
+	{
+    .ATSendStr 			= NULL,
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_CGDCONT,
+		.len_string 		= 0,
+		.time_out 			= 300,
+    .run 						= nb_cgdcont_run,
+		.set						= nb_cgdcont_set,
+		.get						= nb_cgdcont_get,
 		.nb_cmd_status  = NB_IDIE,
   },
 /**************** CPSMS	****************/
@@ -442,11 +525,39 @@ static struct NBTASK NBTask[] =
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_CSQ,
 		.len_string 		= sizeof(AT CSQ NEWLINE) - 1,
-		.time_out 			= 300,
+		.time_out 			= 500,
 		.try_num        = 4,
     .run 						= nb_null_run,
 		.set						= nb_null_run,
 		.get						= nb_csq_get,
+		.nb_cmd_status  = NB_IDIE,
+  },
+/**************** QDNSCFG	****************/
+	{		
+    .ATSendStr 			= NULL,
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_QDNSCFG,
+		.len_string 		= 0,
+		.time_out 			= 300,
+		.try_num        = 4,
+    .run 						= nb_qdnscfg_run,
+		.set						= nb_qdnscfg_set,
+		.get						= nb_null_run,
+		.nb_cmd_status  = NB_IDIE,
+  },
+/**************** QDNS	****************/
+	{		
+    .ATSendStr 			= NULL,
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_QDNS,
+		.len_string 		= 0,
+		.time_out 			= 300,
+		.try_num        = 4,
+    .run 						= nb_qdns_run,
+		.set						= nb_qdns_set,
+		.get						= nb_qdns_get,
 		.nb_cmd_status  = NB_IDIE,
   },
 /**************** COAP_QCOAPCFG	****************/
@@ -512,7 +623,7 @@ static struct NBTASK NBTask[] =
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_COAP_SEND,
 		.len_string 		= 0,
-		.time_out 			= 500,
+		.time_out 			= 1000,
 		.try_num        = 4,
     .run 						= nb_COAP_send_run,
 		.set						= nb_COAP_send_set,
@@ -546,8 +657,9 @@ static struct NBTASK NBTask[] =
 		.set						= nb_COAP_close_set,
 		.get						= nb_COAP_close_get,
 		.nb_cmd_status  = NB_IDIE,
-  },
+  },		
 /**************** COAP_URI	****************/
+
 	{		
     .ATSendStr 			= NULL,
 		.ATRecStrOK  		= NULL,
@@ -557,6 +669,77 @@ static struct NBTASK NBTask[] =
 		.time_out 			= 0,
 		.try_num        = 0,
     .run 						= nb_COAP_uri_run,
+		.set						= nb_null_run,
+		.get						= nb_null_run,
+		.nb_cmd_status  = NB_IDIE,
+  },
+	
+/**************** _AT_COAP_OPEN_CONFIG_95GV	****************/
+	{		
+    .ATSendStr 			= NULL,
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_OPEN_CONFIG_95GV,
+		.len_string 		= 0,
+		.time_out 			= 500,
+		.try_num        = 4,
+    .run 						= nb_COAP_open_config95gv_run,
+		.set						= nb_COAP_open_config95gv_set,
+		.get						= nb_null_run,
+		.nb_cmd_status  = NB_IDIE,
+  },	
+/**************** COAP_QCOAPOPTION_95GV	****************/
+	{		
+    .ATSendStr 			= NULL,
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_OPTION_95GV,
+		.len_string 		= 0,
+		.time_out 			= 500,
+		.try_num        = 2,
+    .run 						= nb_COAP_option95gv_run,
+		.set						= nb_COAP_option95gv_set,
+		.get						= nb_COAP_option95gv_get,
+		.nb_cmd_status  = NB_IDIE,
+  },	
+/**************** COAP_SEND_CONFIG_95GV	****************/
+	{		
+    .ATSendStr 			= NULL,
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_SEND_CONFIG_95GV,
+		.len_string 		= 0,
+		.time_out 			= 1000,
+		.try_num        = 3,
+    .run 						= nb_COAP_send_config95gv_run,
+		.set						= nb_COAP_send_config95gv_set,
+		.get						= nb_null_run,
+		.nb_cmd_status  = NB_IDIE,
+  },	
+/**************** COAP_CLOSED_BC95GV	****************/
+	{		
+    .ATSendStr 			= AT QCOAPCLOSE "=0" NEWLINE,
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_CLOSE_BC95GV,
+		.len_string 		= sizeof(AT QCOAPCLOSE "=0" NEWLINE) - 1,
+		.time_out 			= 500,
+		.try_num        = 2,
+    .run 						= nb_COAP_closebc95gv_run,
+		.set						= nb_COAP_closebc95gv_set,
+		.get						= nb_COAP_closebc95gv_get,
+		.nb_cmd_status  = NB_IDIE,	
+		 },
+/**************** _AT_COAP_URI_95GV	****************/
+	{		
+    .ATSendStr 			= NULL,
+		.ATRecStrOK  		= NULL,
+		.ATRecStrError  = NULL,
+		.cmd_num        = _AT_COAP_URI_95GV,
+		.len_string 		= 0,
+		.time_out 			= 0,
+		.try_num        = 0,
+    .run 						= nb_COAP_uri95gv_run,
 		.set						= nb_null_run,
 		.get						= nb_null_run,
 		.nb_cmd_status  = NB_IDIE,
@@ -583,7 +766,7 @@ static struct NBTASK NBTask[] =
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_UDP_SEND,
 		.len_string 		= 0,
-		.time_out 			= 500,
+		.time_out 			= 1000,
 		.try_num        = 4,
     .run 						= nb_UDP_send_run,
 		.set						= nb_UDP_send_set,
@@ -707,7 +890,7 @@ static struct NBTASK NBTask[] =
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_SEND,
 		.len_string 		= 0,
-		.time_out 			= 500,
+		.time_out 			= 1000,
     .run 						= nb_MQTT_send_run,
 		.set						= nb_MQTT_send_set,
 		.get						= nb_null_run,
@@ -789,7 +972,7 @@ static struct NBTASK NBTask[] =
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_TCP_SEND,
 		.len_string 		= 0,
-		.time_out 			= 500,
+		.time_out 			= 1000,
 		.try_num        = 4,
     .run 						= nb_TCP_send_run,
 		.set						= nb_TCP_send_set,

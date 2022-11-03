@@ -24,6 +24,7 @@
 #define PWORD      "+PWORD"
 #define CFG        "+CFG"
 #define INTMOD		 "+INTMOD"
+#define APN        "+APN"
 
 #define CLIENT	 	 "+CLIENT"
 #define UNAME			 "+UNAME"
@@ -42,7 +43,10 @@
 #define CDP     	 "+CDP"
 #define LDATA      "+LDATA"
 #define CUM      	 "+CUM" 		//Cache upload mechanism
+#define GETSENSORVALUE      "+GETSENSORVALUE"
 #define FBAND      "+FBAND" 	//Automatically modify the frequency band
+#define DNSCFG     "+DNSCFG"	//DNS Server
+
 /**********************************************/
 
 typedef enum
@@ -125,9 +129,14 @@ ATEerror_t at_fband_get(const char *param);
 ATEerror_t at_fband_set(const char *param);
 
 ATEerror_t at_ldata_get(const char *param);
+ATEerror_t at_dnscfg_get(const char *param);
+ATEerror_t at_dnscfg_set(const char *param);
+ATEerror_t at_apn_set(const char *param);
+ATEerror_t at_apn_get(const char *param);
 
 ATEerror_t at_return_error(const char *param);
 
+ATEerror_t at_getsensorvalue_set(const char *param);
 /*Other*/
 char *rtrim(char *str);
 uint8_t hexDetection(char* str);
@@ -324,6 +333,17 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_inmod_set,
     .run = at_return_error,
   },
+		/** AT+APN **/	
+	{
+    .string = AT APN,
+		.size_string = sizeof(APN) - 1,
+#ifndef NO_HELP
+    .help_string = AT APN "     : Get or set the APN",
+#endif
+    .get = at_apn_get,
+    .set = at_apn_set,
+    .run = at_return_error,
+  },
 	/** AT+5VT **/	
 	{
     .string = AT _5VT,
@@ -443,6 +463,28 @@ static const struct ATCommand_s ATCommand[] =
 #endif
     .get = at_ldata_get,
     .set = at_return_error,
+    .run = at_return_error,
+  },
+			/** AT+GETSENSORVALUE **/	
+	{
+    .string = AT GETSENSORVALUE,
+		.size_string = sizeof(GETSENSORVALUE) - 1,
+#ifndef NO_HELP
+    .help_string = AT GETSENSORVALUE "     : Returns the current sensor measurement",
+#endif
+    .get = at_return_error,
+    .set = at_getsensorvalue_set,
+    .run = at_return_error,
+  },
+				/** AT+DNSCFG **/	
+	{
+    .string = AT DNSCFG,
+		.size_string = sizeof(DNSCFG) - 1,
+#ifndef NO_HELP
+    .help_string = AT DNSCFG "  : Get or Set DNS Server",
+#endif
+    .get = at_dnscfg_get,
+    .set = at_dnscfg_set,
     .run = at_return_error,
   },
 };

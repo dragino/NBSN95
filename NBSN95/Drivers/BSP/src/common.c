@@ -5,6 +5,7 @@ static uint8_t sys_pwd[10]={0};
 static char sensor_raw_data[60]={0};
 static char sensor_data[500]={0};
 
+extern uint8_t rxbuf_u1;
 SYSTEM sys    = {.pwd=sys_pwd};
 SENSOR sensor ={.data=sensor_data};
 USER user={0};
@@ -27,7 +28,7 @@ static char cacheData10[40]={0};
 static char* cacheData0[10]={(char*)cacheData1,(char*)cacheData2,(char*)cacheData3,(char*)cacheData4,(char*)cacheData5,
 												(char*)cacheData6,(char*)cacheData7,(char*)cacheData8,(char*)cacheData9,(char*)cacheData10};
 static uint32_t cacheData_parameters[32]={0};
-
+extern uint8_t 	bc35tobc95_flags;
 void product_information_print(void)
 {
 	printf("\r\nDRAGINO NBSN95 NB-IoT Sensor Node\r\n"
@@ -176,7 +177,7 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 	HAL_Delay(500+sys.power_time);
 	
 	Sensor->batteryLevel_mV = getVoltage();
-
+	sprintf(Sensor->data+strlen(Sensor->data), "%c", 'f');
 	for(int i=0;i<strlen((char*)user.deui);i++)
 		sprintf(Sensor->data+strlen(Sensor->data), "%c",  user.deui[i]);
 	if(sys.mod == model3)
@@ -222,6 +223,18 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 			
 			GPIO_ULT_INPUT_DeInit();
 			GPIO_ULT_OUTPUT_DeInit();
+		if(sensor.distance == 4095)
+		{
+		sensor.distance = 0;	
+		ULT_Rest();
+    MX_USART1_UART_Init	();		
+    uart1_Init();
+		HAL_UART_Receive_IT(&huart1,(uint8_t*)&rxbuf_u1,RXSIZE);
+	  HAL_Delay(100);
+		ULT_getData();
+		uart1_IoDeInit();
+		Sensor->distance = ULT_Data_processing();	
+		}
 		}
 		
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
@@ -303,6 +316,7 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 	}
 	
 	sprintf(Sensor->data+strlen(Sensor->data), "%.8x", sensor.time_stamp);
+//	sprintf(Sensor->data+strlen(Sensor->data), "%.4x", sys.uplink_count);   //count packet
 	memcpy(sensor_raw_data,&Sensor->data[12],strlen(Sensor->data)-12);
 
 	if(sys.list_flag ==1 && sys.cum_flag == '1')	
@@ -320,11 +334,17 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 	}
 
 	Sensor->data_len = strlen(Sensor->data)/2;
-	if(sys.protocol == MQTT_PRO || sys.protocol == COAP_PRO)
-	{
+		if(sys.protocol == COAP_PRO&&bc35tobc95_flags==0)
+		{
 		Sensor->data[strlen(Sensor->data)]=0x1A;
 		Sensor->data_len = Sensor->data_len*2+1;
-	}
+		}
+		
+		if(sys.protocol == MQTT_PRO)
+		{
+		Sensor->data[strlen(Sensor->data)]=0x1A;
+		Sensor->data_len = Sensor->data_len*2+1;
+		}
 	
 	user_main_debug("Sensor->data:%s",Sensor->data);
 	user_main_debug("Sensor->data_len:%d",Sensor->data_len);
@@ -333,6 +353,91 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_SET);
 }
 
+void txPayLoadDeal2(SENSOR* Sensor)
+{	
+	memset(Sensor->data,0,sizeof((char*)Sensor->data));
+	memset(sensor_raw_data,0,sizeof(sensor_raw_data));
+
+	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_RESET);
+	HAL_Delay(500+sys.power_time);
+	
+	Sensor->batteryLevel_mV = getVoltage();
+
+	if(sys.mod == model1)
+	{
+		Sensor->temDs18b20_1 = (int)(DS18B20_GetTemp_SkipRom(1)*10);
+		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
+		
+		uint8_t i2c_device_flag = i2c_device_detection();
+		if(i2c_device_flag == 1)
+			sht20Data();
+		else if(i2c_device_flag == 2)
+			sht31Data();
+	}
+	else if(sys.mod == model2)
+	{
+		Sensor->temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
+		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
+		Sensor->distance = LidarLite();
+		if(sensor.distance == 4095)
+		{
+			sensor.distance = 0;
+			sensor.distance = ULT_distance();
+			
+			GPIO_ULT_INPUT_DeInit();
+			GPIO_ULT_OUTPUT_DeInit();
+		if(sensor.distance == 4095)
+		{
+		sensor.distance = 0;			
+    ULT_Rest();
+    MX_USART1_UART_Init	();		
+    uart1_Init();
+		HAL_UART_Receive_IT(&huart1,(uint8_t*)&rxbuf_u1,RXSIZE);
+	  HAL_Delay(100);
+		ULT_getData();
+		uart1_IoDeInit();
+    ULT_Data_processing();
+		}
+		}
+	}
+	else if(sys.mod == model3)
+	{
+		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
+		Sensor->adc1 = ADCModel(ADC_CHANNEL_1);
+		Sensor->adc4 = ADCModel(ADC_CHANNEL_4);
+	
+		uint8_t i2c_state = i2c_device_detection();
+		if(i2c_state == 1)
+			sht20Data();
+		else if(i2c_state == 2)
+			sht31Data();	
+	}
+	else if(sys.mod == model4)
+	{
+		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
+		Sensor->temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;DS18B20_IoDeInit(1);
+		Sensor->temDs18b20_2 = DS18B20_GetTemp_SkipRom(2)*10;DS18B20_IoDeInit(2);
+		Sensor->temDs18b20_3 = DS18B20_GetTemp_SkipRom(3)*10;DS18B20_IoDeInit(3);	
+	}
+	else if(sys.mod == model5)
+	{
+		if(mod5_init_flag == 0)
+		{
+			at_weight_reset(NULL);
+			mod5_init_flag =1;
+		}
+		
+		Sensor->temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
+		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
+		int32_t Weight = Get_Weight();		
+		user_main_printf("Weight is %d g",Weight);
+	}
+	else if(sys.mod == model6)
+	{
+	user_main_printf("count is %d ",sensor.exit_count);
+	}
+	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_SET);
+}
 
 
 /**
@@ -705,4 +810,66 @@ LinkedList upLink_fail_read(LinkedList L)
 		L0 = L0->next;
 	}
 	return L;
+}
+
+uint8_t is_ipv4_addr(char *ip)
+{
+	if (ip == NULL || ip[0] == '\0' || strstr(ip,"NULL")!=NULL) 
+		return 2;//Parameter error 
+	
+	char *p=strrchr(ip,',');	
+	if(p==NULL)
+		return 2;//Parameter error 
+	
+	char add_buf[50]={0};
+	memcpy(add_buf,ip,p-(char*)user.add);
+	
+	for (uint8_t i = 0, count = 0; i < strlen(add_buf); i++) 
+	{
+		if ((add_buf[i] != '.') && (add_buf[i] < '0' || add_buf[i] > '9')) 
+		{
+			return 0;
+		}
+		if (add_buf[i] == '.')
+		{
+			count++;
+			if (count > 3) 
+			{
+				return 0;
+			}
+		}
+	}
+	
+	return 1;
+}
+
+char* Int2String(int num,char *str)
+{
+    int i = 0;
+    if(num<0)
+    {
+        num = -num;
+        str[i++] = '-';
+    } 
+    do
+    {
+        str[i++] = num%10+48;
+        num /= 10;  
+    }while(num);
+    
+    str[i] = '\0';
+    
+    int j = 0;
+    if(str[0]=='-')
+    {
+        j = 1;
+        ++i;
+    }
+    for(;j<i/2;j++)
+    {
+        str[j] = str[j] + str[i-1-j];
+        str[i-1-j] = str[j] - str[i-1-j];
+        str[j] = str[j] - str[i-1-j];
+    } 
+    return str; 
 }

@@ -2,7 +2,8 @@
 
 static char buff[200]={0};
 static char downlink_data[50]={0};
-
+extern uint8_t dns_id_flags;
+uint8_t downlink_twice_flags=0;
 /**
 	* @brief  Open UDP port operation
   * @param  Instruction parameter
@@ -82,7 +83,10 @@ NB_TaskStatus nb_UDP_send_set(const char* param)
 		strcat(buff,"1");
 	
 	strcat(buff,",");
-	strcat(buff,(char*)user.add);
+	if(strlen((char*)user.add_ip)!=0)
+		strcat(buff,(char*)user.add_ip);
+	else
+		strcat(buff,(char*)user.add);
 	strcat(buff,",");
 	if(sys.cfm == '0')
 		strcat(buff,"0x200,");
@@ -145,8 +149,13 @@ NB_TaskStatus nb_UDP_read_get(const char* param)
 	else
 	{
 		memset(downlink_data,0,sizeof(downlink_data));
-		char* end = strstr((char*)nb.usart.data,(char*)user.add);
+		char*	end    = NULL;
 		char* start  = NULL;
+		if(strlen((char*)user.add_ip)!=0)
+			end = strstr((char*)nb.usart.data,(char*)user.add_ip);
+		else
+			end = strstr((char*)nb.usart.data,(char*)user.add);
+		
 		for(int i=0;i<4;i++)
 		{			
 			start = end;
@@ -223,6 +232,11 @@ NB_TaskStatus nb_UDP_uri_run(const char* param)
 	if(strstr((char*)nb.usart.data,NSONMI) != NULL)
 	{
 		nb_UDP_read_run(NULL);
+		if(downlink_twice_flags==1)
+		{
+		NBTask[_AT_UDP_URI].nb_cmd_status = NB_SEND_SUCC;
+		}
+		downlink_twice_flags++;
 	}
 	
 	return NBTask[_AT_UDP_URI].nb_cmd_status;

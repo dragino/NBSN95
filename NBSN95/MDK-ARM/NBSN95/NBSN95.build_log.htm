@@ -3,40 +3,47 @@
 <pre>
 <h1>µVision Build Log</h1>
 <h2>Tool Versions:</h2>
-IDE-Version: ¦ÌVision V5.33.0.0
-Copyright (C) 2020 ARM Ltd and ARM Germany GmbH. All rights reserved.
-License Information: 123 playmaker, 123, LIC=65ISZ-JDVC2-01QP1-CS5YM-XURX1-WG4PW
+IDE-Version: ¦ÌVision V5.25.2.0
+Copyright (C) 2018 ARM Ltd and ARM Germany GmbH. All rights reserved.
+License Information: ÎÞ Administrator, ÎÞ, LIC=14HV2-9DHUC-JJN6S-LASS7-GI9FT-BY532
  
 Tool Versions:
-Toolchain:       MDK-ARM Plus  Version: 5.33.0.0
-Toolchain Path:  E:\Keil_v5\ARM\ARMCC\Bin
-C Compiler:      Armcc.exe V5.06 update 7 (build 960)
-Assembler:       Armasm.exe V5.06 update 7 (build 960)
-Linker/Locator:  ArmLink.exe V5.06 update 7 (build 960)
-Library Manager: ArmAr.exe V5.06 update 7 (build 960)
-Hex Converter:   FromElf.exe V5.06 update 7 (build 960)
-CPU DLL:         SARMCM3.DLL V5.33.0.0
-Dialog DLL:      DARMCM1.DLL V1.19.4.0
-Target DLL:      STLink\ST-LINKIII-KEIL_SWO.dll V3.0.8.0
-Dialog DLL:      TARMCM1.DLL V1.14.3.0
+Toolchain:       MDK-ARM Plus  Version: 5.25.2.0
+Toolchain Path:  E:\KEIL5\ARM\ARMCC\Bin
+C Compiler:      Armcc.exe V5.06 update 6 (build 750)
+Assembler:       Armasm.exe V5.06 update 6 (build 750)
+Linker/Locator:  ArmLink.exe V5.06 update 6 (build 750)
+Library Manager: ArmAr.exe V5.06 update 6 (build 750)
+Hex Converter:   FromElf.exe V5.06 update 6 (build 750)
+CPU DLL:         SARMCM3.DLL V5.25.2.0
+Dialog DLL:      DARMCM1.DLL V1.19.1.0
+Target DLL:      STLink\ST-LINKIII-KEIL_SWO.dll V3.0.1.0
+Dialog DLL:      TARMCM1.DLL V1.14.0.0
  
 <h2>Project:</h2>
-D:\NBIOT\NBIOT_STM32\BC95_BC35\NBSN95\NBSN95-1.2.3\MDK-ARM\NBSN95.uvprojx
-Project File Date:  12/21/2021
+F:\NB95´úÂë\NBSN95-1.2.7\MDK-ARM\NBSN95.uvprojx
+Project File Date:  09/12/2022
 
 <h2>Output:</h2>
-*** Using Compiler 'V5.06 update 7 (build 960)', folder: 'E:\Keil_v5\ARM\ARMCC\Bin'
+*** Using Compiler 'V5.06 update 6 (build 750)', folder: 'E:\KEIL5\ARM\ARMCC\Bin'
 Build target 'NBSN95'
+compiling at.c...
+..\Drivers\BSP\inc\ult.h(25): warning:  #1295-D: Deprecated declaration ULT_getData - give arg types
+  void ULT_getData();
+..\Drivers\BSP\src\at.c: 1 warning, 0 errors
+linking...
+Program Size: Code=50768 RO-data=3692 RW-data=11800 ZI-data=6640  
+FromELF: creating hex file...
 After Build - User command #2: fromelf --bin -o "NBSN95\NBSN95.bin" "NBSN95\NBSN95.axf"
-"NBSN95\NBSN95.axf" - 0 Error(s), 0 Warning(s).
+"NBSN95\NBSN95.axf" - 0 Error(s), 1 Warning(s).
 
 <h2>Software Packages used:</h2>
 
 Package Vendor: ARM
-                http://www.keil.com/pack/ARM.CMSIS.5.7.0.pack
-                ARM.CMSIS.5.7.0
+                http://www.keil.com/pack/ARM.CMSIS.5.3.0.pack
+                ARM.CMSIS.5.3.0
                 CMSIS (Cortex Microcontroller Software Interface Standard)
-   * Component: CORE Version: 5.4.0
+   * Component: CORE Version: 5.1.1
 
 Package Vendor: Keil
                 http://www.keil.com/pack/Keil.STM32L0xx_DFP.2.1.0.pack
@@ -45,13 +52,13 @@ Package Vendor: Keil
 
 <h2>Collection of Component include folders:</h2>
   .\RTE\_NBSN95
-  E:\Keil_v5\Arm\Packs\ARM\CMSIS\5.7.0\CMSIS\Core\Include
-  E:\Keil_v5\Arm\Packs\Keil\STM32L0xx_DFP\2.1.0\Drivers\CMSIS\Device\ST\STM32L0xx\Include
+  E:\KEIL5\ARM\CMSIS\5.3.0\CMSIS\Include
+  E:\KEIL5\Keil\STM32L0xx_DFP\2.1.0\Drivers\CMSIS\Device\ST\STM32L0xx\Include
 
 <h2>Collection of Component Files used:</h2>
 
-   * Component: ARM::CMSIS:CORE:5.4.0
-Build Time Elapsed:  00:00:01
+   * Component: ARM::CMSIS:CORE:5.1.1
+Build Time Elapsed:  00:00:05
 </pre>
 </body>
 </html>

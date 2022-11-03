@@ -11,7 +11,7 @@ void get_time(void)
 	printf(" %.2d:%.2d:%.2d]", stimestructureget.Hours, stimestructureget.Minutes, stimestructureget.Seconds);			
 }
 
-void My_AlarmInit(uint16_t timer,uint8_t alarmX)
+void My_AlarmInit(uint32_t timer,uint8_t alarmX)
 {
 	if(alarmX == 1)
 		HAL_RTC_DeactivateAlarm(&hrtc,RTC_ALARM_B);

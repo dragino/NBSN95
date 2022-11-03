@@ -2,7 +2,7 @@
 
 static char buff[200]={0};
 static char downlink_data[20]={0};
-
+extern uint8_t dns_id_flags;
 /**
 	* @brief  Open TCP port operation
   * @param  Instruction parameter
@@ -78,7 +78,11 @@ NB_TaskStatus nb_TCP_conn_set(const char* param)
 	strcat(buff,AT NSOCO "=");
 	sprintf(buff+strlen(buff), "%c", nb.socket);
 	strcat(buff,",");
-	strcat(buff,(char*)user.add);
+//	strcat(buff,(char*)user.add);
+		if(strlen((char*)user.add_ip)!=0)
+		strcat(buff,(char*)user.add_ip);
+	else
+		strcat(buff,(char*)user.add);
 	strcat(buff,"\n");
 	
 	NBTask[_AT_TCP_CONN].ATSendStr = buff;
@@ -179,8 +183,14 @@ NB_TaskStatus nb_TCP_read_get(const char* param)
 	else
 	{
 		memset(downlink_data,0,sizeof(downlink_data));		
-		char* end = strstr((char*)nb.usart.data,(char*)user.add);
+//		char* end = strstr((char*)nb.usart.data,(char*)user.add);
+		char*	end    = NULL;
 		char* start  = NULL;
+		if(strlen((char*)user.add_ip)!=0)
+			end = strstr((char*)nb.usart.data,(char*)user.add_ip);
+		else
+			end = strstr((char*)nb.usart.data,(char*)user.add);
+		
 		for(int i=0;i<4;i++)
 		{
 			start = end;
@@ -246,8 +256,12 @@ NB_TaskStatus nb_TCP_uri_run(const char* param)
 	{
 		NBTask[_AT_TCP_URI].nb_cmd_status = NB_SEND_SUCC;	
 	}
+	else if(strstr((char*)nb.usart.data,"NSOCO") != NULL)
+	{
+		NBTask[_AT_TCP_URI].nb_cmd_status = NB_NSOCO_SUCC;		
+	}
 	else
-		NBTask[_AT_UDP_URI].nb_cmd_status = NB_OTHER;
+		NBTask[_AT_TCP_URI].nb_cmd_status = NB_OTHER;
 //Judgment issued and received 
 	if(strstr((char*)nb.usart.data,NSONMI) != NULL)
 	{
@@ -258,5 +272,12 @@ NB_TaskStatus nb_TCP_uri_run(const char* param)
 	{
 		NBTask[_AT_TCP_URI].nb_cmd_status = NB_ERROR;
 	}
+	if(dns_id_flags==1)
+	{
+		if(strstr((char*)nb.usart.data,NSOSTR) != NULL && strstr((char*)nb.usart.data,",100,0") != NULL)
+	{
+		NBTask[_AT_TCP_URI].nb_cmd_status = NB_STA_SUCC;	
+  }
+  }
 	return NBTask[_AT_TCP_URI].nb_cmd_status;
 }

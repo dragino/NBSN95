@@ -1,0 +1,13 @@
+NBSN95
+v1.2.7
+1.Compatible with LDDS45 distance sensor
+
+v1.2.6
+1.Compatible with BC95-G, BC35-G and BG95-GV modules
+
+ v1.2.3
+1.Fix the problem that the COAP protocol has not received ACK and has been waiting 
+
+
+
+

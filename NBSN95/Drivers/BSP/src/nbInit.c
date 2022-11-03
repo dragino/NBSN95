@@ -4,6 +4,9 @@ static uint8_t net_acc_status_led = 0;
 static char buff[200]={0};
 static uint8_t	recieve_data[NB_RX_SIZE] = {0};	   	 			//Receive data
 static uint8_t 	set_band_flag=0;
+uint8_t 	dns_id_flags=0;
+uint8_t 	bc35tobc95_flags=0;
+extern uint8_t downlink_twice_flags;
 	
 NB nb = {.net_flag=no_status,.recieve_flag=0,.usart.len=0,.usart.data=recieve_data,
 				 .imei={0},.imsi={0},.singal=0};
@@ -254,6 +257,50 @@ NB_TaskStatus nb_nband_get(const char* param)
 }
 
 /**
+	* @brief  AT_CGMM: Request Manufacturer Model
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_cgmm_run(const char* param)
+{
+	NBTask[_AT_CGMM].try_num = 3;
+	while(NBTask[_AT_CGMM].try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CGMM])== NB_CMD_SUCC)
+		{
+			NBTask[_AT_CGMM].nb_cmd_status = nb_cgmm_get(param);
+			break;
+		}
+		else
+			NBTask[_AT_CGMM].nb_cmd_status = NB_CMD_FAIL;
+	}
+	return NBTask[_AT_CGMM].nb_cmd_status;
+}
+
+NB_TaskStatus nb_cgmm_get(const char* param)
+{
+	char *p = strstr((char*)nb.usart.data,"BC35G");
+	char *p1 = strstr((char*)nb.usart.data,"BC95-GV");
+	char *p2 = strstr((char*)nb.usart.data,"BC95G");	
+	if(p!=NULL)
+	{	
+	NBTask[_AT_CGMM].nb_cmd_status = NB_35_SUCC;	
+	}
+	if(p2!=NULL)
+	{	
+	NBTask[_AT_CGMM].nb_cmd_status = NB_95g_SUCC;	
+	}
+	if(p1!=NULL)
+	NBTask[_AT_CGMM].nb_cmd_status = NB_95_SUCC;	
+	if(p==NULL && p1==NULL&& p2==NULL)
+	{	
+	NBTask[_AT_CGMM].nb_cmd_status = NB_CMD_FAIL;
+	}
+	return NBTask[_AT_CGMM].nb_cmd_status;
+}
+
+
+/**
 	* @brief  AT_CCLK : Get Time
   * @param  Instruction parameter
   * @retval NB_TaskStatus
@@ -290,7 +337,40 @@ NB_TaskStatus nb_cclk_get(const char* param)
 	}
 	return NBTask[_AT_CCLK].nb_cmd_status;
 }
+/**
+	* @brief  AT+CGDCONT : Define a PDP Context
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_cgdcont_run(const char* param)
+{
+	NBTask[_AT_CGDCONT].try_num = 2;
+	NBTask[_AT_CGDCONT].set(param);
+	while(NBTask[_AT_CGDCONT].try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CGDCONT]) == NB_CMD_SUCC )
+		{
+			break;
+		}
+	}
+	return NBTask[_AT_CGDCONT].nb_cmd_status;
+}
 
+NB_TaskStatus nb_cgdcont_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	sprintf(buff,AT CGDCONT "=1,\"IPV4V6\",\"%s\"" NEWLINE,user.apn);
+	
+	NBTask[_AT_CGDCONT].ATSendStr = buff;
+	NBTask[_AT_CGDCONT].len_string = strlen(NBTask[_AT_CGDCONT].ATSendStr);
+	user_main_debug("NBTask[_AT_CGDCONT].ATSendStr:%s",NBTask[_AT_CGDCONT].ATSendStr);
+	return NBTask[_AT_CGDCONT].nb_cmd_status;
+}
+
+NB_TaskStatus nb_cgdcont_get(const char* param)
+{
+	return NBTask[_AT_CGDCONT].nb_cmd_status;
+}
 /**
 	* @brief  AT+CPSMS : Power Saving ModeSetting
   * @param  Instruction parameter
@@ -355,7 +435,101 @@ NB_TaskStatus nb_csq_get(const char* param)
 
 	return NBTask[_AT_CSQ].nb_cmd_status;
 }
+/**
+	* @brief  AT+QDNSCFG : DNS Server 
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_qdnscfg_run(const char* param)
+{
+	NBTask[_AT_QDNSCFG].set(param);
+	NBTask[_AT_QDNSCFG].try_num = 3;
+	while(NBTask[_AT_QDNSCFG].try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QDNSCFG])== NB_CMD_SUCC)
+		{
+			NBTask[_AT_QDNSCFG].nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+			NBTask[_AT_QDNSCFG].nb_cmd_status = NB_CMD_FAIL;
+	}
+	return NBTask[_AT_QDNSCFG].nb_cmd_status;
+}
+NB_TaskStatus nb_qdnscfg_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	
+	strcat(buff,AT QIDNSCFG "=");
+	strcat(buff,(char*)user.dns_add);
+	strcat(buff,NEWLINE);
+	
+	NBTask[_AT_QDNSCFG].ATSendStr  = buff;
+	NBTask[_AT_QDNSCFG].len_string = strlen(NBTask[_AT_QDNSCFG].ATSendStr);
+	user_main_debug("NBTask[_AT_QDNSCFG].ATSendStr:%s",NBTask[_AT_QDNSCFG].ATSendStr);
+	
+	return NBTask[_AT_QDNSCFG].nb_cmd_status;
+}
+/**
+	* @brief  AT+QDNS : DNS resolve domain name 
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_qdns_run(const char* param)
+{
+	NBTask[_AT_QDNS].set(param);
+	NBTask[_AT_QDNS].try_num = 4;
+	while(NBTask[_AT_QDNS].try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QDNS])== NB_CMD_SUCC)
+		{
+			NBTask[_AT_QDNS].nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+			NBTask[_AT_QDNS].nb_cmd_status = NB_CMD_FAIL;
+	}
+	return NBTask[_AT_QDNS].nb_cmd_status;
+}
+NB_TaskStatus nb_qdns_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	char *p=strrchr((char*)user.add,',');
+	if(p!=NULL)
+	{
+		strcat(buff,AT QDNS "=0,");
+		memcpy(buff+strlen(buff),user.add,p-(char*)user.add);
+		strcat(buff,NEWLINE);
+	}
+	
+	NBTask[_AT_QDNS].ATSendStr  = buff;
+	NBTask[_AT_QDNS].len_string = strlen(NBTask[_AT_QDNS].ATSendStr);
+	user_main_debug("NBTask[_AT_QDNS].ATSendStr:%s",NBTask[_AT_QDNS].ATSendStr);
+	
+	return NBTask[_AT_QDNS].nb_cmd_status;
+}
+NB_TaskStatus nb_qdns_get(const char* param)
+{
+	char *p1=strstr((char*)nb.usart.data,QDNS);	
+	char *q1=strrchr((char*)user.add,',');
+	if(p1==NULL || q1==NULL)
+	{
+		user_main_printf("Domain name resolution failed");
+		NBTask[_AT_QDNS].nb_cmd_status = NB_CMD_FAIL;
+	}
+	else
+	{
+		p1 = strchr(p1,':');
+		char *p2=strchr(p1,'\n');
+		memset(user.add_ip,0,sizeof(user.add_ip));
+		memcpy(user.add_ip+strlen((char*)user.add_ip),p1+1,p2-p1-2);
+		memcpy(user.add_ip+strlen((char*)user.add_ip),q1,strlen(q1));
+		user_main_printf("Domain IP:%s",user.add_ip);
+		NBTask[_AT_QDNS].nb_cmd_status = NB_CMD_SUCC;
+	}	
 
+	return NBTask[_AT_QDNS].nb_cmd_status;
+}
 /**
 	* @brief  AT+NRB : RESET
   * @param  Instruction parameter
@@ -404,7 +578,7 @@ case _AT:{
 case _ATE:{
 				if(NBTask[_ATE].run(NULL) == NB_CMD_SUCC)
 				{
-					*task = _AT_IMEI;
+					*task = _AT_CGMM;
 					user_main_printf("Echo mode turned off successfully.");
 				}
 				else
@@ -413,7 +587,33 @@ case _ATE:{
 					user_main_printf("Echo mode turned off failed.");			
 				}
 			}
-			break;
+			break;		
+case _AT_CGMM:{
+				if(NBTask[_AT_CGMM].run(NULL) == NB_35_SUCC)
+				{
+					*task = _AT_IMEI;
+					bc35tobc95_flags=0;
+					user_main_printf("Model information:BC35-G.");
+				}
+				else if(NBTask[_AT_CGMM].run(NULL) == NB_95g_SUCC)
+				{
+					*task = _AT_IMEI;
+					bc35tobc95_flags=0;
+					user_main_printf("Model information:BC95-G.");
+				}				
+				else if(NBTask[_AT_CGMM].run(NULL) == NB_95_SUCC)
+				{
+					*task = _AT_IMEI;
+					bc35tobc95_flags=1;
+					user_main_printf("Model information:BC95-GV.");
+				}
+				else
+				{
+					at_state = _AT_ERROR;			
+					user_main_printf("Request for manufacturer model failed.");			
+				}
+			}
+			break;		
 case _AT_IMEI:{
 				if(NBTask[_AT_IMEI].get(NULL) == NB_CMD_SUCC)
 				{
@@ -423,7 +623,7 @@ case _AT_IMEI:{
 					if(strstr((char*)user.deui,"NULL") != NULL)
 					{
 						memset(user.deui,0,sizeof(user.deui));
-						memcpy(user.deui,nb.imei+3,12);	
+						memcpy(user.deui,nb.imei,15);	
 					}
 				}
 				else 
@@ -449,7 +649,7 @@ case _AT_IMSI:{
 case _AT_NBAND:{
 				NB_TaskStatus nband_state = NBTask[_AT_NBAND].run(NULL);
 				if(nband_state == NB_CMD_SUCC)
-					*task=_AT_NCONFIG;
+					*task=_AT_CGDCONT;
 				else if(nband_state == NB_NBAND_NOSET)
 					*task=_AT_CFUN;
 				else if(nband_state == NB_NBAND_SET)
@@ -463,7 +663,27 @@ case _AT_NBAND:{
 					at_state = _AT_ERROR;
 				}
 			}
-			break;				
+			break;		
+case _AT_CGDCONT:{
+				if(strstr((char*)user.apn,"NULL") == NULL)
+				{
+					if(NBTask[_AT_CGDCONT].run(NULL) != NB_CMD_SUCC)
+					{
+						at_state = _AT_ERROR;
+						user_main_printf("Failed to set APN");
+					}
+					else
+					{
+						user_main_printf("Set APN successfully");
+						*task=_AT_NCONFIG;
+					}
+				}
+				else
+				{
+					*task=_AT_NCONFIG;
+				}
+			}
+			break;			
 case _AT_CFUN:{
 				if(NBTask[_AT_CFUN].run(NULL) != NB_CMD_SUCC)
 				{
@@ -514,7 +734,36 @@ case _AT_CPSMS:{
 					user_main_printf("PSM mode configured ");
 				else 
 					user_main_printf("PSM mode configuration failed ");			
-				*task=_AT_CCLK;
+				*task=_AT_QDNSCFG;
+			}
+			break;
+case _AT_QDNSCFG:{
+				if(NBTask[_AT_QDNSCFG].run(NULL) == NB_CMD_SUCC)
+					user_main_printf("DNS configuration is successful");
+				else 
+					user_main_printf("DNS configuration failed");			
+				*task=_AT_QDNS;
+			}
+			break;
+case _AT_QDNS:{
+				if(is_ipv4_addr((char*)user.add) == 0)
+				{
+					dns_id_flags=1;
+					NB_TaskStatus nbtask_state = NBTask[_AT_QDNS].run(NULL);
+					if(nbtask_state == NB_CMD_SUCC)
+					{
+						user_main_printf("Resolving domain name...");			
+						*task = _AT_IDLE;
+						nb.dns_flag = running;
+						nb.uplink_flag = no_status;
+					}
+				}
+				else  
+				{
+					dns_id_flags=0;
+					*task = _AT_UPLOAD_START;
+					user_main_printf("No DNS resolution required");
+				}
 			}
 			break;
 case _AT_CCLK:{
@@ -529,7 +778,15 @@ case _AT_CCLK:{
 case _AT_UPLOAD_START:{
 				nb.uplink_flag = send;
 				nb.recieve_flag = NB_IDIE;
-				if(sys.protocol == COAP_PRO)			{*task=_AT_COAP_CONFIG;}
+				if(sys.protocol == COAP_PRO)		
+        	{
+						if(bc35tobc95_flags==0)
+						{
+					  *task=_AT_COAP_CONFIG;
+						}else{
+						*task=_AT_COAP_OPEN_CONFIG_95GV;
+						}
+					}
 				else if(sys.protocol == UDP_PRO)	{*task=_AT_UDP_SEND;}
 				else if(sys.protocol == MQTT_PRO)	{*task=_AT_MQTT_Config;}
 				else if(sys.protocol == TCP_PRO)	{*task=_AT_TCP_OPEN;}
@@ -609,7 +866,7 @@ case _AT_COAP_SEND:
 				*task = _AT_COAP_CLOSE;
 				user_main_printf("Failed to upload data");
 			}
-			break;
+			break;		
 case _AT_COAP_READ:
 			HAL_Delay(sys.rxdl);
 			NBTask[_AT_COAP_READ].run(NULL);
@@ -641,6 +898,86 @@ case _AT_COAP_URI:
 				*task = _AT_COAP_CLOSE;
 			}
 			break;
+/***************************************************COAP_BC95-GV******************************************************************************/					
+case _AT_COAP_OPEN_CONFIG_95GV:
+		  if(strstr((char*)user.add,"NULL") != NULL || strstr((char*)user.uri,"NULL") != NULL)
+			{
+				*task=_AT_UPLOAD_END;
+				user_main_printf("COAP parameter configuration error");
+				break;
+			}
+			if(NBTask[_AT_COAP_OPEN_CONFIG_95GV].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+				user_main_printf("Create a CoAP Context");
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE_BC95GV;
+				user_main_printf("Failed to Create a CoAP context");
+			}
+			break;			
+case _AT_COAP_OPTION_95GV:
+			if(NBTask[_AT_COAP_OPTION_95GV].run(NULL) == NB_CMD_SUCC)
+			{
+			  *task=_AT_COAP_SEND_CONFIG_95GV;			
+				user_main_info("Successfully configured CoAP resource path");
+			}
+			else
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE_BC95GV;
+				user_main_info("Failed to configure the CoAP resource path");
+			}
+			break;		
+case _AT_COAP_SEND_CONFIG_95GV:
+			if(NBTask[_AT_COAP_SEND_CONFIG_95GV].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE_BC95GV;
+				user_main_printf("Failed to upload data");
+			}	
+			break;
+case _AT_COAP_CLOSE_BC95GV:
+			if(NBTask[_AT_COAP_CLOSE_BC95GV].run(NULL) == NB_CLOSE_SUCC)
+			{
+				*task=_AT_IDLE;
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task=_AT_UPLOAD_FAIL;
+				user_main_printf("Failed to delete CoAP context");
+			}
+			break;			
+case _AT_COAP_URI_95GV:
+			uri_state = NBTask[_AT_COAP_URI_95GV].run(NULL);
+			if(uri_state == NB_SEND_SUCC)
+			{
+				*task = _AT_COAP_CLOSE_BC95GV;
+				user_main_printf("Upload data successfully");	
+			}
+			else if(uri_state == NB_QCOAPOPEN_SUCC)
+			{
+				*task = _AT_COAP_OPTION_95GV;
+			}
+			else if(uri_state == NB_QCOAPCLOSE_SUCC)
+			{
+				*task = _AT_UPLOAD_SUCC;
+				user_main_printf("Successfully deleted CoAP context");
+			}
+			else
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE_BC95GV;
+			}
+			break;		
+			
 /***************************************************MQTT******************************************************************************/		
 case _AT_MQTT_Config:
 			if(strstr((char*)user.add,"NULL") != NULL || strstr((char*)user.client,"NULL") != NULL || strstr((char*)user.pubtopic,"NULL") != NULL || strstr((char*)user.subtopic,"NULL") != NULL )
@@ -771,6 +1108,11 @@ case _AT_MQTT_URI:
 				case NB_ERROR:
 							at_state = _AT_ERROR;
 							*task = _AT_UPLOAD_FAIL;
+				    break;
+				case NB_STA_SUCC:
+				     	at_state = _AT_ERROR;
+							*task = _AT_QDNS;
+			      	user_main_printf("Failed to send, resolve the domain name");	
 						break;
 				default:
 							*task = _AT_IDLE;
@@ -903,6 +1245,16 @@ case _AT_TCP_URI:
 				*task = _AT_TCP_CLOSE;
 				user_main_printf("Datagram has been confirmed to be received by the server");
 			}
+			else if(uri_state == NB_STA_SUCC)
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_QDNS;
+			  user_main_printf("Failed to send, resolve the domain name");
+			}
+			else if(uri_state == NB_NSOCO_SUCC)
+			{
+				*task = _AT_TCP_SEND;
+			}
 			else
 			{
 				at_state = _AT_ERROR;
@@ -916,6 +1268,7 @@ case _AT_UPLOAD_END:
 			*task = _AT_IDLE;
 			memset((char*)nb.usart.data,0,sizeof(nb.usart.data));
 			nb.uplink_flag = no_status;
+		 downlink_twice_flags=0;
 			break;
 
 case _AT_UPLOAD_SUCC:
@@ -946,10 +1299,19 @@ case _AT_NRB:{
 				nb.uplink_flag = no_status;
 				set_band_flag = 0;				
 				My_AlarmInit(sys.tdc,0);
+
 				break;
 			}
 case _AT_URI:{
-				if(sys.protocol == COAP_PRO)			*task = _AT_COAP_URI;
+				if(sys.protocol == COAP_PRO)	
+				{
+						if(bc35tobc95_flags==0)
+						{
+					   *task=_AT_COAP_URI;
+						}else{
+						*task=_AT_COAP_URI_95GV;
+						}
+				}
 				else if(sys.protocol == UDP_PRO)	*task = _AT_UDP_URI;
 				else if(sys.protocol == MQTT_PRO)	*task = _AT_MQTT_URI;
 				else if(sys.protocol == TCP_PRO)	*task = _AT_TCP_URI;
@@ -959,7 +1321,6 @@ case _AT_FLAG_INIT:{
 				nb.uplink_flag = no_status;
 				nb.net_flag = no_status;
 				net_acc_status_led = 0;
-				nb.uplink_flag = no_status;
 				set_band_flag = 0;
 				*task = _AT;
 			}

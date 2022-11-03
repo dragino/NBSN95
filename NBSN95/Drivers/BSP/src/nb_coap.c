@@ -2,6 +2,7 @@
 
 static char buff[200]={0};
 static char downlink_data[50]={0};
+extern uint8_t dns_id_flags; 
 /**
 	* @brief  Configure to show the CoAP option of sender
   * @param  Instruction parameter
@@ -252,6 +253,165 @@ NB_TaskStatus nb_COAP_close_get(const char* param)
 	return NBTask[_AT_COAP_CLOSE].nb_cmd_status;
 }
 
+/************************COAP BC95-GV***********************/
+/**
+	* @brief  COAP Configure server address
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_COAP_open_config95gv_run(const char* param)
+{
+	NBTask[_AT_COAP_OPEN_CONFIG_95GV].try_num = 2;
+	NBTask[_AT_COAP_OPEN_CONFIG_95GV].set(NULL);
+	
+	if(nb_at_send(&NBTask[_AT_COAP_OPEN_CONFIG_95GV]) == NB_CMD_SUCC)
+	{
+		NBTask[_AT_COAP_OPEN_CONFIG_95GV].nb_cmd_status = NB_CMD_SUCC;
+	}
+	else
+		NBTask[_AT_COAP_OPEN_CONFIG_95GV].nb_cmd_status = NB_CMD_FAIL;
+	
+	return NBTask[_AT_COAP_OPEN_CONFIG_95GV].nb_cmd_status;
+}
+
+NB_TaskStatus nb_COAP_open_config95gv_set(const char* param)
+{
+	char* pos=strchr((char*)user.add,',');
+	char pos1[20]={0};
+	memset(buff,0,sizeof(buff));
+	memset(pos1,0,sizeof(pos1));
+	memcpy(pos1,(char*)user.add,strlen((char*)user.add)-strlen(pos));
+	strcat(buff,AT QCOAPOPEN"=0,");
+	strcat(buff,"\"");
+	strcat(buff,pos1);
+	strcat(buff,"\"");
+	strcat(buff,pos);
+	strcat(buff,"\n");
+	
+	NBTask[_AT_COAP_OPEN_CONFIG_95GV].ATSendStr  = buff;
+	NBTask[_AT_COAP_OPEN_CONFIG_95GV].len_string = strlen(NBTask[_AT_COAP_OPEN_CONFIG_95GV].ATSendStr);
+	user_main_debug("NBTask[_AT_COAP_OPEN_CONFIG_95GV].ATSendStr:%s",NBTask[_AT_COAP_OPEN_CONFIG_95GV].ATSendStr);
+	return NBTask[_AT_COAP_OPEN_CONFIG_95GV].nb_cmd_status;
+}
+
+/**
+	* @brief  Configure CoAP Options
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_COAP_option95gv_run(const char* param)
+{
+	NBTask[_AT_COAP_OPTION_95GV].try_num = 4;
+	NBTask[_AT_COAP_OPTION_95GV].set(param);
+	
+	while(NBTask[_AT_COAP_OPTION_95GV].try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_COAP_OPTION_95GV]) == NB_CMD_SUCC )
+		{
+			NBTask[_AT_COAP_OPTION_95GV].nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+		{
+			NBTask[_AT_COAP_OPTION_95GV].nb_cmd_status = NB_CMD_FAIL;
+			HAL_Delay(500);
+		}
+	}
+	return NBTask[_AT_COAP_OPTION_95GV].nb_cmd_status;
+}
+
+NB_TaskStatus nb_COAP_option95gv_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	strcat(buff,AT QCOAPOPTION"=0,0,");
+	strcat(buff,(char*)user.uri);
+	strcat(buff,"\n");
+	
+	NBTask[_AT_COAP_OPTION_95GV].ATSendStr  = buff;
+	NBTask[_AT_COAP_OPTION_95GV].len_string = strlen(NBTask[_AT_COAP_OPTION_95GV].ATSendStr);
+	user_main_debug("NBTask[_AT_COAP_OPTION_95GV].ATSendStr:%s",NBTask[_AT_COAP_OPTION_95GV].ATSendStr);
+	return NBTask[_AT_COAP_OPTION_95GV].nb_cmd_status;
+}
+	
+NB_TaskStatus nb_COAP_option95gv_get(const char* param)
+{
+	return NBTask[_AT_COAP_OPTION_95GV].nb_cmd_status;
+}
+
+/**
+	* @brief  COAP Send DATA Config
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_COAP_send_config95gv_run(const char* param)
+{
+	NBTask[_AT_COAP_SEND_CONFIG_95GV].try_num = 2;
+	NBTask[_AT_COAP_SEND_CONFIG_95GV].set(NULL);
+	
+	if(nb_at_send(&NBTask[_AT_COAP_SEND_CONFIG_95GV]) == NB_CMD_SUCC)
+	{
+		NBTask[_AT_COAP_SEND_CONFIG_95GV].nb_cmd_status = NB_CMD_SUCC;
+	}
+	else
+		NBTask[_AT_COAP_SEND_CONFIG_95GV].nb_cmd_status = NB_CMD_FAIL;
+	
+	return NBTask[_AT_COAP_SEND_CONFIG_95GV].nb_cmd_status;
+}
+
+NB_TaskStatus nb_COAP_send_config95gv_set(const char* param)
+{
+	char* num;
+	memset(buff,0,sizeof(buff));
+	strcat(buff,AT QCOAPSEND"=0,1,3,0,");
+	num=Int2String(sensor.data_len,num);
+	strcat(buff,(char*)num);
+	strcat(buff,",\"");
+	strcat(buff,(char*)sensor.data);
+	strcat(buff,"\"");
+	strcat(buff,"\n");
+	
+	NBTask[_AT_COAP_SEND_CONFIG_95GV].ATSendStr  = buff;
+	NBTask[_AT_COAP_SEND_CONFIG_95GV].len_string = strlen(NBTask[_AT_COAP_SEND_CONFIG_95GV].ATSendStr);
+	user_main_debug("NBTask[_AT_COAP_SEND_CONFIG_95GV].ATSendStr:%s",NBTask[_AT_COAP_SEND_CONFIG_95GV].ATSendStr);
+	return NBTask[_AT_COAP_SEND_CONFIG_95GV].nb_cmd_status;
+}
+
+/**
+	* @brief  Delete the CoAP context
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_COAP_closebc95gv_run(const char* param)
+{
+	NBTask[_AT_COAP_CLOSE_BC95GV].try_num = 2;
+	NBTask[_AT_COAP_CLOSE_BC95GV].set(param);
+	while(NBTask[_AT_COAP_CLOSE_BC95GV].try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_COAP_CLOSE_BC95GV]) == NB_CMD_SUCC )
+		{
+			NBTask[_AT_COAP_CLOSE_BC95GV].nb_cmd_status = NB_CLOSE_SUCC;
+			break;
+		}
+		else
+		{
+			NBTask[_AT_COAP_CLOSE_BC95GV].nb_cmd_status = NB_CLOSE_FAIL;
+			HAL_Delay(500);
+		}
+	}
+	return NBTask[_AT_COAP_CLOSE_BC95GV].nb_cmd_status;
+}
+	
+NB_TaskStatus nb_COAP_closebc95gv_set(const char* param)
+{
+	user_main_debug("NBTask[_AT_COAP_CLOSE_BC95GV].ATSendStr:%s",NBTask[_AT_COAP_CLOSE_BC95GV].ATSendStr);
+	return NBTask[_AT_COAP_CLOSE_BC95GV].nb_cmd_status;
+}
+
+NB_TaskStatus nb_COAP_closebc95gv_get(const char* param)
+{
+	return NBTask[_AT_COAP_CLOSE_BC95GV].nb_cmd_status;
+}
+
 /**
 	* @brief  COAP URI:Scheduling tasks via URI 
   * @param  Instruction parameter
@@ -279,4 +439,36 @@ NB_TaskStatus nb_COAP_uri_run(const char* param)
 		NBTask[_AT_COAP_URI].nb_cmd_status = NB_ERROR;
 	}
 	return NBTask[_AT_COAP_URI].nb_cmd_status;
+}
+
+/**
+COAP URI BC95-GV*************************************************************
+  */
+NB_TaskStatus nb_COAP_uri95gv_run(const char* param)
+{
+	user_main_debug("uri:%s",nb.usart.data);
+	
+	if(strstr((char*)nb.usart.data,QCOAPOPEN": 0,0") != NULL)
+	{
+		NBTask[_AT_COAP_URI_95GV].nb_cmd_status = NB_QCOAPOPEN_SUCC;	
+	}
+	else if(strstr((char*)nb.usart.data,QCOAPCLOSE": 0,0") != NULL)
+	{
+		NBTask[_AT_COAP_URI_95GV].nb_cmd_status = NB_QCOAPCLOSE_SUCC;	
+	}
+	else if(strstr((char*)nb.usart.data,QCOAPURC": 0,2,20") != NULL)
+	{
+		NBTask[_AT_COAP_URI_95GV].nb_cmd_status = NB_SEND_SUCC;	
+	}
+	else
+		NBTask[_AT_COAP_URI_95GV].nb_cmd_status = NB_OTHER;	
+
+	if(strstr((char*)nb.usart.data,QCOAPURC": 0,2,5") != NULL ||
+		strstr((char*)nb.usart.data,QCOAPURC": 0,2,4") != NULL ||
+		strstr((char*)nb.usart.data,QCOAPURC": 0,1,4") != NULL||
+		strstr((char*)nb.usart.data,QCOAPURC": 0,1,5") != NULL)
+	{
+		NBTask[_AT_COAP_URI_95GV].nb_cmd_status = NB_ERROR;
+	}
+	return NBTask[_AT_COAP_URI_95GV].nb_cmd_status;
 }

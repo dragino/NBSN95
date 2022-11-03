@@ -100,6 +100,7 @@ uint16_t ULT_distance(void)
 	
 	else
 	{
+		distance=4095;
 		user_main_printf("ULT is not connect");
 		return distance;
 	}	

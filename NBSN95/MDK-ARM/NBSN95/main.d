@@ -7,7 +7,7 @@ nbsn95\main.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_def.h
 nbsn95\main.o: ../Drivers/CMSIS/Device/ST/STM32L0xx/Include/stm32l0xx.h
 nbsn95\main.o: ../Drivers/CMSIS/Device/ST/STM32L0xx/Include/stm32l072xx.h
 nbsn95\main.o: ../Drivers/CMSIS/Include/core_cm0plus.h
-nbsn95\main.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+nbsn95\main.o: E:\KEIL5\ARM\ARMCC\Bin\..\include\stdint.h
 nbsn95\main.o: ../Drivers/CMSIS/Include/cmsis_version.h
 nbsn95\main.o: ../Drivers/CMSIS/Include/cmsis_compiler.h
 nbsn95\main.o: ../Drivers/CMSIS/Include/cmsis_armcc.h
@@ -15,7 +15,7 @@ nbsn95\main.o: ../Drivers/CMSIS/Include/mpu_armv7.h
 nbsn95\main.o: ../Drivers/CMSIS/Device/ST/STM32L0xx/Include/system_stm32l0xx.h
 nbsn95\main.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal.h
 nbsn95\main.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h
-nbsn95\main.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+nbsn95\main.o: E:\KEIL5\ARM\ARMCC\Bin\..\include\stddef.h
 nbsn95\main.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_rcc_ex.h
 nbsn95\main.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_exti.h
 nbsn95\main.o: ../Drivers/STM32L0xx_HAL_Driver/Inc/stm32l0xx_hal_gpio.h
@@ -41,15 +41,15 @@ nbsn95\main.o: ../Inc/dma.h
 nbsn95\main.o: ../Inc/i2c.h
 nbsn95\main.o: ../Inc/iwdg.h
 nbsn95\main.o: ../Inc/usart.h
-nbsn95\main.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+nbsn95\main.o: E:\KEIL5\ARM\ARMCC\Bin\..\include\stdio.h
 nbsn95\main.o: ../Inc/rtc.h
 nbsn95\main.o: ../Inc/gpio.h
 nbsn95\main.o: ..\Drivers\BSP\inc\at.h
-nbsn95\main.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\ctype.h
-nbsn95\main.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+nbsn95\main.o: E:\KEIL5\ARM\ARMCC\Bin\..\include\ctype.h
+nbsn95\main.o: E:\KEIL5\ARM\ARMCC\Bin\..\include\string.h
 nbsn95\main.o: ..\Drivers\BSP\inc\common.h
-nbsn95\main.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
-nbsn95\main.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
+nbsn95\main.o: E:\KEIL5\ARM\ARMCC\Bin\..\include\math.h
+nbsn95\main.o: E:\KEIL5\ARM\ARMCC\Bin\..\include\stdlib.h
 nbsn95\main.o: ..\Drivers\BSP\inc\at.h
 nbsn95\main.o: ..\Drivers\BSP\inc\time_server.h
 nbsn95\main.o: ..\Drivers\BSP\inc\common.h
@@ -60,6 +60,7 @@ nbsn95\main.o: ..\Drivers\BSP\inc\sht31.h
 nbsn95\main.o: ..\Drivers\BSP\inc\lidar.h
 nbsn95\main.o: ..\Drivers\BSP\inc\ultrasound.h
 nbsn95\main.o: ..\Drivers\BSP\inc\weight.h
+nbsn95\main.o: ..\Drivers\BSP\inc\ult.h
 nbsn95\main.o: ..\Drivers\BSP\inc\flash_eraseprogram.h
 nbsn95\main.o: ..\Drivers\BSP\inc\lowpower.h
 nbsn95\main.o: ..\Drivers\BSP\inc\nbInit.h

@@ -2,7 +2,8 @@
 
 static char buff[200]={0};
 static char downlink_data[50]={0};
-
+extern uint8_t dns_id_flags;
+extern uint8_t 	bc35tobc95_flags;
 /**
 	* @brief  Set MQTT configuration parameters
   * @param  Instruction parameter
@@ -208,7 +209,10 @@ NB_TaskStatus nb_MQTT_data_read_set(const char* param)
 	memset(downlink_data,0,20);		
 	char* pos_start  = strrchr((char*)nb.usart.data,'"');	user_main_debug("pos_start:%p",&pos_start);
 	char* pos_end    = strchr(pos_start,'\n');			user_main_debug("pos_end:%p",&pos_end);		
+	if(bc35tobc95_flags==0)
 	memcpy(downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+2],(pos_end-pos_start)-1);	
+	else if(bc35tobc95_flags==1)
+	memcpy(downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+4],(pos_end-pos_start)-1);	
 	user_main_printf("Received downlink data:%s",downlink_data);
 	rxPayLoadDeal(downlink_data);
 	
@@ -282,6 +286,13 @@ NB_TaskStatus nb_MQTT_uri_run(const char* param)
 	if(strstr((char*)nb.usart.data,QMTSTAT) != NULL)
 	{
 		NBTask[_AT_MQTT_URI].nb_cmd_status = NB_ERROR;
+		if(dns_id_flags==1)
+		{
+		 if((strstr((char*)nb.usart.data,QMTCONN": 0,2") != NULL)&&(strstr((char*)nb.usart.data,QMTSTAT": 0,3") != NULL))
+	    {
+	      NBTask[_AT_MQTT_URI].nb_cmd_status = NB_STA_SUCC;	
+	    }
+	  }
 	}
 	return NBTask[_AT_MQTT_URI].nb_cmd_status;
 }
