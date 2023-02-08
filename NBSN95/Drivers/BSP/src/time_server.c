@@ -1,6 +1,7 @@
 #include "time_server.h"
+#include "time.h"
 
-void get_time()
+void get_time(void)
 {
 	RTC_DateTypeDef sdatestructureget;			
 	RTC_TimeTypeDef stimestructureget;
@@ -10,7 +11,7 @@ void get_time()
 	printf(" %.2d:%.2d:%.2d]", stimestructureget.Hours, stimestructureget.Minutes, stimestructureget.Seconds);			
 }
 
-void My_AlarmInit(uint16_t timer,uint8_t alarmX)
+void My_AlarmInit(uint32_t timer,uint8_t alarmX)
 {
 	if(alarmX == 1)
 		HAL_RTC_DeactivateAlarm(&hrtc,RTC_ALARM_B);
@@ -85,3 +86,29 @@ void My_AlarmInit(uint16_t timer,uint8_t alarmX)
     Error_Handler();
   }
 }
+
+long GetTick(char *str_time)  
+{  
+	struct tm stm;  
+	int iY, iM, iD, iH, iMin, iS;  
+
+	memset(&stm,0,sizeof(stm));  
+
+	iY = atoi(str_time);  
+	iM = atoi(str_time+5);  
+	iD = atoi(str_time+8);  
+	iH = atoi(str_time+11);  
+	iMin = atoi(str_time+14);  
+	iS = atoi(str_time+17);  
+
+	stm.tm_year=iY-1900;  
+	stm.tm_mon=iM-1;  
+	stm.tm_mday=iD;  
+	stm.tm_hour=iH;  
+	stm.tm_min=iMin;  
+	stm.tm_sec=iS;  
+
+	/*printf("%d-%0d-%0d %0d:%0d:%0d\n", iY, iM, iD, iH, iMin, iS);*/  
+
+	return mktime(&stm);  
+} 

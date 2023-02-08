@@ -2,7 +2,7 @@
 
 static char buff[200]={0};
 static char downlink_data[20]={0};
-
+extern uint8_t dns_id_flags;
 /**
 	* @brief  Open TCP port operation
   * @param  Instruction parameter
@@ -34,12 +34,12 @@ NB_TaskStatus nb_TCP_open_set(const char* param)
 
 NB_TaskStatus nb_TCP_open_get(const char* param)
 {
-	char *pch = strchr(nb.recieve_data,'O');
+	char *pch = strchr((char*)nb.usart.data,'O');
 	if(pch == NULL)
 		NBTask[_AT_TCP_OPEN].nb_cmd_status = NB_OPEN_FAIL;
 	else
 	{
-		nb.socket = nb.recieve_data[(pch-nb.recieve_data)-5];
+		nb.socket = nb.usart.data[(pch - ((char*)nb.usart.data))-5];
 		user_main_debug("nb.socket:%c\r\n",nb.socket);
 		NBTask[_AT_TCP_OPEN].nb_cmd_status = NB_OPEN_SUCC;
 	}
@@ -78,7 +78,11 @@ NB_TaskStatus nb_TCP_conn_set(const char* param)
 	strcat(buff,AT NSOCO "=");
 	sprintf(buff+strlen(buff), "%c", nb.socket);
 	strcat(buff,",");
-	strcat(buff,(char*)user.add);
+//	strcat(buff,(char*)user.add);
+		if(strlen((char*)user.add_ip)!=0)
+		strcat(buff,(char*)user.add_ip);
+	else
+		strcat(buff,(char*)user.add);
 	strcat(buff,"\n");
 	
 	NBTask[_AT_TCP_CONN].ATSendStr = buff;
@@ -99,19 +103,16 @@ NB_TaskStatus nb_TCP_conn_get(const char* param)
   */
 NB_TaskStatus nb_TCP_send_run(const char* param)
 {
-	NBTask[_AT_TCP_SEND].try_num = 4;
+	NBTask[_AT_TCP_SEND].try_num = 2;
 	NBTask[_AT_TCP_SEND].set(param);
 	while(NBTask[_AT_TCP_SEND].try_num--)
 	{
 		if(nb_at_send(&NBTask[_AT_TCP_SEND]) == NB_CMD_SUCC )
 		{
-			if(NBTask[_AT_TCP_SEND].get(param) == NB_SEND_SUCC)
-				break;
+			break;
 		}
 		else
 		{
-			user_main_printf("Sending data...");			
-			NBTask[_AT_TCP_SEND].nb_cmd_status = NB_SEND_FAIL;
 			HAL_Delay(500);
 		}
 	}
@@ -136,32 +137,6 @@ NB_TaskStatus nb_TCP_send_set(const char* param)
 	return NBTask[_AT_TCP_SEND].nb_cmd_status;
 }
 
-NB_TaskStatus nb_TCP_send_get(const char* param)
-{
-	char nsostr[20] = {0};
-	strcat(nsostr,NSOSTR":");
-	sprintf(nsostr+strlen(nsostr), "%c", nb.socket);
-	strcat(nsostr,",100,1");	
-	
-	uint32_t time = HAL_GetTick();
-	while(HAL_GetTick() - time < 2000 && nb.recieve_flag != NB_RECIEVE)
-	{
-		user_main_info("...");
-	}
-	
-	nb.recieve_flag = NB_IDIE;	
-	user_main_info("recieve_t data:%s",nb.recieve_data_server);
-	
-	if(strstr(nb.recieve_data_server,nsostr) != NULL || strstr(nb.recieve_data,nsostr) != NULL)
-	{
-		NBTask[_AT_TCP_SEND].nb_cmd_status = NB_SEND_SUCC;	
-	}
-	else
-		NBTask[_AT_TCP_SEND].nb_cmd_status = NB_SEND_FAIL;
-	
-	return NBTask[_AT_TCP_SEND].nb_cmd_status;
-}
-
 /**
 	* @brief  Read TCP data
   * @param  Instruction parameter
@@ -170,21 +145,17 @@ NB_TaskStatus nb_TCP_send_get(const char* param)
 NB_TaskStatus nb_TCP_read_run(const char* param)
 {
 	NBTask[_AT_TCP_READ].set(param);
-	while(nb_at_send(&NBTask[_AT_TCP_READ]) == NB_CMD_SUCC)
+	if(nb_at_send(&NBTask[_AT_TCP_READ]) == NB_CMD_SUCC)
 	{
-		if(NBTask[_AT_TCP_READ].get(param) == NB_READ_NODATA)
+		if(NBTask[_AT_TCP_READ].get(param) == NB_READ_DATA)
 		{			
-			break;
-		}
-		else
-		{
 			rxPayLoadDeal(downlink_data);
 		}
 	}
 	
 	return NBTask[_AT_TCP_READ].nb_cmd_status;
 }
-	
+
 NB_TaskStatus nb_TCP_read_set(const char* param)
 {
 	memset(buff,0,sizeof(buff));
@@ -204,21 +175,29 @@ NB_TaskStatus nb_TCP_read_set(const char* param)
 	
 NB_TaskStatus nb_TCP_read_get(const char* param)
 {
-	char *pch = strchr(nb.recieve_data,','); 
+	char *pch = strchr((char*)nb.usart.data,','); 
 	if(pch == NULL)
+	{
 		NBTask[_AT_TCP_READ].nb_cmd_status = NB_READ_NODATA;
+	}
 	else
 	{
 		memset(downlink_data,0,sizeof(downlink_data));		
-		char* end = strstr(nb.recieve_data,(char*)user.add);
+//		char* end = strstr((char*)nb.usart.data,(char*)user.add);
+		char*	end    = NULL;
 		char* start  = NULL;
+		if(strlen((char*)user.add_ip)!=0)
+			end = strstr((char*)nb.usart.data,(char*)user.add_ip);
+		else
+			end = strstr((char*)nb.usart.data,(char*)user.add);
+		
 		for(int i=0;i<4;i++)
-		{			
+		{
 			start = end;
 			end = strchr(end,',');
 			end++;
-		}	
-		memcpy(downlink_data,nb.recieve_data +(start - nb.recieve_data),(end-start)-1);		
+		}
+		memcpy(downlink_data,nb.usart.data +(start - (char*)nb.usart.data),(end-start)-1);		
 		user_main_printf("Received downlink data:%s",downlink_data);
 		
 		NBTask[_AT_TCP_READ].nb_cmd_status = NB_READ_DATA;
@@ -268,4 +247,37 @@ NB_TaskStatus nb_TCP_close_set(const char* param)
 NB_TaskStatus nb_TCP_close_get(const char* param)
 {
 	return NBTask[_AT_TCP_CLOSE].nb_cmd_status;
+}
+
+NB_TaskStatus nb_TCP_uri_run(const char* param)
+{
+	user_main_debug("uri:%s",nb.usart.data);
+	if(strstr((char*)nb.usart.data,NSOSTR) != NULL && strstr((char*)nb.usart.data,",100,1") != NULL)
+	{
+		NBTask[_AT_TCP_URI].nb_cmd_status = NB_SEND_SUCC;	
+	}
+	else if(strstr((char*)nb.usart.data,"NSOCO") != NULL)
+	{
+		NBTask[_AT_TCP_URI].nb_cmd_status = NB_NSOCO_SUCC;		
+	}
+	else
+		NBTask[_AT_TCP_URI].nb_cmd_status = NB_OTHER;
+//Judgment issued and received 
+	if(strstr((char*)nb.usart.data,NSONMI) != NULL)
+	{
+		nb_TCP_read_run(NULL);
+	}
+//Ask if the process has failed
+	if(strstr((char*)nb.usart.data,NSOCLI) != NULL)
+	{
+		NBTask[_AT_TCP_URI].nb_cmd_status = NB_ERROR;
+	}
+	if(dns_id_flags==1)
+	{
+		if(strstr((char*)nb.usart.data,NSOSTR) != NULL && strstr((char*)nb.usart.data,",100,0") != NULL)
+	{
+		NBTask[_AT_TCP_URI].nb_cmd_status = NB_STA_SUCC;	
+  }
+  }
+	return NBTask[_AT_TCP_URI].nb_cmd_status;
 }

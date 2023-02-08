@@ -2,7 +2,6 @@
 #define _Ultrasound_h_
 
 #include "common.h"
-#include "tim.h"
 
 void GPIO_ULT_INPUT_Init(void);
 void GPIO_ULT_OUTPUT_Init(void);

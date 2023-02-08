@@ -2,10 +2,12 @@
 
 static uint8_t  keep = 0;
 static uint32_t general_parameters[32]={0};
+static uint32_t servaddr_parameters[32]={0};
 static uint32_t coap_parameters[32]={0};
 static uint32_t mqtt_parameters_basic[32]={0};
 static uint32_t mqtt_parameters_topic[32]={0};
 
+uint8_t getsensorvalue_flag=0;
 ATEerror_t ATInsPro(char* atdata)
 {
 	uint8_t i = 0;
@@ -76,43 +78,50 @@ ATEerror_t at_reset_run(const char *param)
   return AT_OK;
 }
 
+/************** 			AT+MODEL			 **************/
+ATEerror_t at_model_get(const char *param)
+{
+	if(keep)
+		printf("AT+MODEL=");
+	printf("NBSN95,%s\r\n",AT_VERSION_STRING);
+	return AT_OK;
+}
+
 /************** 			AT+CFGMOD			 **************/
 ATEerror_t at_mod_set(const char *param)
 {
 	char* pos = strchr(param,'=');
-	sys.mod = param[(pos-param)+1];
+	uint8_t mod = param[(pos-param)+1];
 
-	if(sys.mod == model1)
+	if(mod == model1)
 	{
-		user_main_printf("\r\nDefault mode\r\n");
+		printf("\r\nDefault mode\r\n");
 	}
-	else if(sys.mod == model2)
+	else if(mod == model2)
 	{
-		user_main_printf("\r\nDistance mode\r\n");
+		printf("\r\nDistance mode\r\n");
 	}
-	else if(sys.mod == model3)
+	else if(mod == model3)
 	{
-		user_main_printf("\r\n3xADC + I2C mode\r\n");
+		printf("\r\n3xADC + I2C mode\r\n");
 	}
-	else if(sys.mod == model4)
+	else if(mod == model4)
 	{
-		user_main_printf("\r\n3xDS18B20 mode\r\n");
+		printf("\r\n3xDS18B20 mode\r\n");
 	}
-	else if(sys.mod == model5)
+	else if(mod == model5)
 	{
-		user_main_printf("\r\nWeiget mode\r\n");
+		printf("\r\nWeiget mode\r\n");
 	}
-	else if(sys.mod == model6)
+	else if(mod == model6)
 	{
-		user_main_printf("\r\nCounting mode\r\n");
-	}
-	
+		printf("\r\nCounting mode\r\n");
+	}	
 	else
 	{
-		user_main_printf("%s",ATError_description[AT_PARAM_ERROR]);
 		return AT_PARAM_ERROR;
 	}
-	
+	sys.mod = mod;
   return AT_OK;
 }
 
@@ -133,11 +142,19 @@ ATEerror_t at_pword_set(const char *param)
 	{		
 		return AT_PARAM_ERROR;
 	}
-	const char* p = param+(pos-param)+1;
 	
-	sys.pwd[0] = p[3]<<24 |  p[2]<<16 | p[1]<<8 | p[0];
-	sys.pwd[1] = p[7]<<24 |  p[6]<<16 | p[5]<<8 | p[4];
-		
+	if((strlen(param) - (pos-param)-1==1) && pos[1]=='0')
+	{
+		sys.pwd_flag=2;
+	}
+	else
+	{
+		sys.pwd_flag=1;
+	}
+	
+	memset(sys.pwd,0,8);
+	memcpy(sys.pwd,&pos[1],strlen(param) - (pos-param)-1);
+	
   return AT_OK;
 }
 
@@ -162,7 +179,7 @@ ATEerror_t at_deui_get(const char *param)
 ATEerror_t at_deui_set(const char *param)
 {
 	char* pos = strchr(param,'=');
-	if(strlen(param) - (pos-param)-1 !=12 || hexDetection((char*)(param+(pos-param)+1)) == 0)
+	if(strlen(param) - (pos-param)-1 !=15 || hexDetection((char*)(param+(pos-param)+1)) == 0)
 	{
 		return AT_PARAM_ERROR;
 	}
@@ -176,8 +193,12 @@ ATEerror_t at_deui_set(const char *param)
 /************** 			AT+FDR		 **************/
 ATEerror_t at_fdr_run(const char *param)
 {
+	upLink_flash_clear(sys.list);
+	HAL_FLASHEx_DATAEEPROM_Unlock();
+	HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_FDR_FLAG,0x01);//store fdr_flag
+	HAL_FLASHEx_DATAEEPROM_Lock();
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);
-	NVIC_SystemReset();
+	NVIC_SystemReset();	
   return AT_OK;
 }
 
@@ -185,7 +206,6 @@ ATEerror_t at_fdr_run(const char *param)
 ATEerror_t at_cfg_run(const char *param)
 {
 	keep = 1;
-	user_main_printf();
 	for (int i = 0; i < (sizeof(ATCommand) / sizeof(struct ATCommand_s)); i++)
 	{
 		ATCommand[i].get(param);
@@ -201,7 +221,10 @@ ATEerror_t at_servaddr_get(const char *param)
 	if(keep)
 		printf("AT+SERVADDR=");
 	printf("%s\r\n",user.add);
+	if(strlen((char*)user.add_ip)!=0 && strstr((char*)user.add_ip,"NULL") == NULL)
+		printf("(%s)",user.add_ip);
 	
+	printf("\r\n");
   return AT_OK;
 }
 
@@ -213,7 +236,7 @@ ATEerror_t at_servaddr_set(const char *param)
 	}
 	
 	char* pos = strchr(param,'=');
-	if(strlen(param) - (pos-param)-1 >21)
+	if(strlen(param) - (pos-param)-1 >69)
 	{
 		return AT_PARAM_ERROR;
 	}
@@ -373,8 +396,8 @@ ATEerror_t at_tdc_get(const char *param)
 ATEerror_t at_tdc_set(const char *param)
 {
 	char* pos = strchr(param,'=');
-	uint16_t tdc = atoi((param+(pos-param)+1));
-	if(sys.tdc > 0xFFFFFF)
+	uint32_t tdc = atoi((param+(pos-param)+1));
+	if(tdc > 0xFFFFFF || tdc<60)
 	{
 		return AT_PARAM_ERROR;
 	}
@@ -398,7 +421,6 @@ ATEerror_t at_inmod_set(const char *param)
 	sys.inmod = param[(pos-param)+1];
 	if(sys.inmod != '0' && sys.inmod != '1' && sys.inmod != '2' && sys.inmod != '3')
 	{
-		sys.inmod = '0';
 		return AT_PARAM_ERROR;
 	}
 	EX_GPIO_Init(sys.inmod-0x30);
@@ -472,8 +494,29 @@ ATEerror_t at_cfm_set(const char *param)
 	
   return AT_OK;
 }
+/************** 			AT+CUM		 **************/
+ATEerror_t at_cum_get(const char *param)
+{
+	if(keep)
+		printf(AT CUM"=");
+	printf("%c\r\n",sys.cum_flag);
+  return AT_OK;
+}
 
-/************** 		AT+RXDL		 **************/
+ATEerror_t at_cum_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	uint8_t cum = param[(pos-param)+1];
+	if(cum != '0' && cum != '1')
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	sys.cum_flag = cum;
+	
+  return AT_OK;
+}
+/************** 			AT+RXDL		 **************/
 ATEerror_t at_rxdl_set(const char *param)
 {
 	char* pos = strchr(param,'=');
@@ -550,28 +593,140 @@ ATEerror_t at_weight_GapValue_set(const char *param)
 ATEerror_t at_weight_GapValue_get(const char *param)
 {
 	if(!keep)
-		user_main_printf("%0.1f g\r\n",(float)Get_Weight());
+		printf("%0.1f g\r\n",(float)Get_Weight());
 	
   return AT_OK;		
 }
 
-/************** 			AT+CNTFAC		**************/
-ATEerror_t at_cntfac_set(const char *param)
+/************** 			AT+CDP		**************/
+ATEerror_t at_cdp_run(const char *param)
+{
+	printList(sys.list);
+	return AT_OK;
+}
+
+ATEerror_t at_cdp_set(const char *param)
 {
 	char* pos = strchr(param,'=');
-	sensor.factor=atof((param+(pos-param)+1));
+	uint8_t cdp = param[(pos-param)+1];
+	if(cdp != '0')
+	{
+		return AT_PARAM_ERROR;
+	}
+	upLink_flash_clear(sys.list);
+	return AT_OK;
+}
+
+/************** 			AT+EXT		**************/
+ATEerror_t at_ext_get(const char *param)
+{
+	if(keep)
+		printf(AT EXT"=");
+	printf("%d\r\n",sensor.exit_count);
+  return AT_OK;
+}
+
+ATEerror_t at_ext_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	sensor.exit_count = atoi((param+(pos-param)+1));
+	return AT_OK;
+}
+
+/************** 			AT+LDATA		**************/
+ATEerror_t at_ldata_get(const char *param)
+{
+	if(keep)
+		printf(AT LDATA"=");
+	printf("%s\r\n",(strlen(sensor.data)==0)?"NULL":sensor.data);
+	return AT_OK;
+}
+
+/************** 			AT+FBAND		**************/
+ATEerror_t at_fband_get(const char *param)
+{
+	if(keep)
+		printf(AT FBAND"=");
+	printf("%c\r\n",sys.nband_flag);
+	return AT_OK;
+}
+
+ATEerror_t at_fband_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	if(pos[1]== '0' || pos[1]== '1')
+		sys.nband_flag = pos[1];
+	else
+		return AT_PARAM_ERROR;
 	
 	return AT_OK;
 }
-
-ATEerror_t at_cntfac_get(const char *param)
+/************** 			AT+DNSCFG		**************/
+ATEerror_t at_dnscfg_get(const char *param)
 {
 	if(keep)
-		printf(AT CNTFAC"=");
-	printf("%0.2f\r\n",sensor.factor);
+		printf(AT DNSCFG"=");
+	printf("%s\r\n",user.dns_add);
 	return AT_OK;
 }
 
+ATEerror_t at_dnscfg_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >15)
+	{
+		return AT_PARAM_ERROR;
+	}
+	if(countchar(pos,',')!=1 || countchar(pos,'.')!=6)
+	{
+		return AT_PARAM_ERROR;
+	}
+
+	memset(user.dns_add,0,sizeof(user.dns_add));
+	memcpy(user.dns_add,(param+(pos-param)+1),strlen((param+(pos-param)+1)));		
+	return AT_OK;
+}
+/************** 			AT+APN		**************/
+ATEerror_t at_apn_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >20)
+	{
+		return AT_PARAM_ERROR;
+	}
+	memset(user.apn,0,sizeof(user.apn));
+	memcpy(user.apn,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
+	return AT_OK;
+}
+ATEerror_t at_apn_get(const char *param)
+{
+	if(keep)
+		printf(AT APN"=");
+	printf("%s\r\n",user.apn);
+	return AT_OK;
+}
+/************** 			AT+GETSENSORVALUE		 **************/
+ATEerror_t at_getsensorvalue_set(const char *param)
+{
+		char* pos = strchr(param,'=');
+	uint8_t getsensorvalue = param[(pos-param)+1];
+ 
+	if(getsensorvalue == '0' )
+	{	
+		txPayLoadDeal2(&sensor);
+	}
+	else if(getsensorvalue == '1')
+	{	
+		getsensorvalue_flag=1;
+		//task_num = _AT_CSQ;
+		//NBTASK(&task_num);	
+	}
+	else
+	{
+	return AT_PARAM_ERROR;
+	}	
+  return AT_OK;
+}
 /************** 		Other		 **************/
 char *rtrim(char* str)
 {
@@ -579,8 +734,7 @@ char *rtrim(char* str)
 	{
 		if(str[i]=='\r' || str[i]=='\n')
 			str[i] = 0;
-	}
-  
+	} 
 	return str;
 }
 
@@ -598,19 +752,26 @@ void config_Set(void)
 {
 	memset(general_parameters,0,sizeof(general_parameters));
 	
-	general_parameters[0]=sys.pwd[0];
-	general_parameters[1]=sys.pwd[1];
-	general_parameters[2]=sys.mod<<24   | sys.tdc;
-	general_parameters[3]=sys.inmod<<24 | sys.protocol<<16 | sys.cfm<<8;
-	general_parameters[4]=sys.rxdl<<16  | sys.power_time;
+	general_parameters[0]=sys.pwd[0]<<24 | sys.pwd[1]<<16 	| sys.pwd[2]<<8 | sys.pwd[3];
+	general_parameters[1]=sys.pwd[4]<<24 | sys.pwd[5]<<16 	| sys.pwd[6]<<8 | sys.pwd[7];
+	general_parameters[2]=sys.mod<<24    | sys.tdc;
+	general_parameters[3]=sys.inmod<<24  | sys.protocol<<16 | sys.cfm<<8 		| sys.cum_flag;
+	general_parameters[4]=sys.rxdl<<16   | sys.power_time;
 	general_parameters[5]=(int)(sensor.GapValue *10000);
-	general_parameters[6]=(int)(sensor.factor *10000);
+	general_parameters[6]=sensor.exit_count;
+	general_parameters[20]=sys.nband_flag<<24;
 	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.deui);i=i+4,j++)
 			general_parameters[7+j]=user.deui[i+0]<<24 | user.deui[i+1]<<16 | user.deui[i+2]<<8 | user.deui[i+3];
 	
+	for(uint8_t i=0,j=0;i<strlen((char*)user.apn);i=i+4,j++)
+			general_parameters[11+j]=user.apn[i+0]<<24 | user.apn[i+1]<<16 | user.apn[i+2]<<8 | user.apn[i+3];
+	
+	for(uint8_t i=0,j=0;i<strlen((char*)user.dns_add);i=i+4,j++)
+			general_parameters[16+j]=user.dns_add[i+0]<<24 | user.dns_add[i+1]<<16 | user.dns_add[i+2]<<8 | user.dns_add[i+3];
+	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.add);i=i+4,j++)
-			general_parameters[25+j]=user.add[i+0]<<24 | user.add[i+1]<<16 | user.add[i+2]<<8 | user.add[i+3];
+			servaddr_parameters[0+j]=user.add[i+0]<<24 | user.add[i+1]<<16 | user.add[i+2]<<8 | user.add[i+3];
 	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.uri);i=i+4,j++)
 			coap_parameters[j]=user.uri[i+0]<<24 | user.uri[i+1]<<16 | user.uri[i+2]<<8 | user.uri[i+3];
@@ -632,6 +793,7 @@ void config_Set(void)
 	
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);
+	FLASH_program(FLASH_USER_START_SERVADDR_ADD,servaddr_parameters, sizeof(servaddr_parameters)/4);
 	FLASH_program(FLASH_USER_START_COAP,coap_parameters, sizeof(coap_parameters)/4);
 	FLASH_program(FLASH_USER_START_MQTT_BASIC,mqtt_parameters_basic, sizeof(mqtt_parameters_basic)/4);
 	FLASH_program(FLASH_USER_START_MQTT_TOPIC,mqtt_parameters_topic, sizeof(mqtt_parameters_topic)/4);
@@ -640,13 +802,22 @@ void config_Set(void)
 void config_Get(void)
 {
 	uint32_t add = FLASH_USER_START_ADDR_CONFIG;
-	
-	sys.pwd[0] = FLASH_read(add);
-	sys.pwd[1] = FLASH_read(add+4);
-	if(sys.pwd[0] == 0 && sys.pwd[1] == 0)
+	for(uint8_t i=0,j=0;i<2;i++,j=j+4)
 	{
-		sys.pwd[0] = 0x34333231;
-		sys.pwd[1] = 0x38373635;
+		uint32_t temp  = FLASH_read(add+i*4);
+		sys.pwd[j] 	 = (temp>>24) & 0x000000FF;
+		sys.pwd[j+1] 	 = (temp>>16) & 0x000000FF;
+		sys.pwd[j+2] 	 = (temp>>8)  & 0x000000FF;
+		sys.pwd[j+3] 		 = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)sys.pwd) == 0)
+	{
+		memcpy(sys.pwd,"12345678",8);
+		sys.pwd_flag = 0;
+	}
+	else if(strlen((char*)sys.pwd)==1 && strchr((char*)sys.pwd,'0'))
+	{
+		sys.pwd_flag = 2;
 	}
 	
 	sys.mod = FLASH_read(add+8) >>24;
@@ -670,6 +841,10 @@ void config_Get(void)
 	if(sys.cfm != '0' && sys.cfm != '1')
 		sys.cfm = '0';
 	
+	sys.cum_flag = FLASH_read(add+12) & 0x000000FF;	
+	if(sys.cum_flag != '0' && sys.cum_flag != '1')
+		sys.cum_flag = '0';
+	
 	sys.power_time = FLASH_read(add+16)    & 0x0000FFFF;	
 	sys.rxdl       = FLASH_read(add+16)>>16& 0x0000FFFF;
 	
@@ -677,12 +852,14 @@ void config_Get(void)
 	if(sensor.GapValue == 0.0)
 		sensor.GapValue = 400.0;
 	
-	sensor.factor = FLASH_read(add+24)/10000.0;
-	if(sensor.factor == 0.0)
-		sensor.factor = 1.0;
+	sensor.exit_count = FLASH_read(add+24);
+
+	sys.nband_flag = FLASH_read(add+80)>>24 &0xFF;
+	if(sys.nband_flag!='0' && sys.nband_flag!='1')
+		sys.nband_flag = '1';
 	
 	add = add+28;
-	for(uint8_t i=0,j=0;i<3;i++,j=j+4)
+	for(uint8_t i=0,j=0;i<4;i++,j=j+4)
 	{
 		uint32_t temp  = FLASH_read(add+i*4);
 		user.deui[j] 	 = (temp>>24) & 0x000000FF;
@@ -694,9 +871,38 @@ void config_Get(void)
 	{
 		sprintf((char*)user.deui, "%s", "NULL");
 	}
+
+	add = FLASH_USER_START_ADDR_CONFIG + 0x04*11;
+	for(uint8_t i=0,j=0;i<5;i++,j=j+4)
+	{
+		uint32_t temp  = FLASH_read(add+i*4);
+		user.apn[j] 	 = (temp>>24) & 0x000000FF;
+		user.apn[j+1] = (temp>>16) & 0x000000FF;
+		user.apn[j+2] = (temp>>8)  & 0x000000FF;
+		user.apn[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.apn) == 0)
+	{
+		sprintf((char*)user.apn, "%s", "NULL");
+	}
+	
+		add = FLASH_USER_START_ADDR_CONFIG + 0x04*16;
+	for(uint8_t i=0,j=0;i<4;i++,j=j+4)
+	{
+		uint32_t temp  = FLASH_read(add+i*4);
+		user.dns_add[j] 	 = (temp>>24) & 0x000000FF;
+		user.dns_add[j+1] = (temp>>16) & 0x000000FF;
+		user.dns_add[j+2] = (temp>>8)  & 0x000000FF;
+		user.dns_add[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.dns_add) == 0)
+	{
+		sprintf((char*)user.dns_add, "%s", "8.8.8.8,8.8.4.4");
+	}
+	
 	
 	add = FLASH_USER_START_SERVER_ADD;
-	for(uint8_t i=0,j=0;i<6;i++,j=j+4)
+	for(uint8_t i=0,j=0;i<18;i++,j=j+4)
 	{
 		uint32_t temp = FLASH_read(add+i*4);
 		user.add[j] 	= (temp>>24) & 0x000000FF;
