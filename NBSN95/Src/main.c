@@ -198,9 +198,10 @@ int main(void)
 			task_num = _AT_URI;
 			nb.recieve_flag = NB_IDIE;
 		}
-		if(getsensorvalue_flag == 1)
+		if(getsensorvalue_flag == 1 && nb.uplink_flag == no_status)
 		{
 			task_num = _AT_CSQ;
+			nb.uplink_flag = send;
 			NBTASK(&task_num);
 			getsensorvalue_flag = 0;
 		}
@@ -398,7 +399,10 @@ void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
 	if(nb.net_flag == no_status)
 		task_num = _AT_FLAG_INIT;
 	else if(nb.net_flag == success && nb.uplink_flag == no_status)
+	{
 		task_num = _AT_CSQ;
+		nb.uplink_flag = send;
+	}
 	
 	LPM_DisableStopMode();
 }
@@ -420,7 +424,10 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 #endif	
 
 	if(nb.net_flag == fail)
+	{
 		task_num = _AT_CSQ;
+		nb.uplink_flag = send;
+	}
 	if(nb.net_flag == success && nb.uplink_flag == send)
 	{
 		uplink_time_num++;
@@ -467,11 +474,15 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 			sensor.exit_count++;
 		else if(nb.net_flag == success && sys.mod != model6 && (task_num < _AT_COAP_CONFIG || task_num > _AT_TCP_CLOSE))
 		{
+			if(nb.uplink_flag == no_status)
+			{
 			task_num = _AT_CSQ;
+		  nb.uplink_flag = send;
 			sys.exit_flag = 1;
 			//sensor.exit_state = HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_14)==1?1:2;
 			sensor.exit_state = 1;
 			LPM_DisableStopMode();	
+			}
 		}
 	}
 	else if(GPIO_Pin == GPIO_PIN_13)

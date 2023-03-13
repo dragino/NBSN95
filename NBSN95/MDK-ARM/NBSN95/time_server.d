@@ -59,5 +59,6 @@ nbsn95\time_server.o: ..\Drivers\BSP\inc\lidar.h
 nbsn95\time_server.o: ..\Drivers\BSP\inc\ultrasound.h
 nbsn95\time_server.o: ..\Drivers\BSP\inc\weight.h
 nbsn95\time_server.o: ..\Drivers\BSP\inc\ult.h
+nbsn95\time_server.o: ..\Drivers\BSP\inc\maxsonar.h
 nbsn95\time_server.o: ../Inc/rtc.h
 nbsn95\time_server.o: E:\KEIL5\ARM\ARMCC\Bin\..\include\time.h

@@ -562,6 +562,11 @@
               <FileType>1</FileType>
               <FilePath>..\Drivers\BSP\src\ult.c</FilePath>
             </File>
+            <File>
+              <FileName>maxsonar.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\BSP\src\maxsonar.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

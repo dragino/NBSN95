@@ -23,6 +23,7 @@
 "nbsn95\ultrasound.o"
 "nbsn95\weight.o"
 "nbsn95\ult.o"
+"nbsn95\maxsonar.o"
 "nbsn95\nbinit.o"
 "nbsn95\nb_mqtt.o"
 "nbsn95\nb_udp.o"

@@ -163,6 +163,7 @@ typedef struct
 	uint8_t  	recieve_flag;				 				 //Serial reception completion flag
 	uint8_t		recieve_ack_flag;
 	uint8_t   resend_count;
+	char     recieve_data[512];	   			 	 //Receive data
 	uint8_t		imsi[20];						 				 //IMSI number
 	uint8_t		imei[20];						 				 //IMEI number
 	USART			usart;

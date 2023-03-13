@@ -59,4 +59,5 @@ nbsn95\at.o: ..\Drivers\BSP\inc\lidar.h
 nbsn95\at.o: ..\Drivers\BSP\inc\ultrasound.h
 nbsn95\at.o: ..\Drivers\BSP\inc\weight.h
 nbsn95\at.o: ..\Drivers\BSP\inc\ult.h
+nbsn95\at.o: ..\Drivers\BSP\inc\maxsonar.h
 nbsn95\at.o: ..\Drivers\BSP\inc\flash_eraseprogram.h

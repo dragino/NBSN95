@@ -61,3 +61,4 @@ nbsn95\lidar.o: ..\Drivers\BSP\inc\lidar.h
 nbsn95\lidar.o: ..\Drivers\BSP\inc\ultrasound.h
 nbsn95\lidar.o: ..\Drivers\BSP\inc\weight.h
 nbsn95\lidar.o: ..\Drivers\BSP\inc\ult.h
+nbsn95\lidar.o: ..\Drivers\BSP\inc\maxsonar.h

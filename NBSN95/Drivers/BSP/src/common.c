@@ -234,6 +234,15 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 		ULT_getData();
 		uart1_IoDeInit();
 		Sensor->distance = ULT_Data_processing();	
+			if(sensor.distance == 0)
+			{
+				 MAXSONAR_Rest();
+			   MX_USART1_UART_Init	();	
+         uart1_Init();	
+         MAXSONAR_getData();
+		     uart1_IoDeInit();		
+		     Sensor->distance = MAXSONAR_Data_processing();					
+			}
 		}
 		}
 		

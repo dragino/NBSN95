@@ -854,6 +854,10 @@ void config_Get(void)
 	
 	sensor.exit_count = FLASH_read(add+24);
 
+	sys.nband_flag = FLASH_read(add+80)>>24 &0xFF;
+	if(sys.nband_flag!='0' && sys.nband_flag!='1')
+		sys.nband_flag = '1';
+	
 	add = add+28;
 	for(uint8_t i=0,j=0;i<4;i++,j=j+4)
 	{
@@ -867,10 +871,6 @@ void config_Get(void)
 	{
 		sprintf((char*)user.deui, "%s", "NULL");
 	}
-	
-	sys.nband_flag = FLASH_read(add+80)>>24 &0xFF;
-	if(sys.nband_flag!='0' && sys.nband_flag!='1')
-		sys.nband_flag = '1';
 
 	add = FLASH_USER_START_ADDR_CONFIG + 0x04*11;
 	for(uint8_t i=0,j=0;i<5;i++,j=j+4)
