@@ -1,0 +1,9 @@
+black ->E-
+red ->E+
+green -> A+
+white -> A-
+
+GND->GND
+VCC->VDD
+SCK ->PA11
+DT ->PB12

@@ -6,7 +6,7 @@ void DS18B20_delay(uint16_t time)
 
   while(time)
   {    
-    for (i = 0; i < 4; i++);
+    for (i = 0; i < 2; i++);
     time--;
   }
 }

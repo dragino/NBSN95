@@ -28,6 +28,19 @@ void WEIGHT_DOUT_Init(void)
 	HW_GPIO_Init(WEIGHT_DOUT_PORT,WEIGHT_DOUT_PIN,&GPIO_InitStruct);	
 }
 
+void WEIGHT_SCK_DeInit(void)
+{
+	GPIO_InitTypeDef GPIO_InitStruct={0};	
+	
+	HW_GPIO_Init(WEIGHT_SCK_PORT,WEIGHT_SCK_PIN,&GPIO_InitStruct);	
+}
+
+void WEIGHT_DOUT_DeInit(void)
+{
+	GPIO_InitTypeDef GPIO_InitStruct={0};	
+	
+	HW_GPIO_Init(WEIGHT_DOUT_PORT,WEIGHT_DOUT_PIN,&GPIO_InitStruct);			
+}
 
 uint32_t HX711_Read(void)	
 {
@@ -54,17 +67,19 @@ void Get_Maopi(void)
 {
 	Weight_Maopi = HX711_Read();
 	user_main_debug("Weight_Maopi %d \r\n",Weight_Maopi);	
+//	user_main_printf("Weight_Maopi %d \r\n",Weight_Maopi);	
 } 
 
 int32_t Get_Weight(void)
 {
+//	user_main_printf("Weight_Maopi %d \r\n",HX711_Read());	
 	HX711_Buffer = HX711_Read();
 	if(HX711_Buffer != Weight_Maopi)			
 	{
 		Weight_Shiwu = HX711_Buffer - Weight_Maopi;			
 	
 		Weight_Shiwu = (int32_t)((float)Weight_Shiwu/sensor.GapValue);
-		if((Weight_Shiwu<-5000)||(Weight_Shiwu>5000))
+		if((Weight_Shiwu<-100000)||(Weight_Shiwu>100000))
 		{
 			Weight_Shiwu =0;
 		}

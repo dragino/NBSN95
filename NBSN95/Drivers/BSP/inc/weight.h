@@ -48,6 +48,8 @@ do {                                                    \
 
 void WEIGHT_SCK_Init(void);
 void WEIGHT_DOUT_Init(void);
+void WEIGHT_SCK_DeInit(void);
+void WEIGHT_DOUT_DeInit(void);
 uint32_t HX711_Read(void);
 void Get_Maopi(void);
 int32_t Get_Weight(void);

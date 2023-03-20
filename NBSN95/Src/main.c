@@ -73,7 +73,7 @@ uint8_t rxDATA_u1[100]={0};
 uint8_t rxlen_u1 = 0;
 extern uint8_t getsensorvalue_flag;
 static uint8_t pwd_time_count = 0;			//Password time count times
-
+extern uint8_t controlMCU_flag;
 static uint16_t dns_time_count = 0;			//DNS time count times
 
 static uint8_t task_num = _AT_IDLE;			//NB task directory
@@ -81,10 +81,13 @@ static uint8_t task_num = _AT_IDLE;			//NB task directory
 static uint8_t error_num = 0;				    //Error count
 
 static uint8_t uplink_time_num = 0;
-
 extern uint8_t dns_id_flags;
 extern uint8_t 	bc35tobc95_flags;   //Switch module flag
 static uint8_t dns_reset_num;
+uint8_t join_network_num = 0;				  
+uint8_t join_network_flag = 0;	
+uint8_t join_network_time = 0;
+uint8_t join_network_timer = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -155,13 +158,29 @@ int main(void)
 #ifdef NBIOT
 	if((*(__IO uint8_t *)EEPROM_USER_START_FDR_FLAG) == 0x01)
 	{
+		if(controlMCU_flag==0)	
+{	
 		task_num = _AT_FLAG_INIT;
+}
+else if(controlMCU_flag ==1)
+{		
+	task_num = _AT_IDLE;
+}
 		HAL_FLASHEx_DATAEEPROM_Unlock();
 		HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_FDR_FLAG,0x00);
 		HAL_FLASHEx_DATAEEPROM_Lock();
 	}
 	else
+	{
+		if(controlMCU_flag==0)	
+{	
 		task_num = _AT_FLAG_INIT;
+}
+else if(controlMCU_flag==1)
+{		
+	task_num = _AT_IDLE;
+}
+}
 #else
 	task_num = _AT_IDLE;
 #endif
@@ -172,7 +191,8 @@ int main(void)
     /* USER CODE BEGIN 3 */
 		
 #ifdef NBIOT		
-		
+if(controlMCU_flag==0)	
+{	
 		if(task_num != _AT_IDLE)
 		{
 			HAL_Delay(1000);
@@ -205,6 +225,7 @@ int main(void)
 			NBTASK(&task_num);
 			getsensorvalue_flag = 0;
 		}
+}
 #endif
 		
 		USERTASK();
@@ -396,6 +417,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
 {
+			if(controlMCU_flag==0)	
+{	
 	if(nb.net_flag == no_status)
 		task_num = _AT_FLAG_INIT;
 	else if(nb.net_flag == success && nb.uplink_flag == no_status)
@@ -403,14 +426,15 @@ void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
 		task_num = _AT_CSQ;
 		nb.uplink_flag = send;
 	}
-	
+}	
 	LPM_DisableStopMode();
 }
 
 void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 {
 	HAL_IWDG_Refresh(&hiwdg);
-	
+			if(controlMCU_flag==0)	
+{		
 #ifdef NBIOT	
 	if(sys.pwd_flag==1)
 	{
@@ -423,10 +447,11 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 	}
 #endif	
 
-	if(nb.net_flag == fail)
+	if(nb.net_flag == fail && join_network_flag==1)
 	{
 		task_num = _AT_CSQ;
-		nb.uplink_flag = send;
+    join_network_timer=1;
+    join_network_flag=0;
 	}
 	if(nb.net_flag == success && nb.uplink_flag == send)
 	{
@@ -463,6 +488,18 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 		}
 	}
 	
+	if(join_network_timer==1)
+	{
+		join_network_time++;
+		if(join_network_time==(sys.csq_time*3))
+		{
+		 join_network_time=0;
+		join_network_timer=0;
+		nb.net_flag = no_status;
+    task_num	=	_AT_CFUNOFF;
+		}
+	}	
+}	
 	My_AlarmInit(18,1);
 }
 

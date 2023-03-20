@@ -46,7 +46,8 @@
 #define GETSENSORVALUE      "+GETSENSORVALUE"
 #define FBAND      "+FBAND" 	//Automatically modify the frequency band
 #define DNSCFG     "+DNSCFG"	//DNS Server
-
+#define DIS_CTL     "+DIS_CTL"
+#define CSQTIME     "+CSQTIME"
 /**********************************************/
 
 typedef enum
@@ -134,9 +135,15 @@ ATEerror_t at_dnscfg_set(const char *param);
 ATEerror_t at_apn_set(const char *param);
 ATEerror_t at_apn_get(const char *param);
 
+ATEerror_t at_disctl_set(const char *param);
+ATEerror_t at_disctl_get(const char *param);
+
 ATEerror_t at_return_error(const char *param);
 
 ATEerror_t at_getsensorvalue_set(const char *param);
+
+ATEerror_t at_csqtime_set(const char *param);
+ATEerror_t at_csqtime_get(const char *param);
 /*Other*/
 char *rtrim(char *str);
 uint8_t hexDetection(char* str);
@@ -485,6 +492,28 @@ static const struct ATCommand_s ATCommand[] =
 #endif
     .get = at_dnscfg_get,
     .set = at_dnscfg_set,
+    .run = at_return_error,
+  },
+				/** AT+DIS_CTL **/	
+	{
+    .string = AT DIS_CTL,
+		.size_string = sizeof(DIS_CTL) - 1,
+#ifndef NO_HELP
+    .help_string = AT DIS_CTL "  : Get or Set control MCU ",
+#endif
+    .get = at_disctl_get,
+    .set = at_disctl_set,
+    .run = at_return_error,
+  },
+				/** AT+CSQTIME **/	
+	{
+    .string = AT CSQTIME,
+		.size_string = sizeof(CSQTIME) - 1,
+#ifndef NO_HELP
+    .help_string = AT CSQTIME "  : Get or Set the time to join the network ",
+#endif
+    .get = at_csqtime_get,
+    .set = at_csqtime_set,
     .run = at_return_error,
   },
 };

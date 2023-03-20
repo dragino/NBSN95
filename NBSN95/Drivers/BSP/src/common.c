@@ -301,13 +301,23 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 	{
 		if(mod5_init_flag == 0)
 		{
-			at_weight_reset(NULL);
-			mod5_init_flag =1;
+				WEIGHT_SCK_Init();
+	      WEIGHT_DOUT_Init();
+	      Get_Maopi();
+	      HAL_Delay(500);
+        Get_Maopi();
+      	WEIGHT_SCK_DeInit();
+	      WEIGHT_DOUT_DeInit();		
+			  mod5_init_flag =1;
 		}
 		
 		Sensor->temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
 		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
-		int32_t Weight = Get_Weight();		
+	  WEIGHT_SCK_Init();
+	  WEIGHT_DOUT_Init();
+		int32_t Weight = Get_Weight();	
+	  WEIGHT_SCK_DeInit();
+	  WEIGHT_DOUT_DeInit();		
 		user_main_printf("Weight is %d g",Weight);
 		
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
@@ -326,7 +336,7 @@ void txPayLoadDeal(SENSOR* Sensor,LinkedList L)
 	
 	sprintf(Sensor->data+strlen(Sensor->data), "%.8x", sensor.time_stamp);
 //	sprintf(Sensor->data+strlen(Sensor->data), "%.4x", sys.uplink_count);   //count packet
-	memcpy(sensor_raw_data,&Sensor->data[12],strlen(Sensor->data)-12);
+	memcpy(sensor_raw_data,&Sensor->data[16],strlen(Sensor->data)-16);
 
 	if(sys.list_flag ==1 && sys.cum_flag == '1')	
 	{
@@ -430,15 +440,13 @@ void txPayLoadDeal2(SENSOR* Sensor)
 	}
 	else if(sys.mod == model5)
 	{
-		if(mod5_init_flag == 0)
-		{
-			at_weight_reset(NULL);
-			mod5_init_flag =1;
-		}
-		
 		Sensor->temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
 		Sensor->adc0 = ADCModel(ADC_CHANNEL_0);
-		int32_t Weight = Get_Weight();		
+	  WEIGHT_SCK_Init();
+	  WEIGHT_DOUT_Init();
+		int32_t Weight = Get_Weight();	
+	  WEIGHT_SCK_DeInit();
+	  WEIGHT_DOUT_DeInit();			
 		user_main_printf("Weight is %d g",Weight);
 	}
 	else if(sys.mod == model6)

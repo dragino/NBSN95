@@ -8,6 +8,9 @@ static uint32_t mqtt_parameters_basic[32]={0};
 static uint32_t mqtt_parameters_topic[32]={0};
 
 uint8_t getsensorvalue_flag=0;
+uint8_t controlMCU_flag=0;
+uint32_t csq_time=0;
+
 ATEerror_t ATInsPro(char* atdata)
 {
 	uint8_t i = 0;
@@ -539,22 +542,22 @@ ATEerror_t at_rxdl_get(const char *param)
 /************** 			AT+WEIGHT		**************/
 ATEerror_t at_weight_reset(const char *param)
 {
+	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_RESET);
 	WEIGHT_SCK_Init();
 	WEIGHT_DOUT_Init();
 	Get_Maopi();
+	HAL_Delay(500);
   Get_Maopi();
+	WEIGHT_SCK_DeInit();
+	WEIGHT_DOUT_DeInit();		
+	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_SET);
 	return AT_OK;	
 }
 
 ATEerror_t at_weight_get(const char *param)
 {
-	if(sensor.GapValue == 0)
-	{
-		sensor.GapValue = 400.0;
-	}
-	if(keep)
-		printf("AT+WEIGRE=");
-	printf("%0.1f\r\n",sensor.GapValue);
+	if(!keep)
+		printf("%0.1f g\r\n",(float)Get_Weight());
 	
 	return AT_OK;
 }
@@ -592,9 +595,14 @@ ATEerror_t at_weight_GapValue_set(const char *param)
 
 ATEerror_t at_weight_GapValue_get(const char *param)
 {
-	if(!keep)
-		printf("%0.1f g\r\n",(float)Get_Weight());
-	
+	if(sensor.GapValue == 0)
+	{
+		sensor.GapValue = 400.0;
+	}
+	if(keep)
+		printf("AT+WEIGRE=");
+	printf("%0.1f\r\n",sensor.GapValue);
+		
   return AT_OK;		
 }
 
@@ -727,6 +735,52 @@ ATEerror_t at_getsensorvalue_set(const char *param)
 	}	
   return AT_OK;
 }
+
+/************** 			AT+DIS_CTL		 **************/
+ATEerror_t at_disctl_get(const char *param)
+{
+	if(keep)
+		printf(AT DIS_CTL"=");
+	printf("%d\r\n",controlMCU_flag);
+  return AT_OK;
+}
+
+ATEerror_t at_disctl_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	uint8_t controlMCU = atoi((param+(pos-param)+1));
+	if(controlMCU != 0 && controlMCU != 1)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	controlMCU_flag = controlMCU;
+	
+  return AT_OK;
+}
+
+/************** 			AT+CSQTIME		 **************/
+ATEerror_t at_csqtime_get(const char *param)
+{
+	if(keep)
+		printf("AT+CSQTIME=");
+	printf("%d\r\n",sys.csq_time);
+  return AT_OK;
+}
+
+ATEerror_t at_csqtime_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	uint32_t tdc = atoi((param+(pos-param)+1));
+	if(tdc > 10|| tdc<1)
+	{
+		return AT_PARAM_ERROR;
+	}
+	sys.csq_time = tdc;
+  return AT_OK;
+}
+
+
 /************** 		Other		 **************/
 char *rtrim(char* str)
 {
@@ -759,7 +813,7 @@ void config_Set(void)
 	general_parameters[4]=sys.rxdl<<16   | sys.power_time;
 	general_parameters[5]=(int)(sensor.GapValue *10000);
 	general_parameters[6]=sensor.exit_count;
-	general_parameters[20]=sys.nband_flag<<24;
+	general_parameters[20]=sys.nband_flag<<24 | sys.csq_time<<8|controlMCU_flag;
 	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.deui);i=i+4,j++)
 			general_parameters[7+j]=user.deui[i+0]<<24 | user.deui[i+1]<<16 | user.deui[i+2]<<8 | user.deui[i+3];
@@ -857,6 +911,12 @@ void config_Get(void)
 	sys.nband_flag = FLASH_read(add+80)>>24 &0xFF;
 	if(sys.nband_flag!='0' && sys.nband_flag!='1')
 		sys.nband_flag = '1';
+
+	controlMCU_flag = FLASH_read(add+80) &0xFF;
+
+  sys.csq_time = FLASH_read(add+80)>>8 &0xFF;	
+	if(sys.csq_time==0)
+		sys.csq_time =5;	
 	
 	add = add+28;
 	for(uint8_t i=0,j=0;i<4;i++,j=j+4)

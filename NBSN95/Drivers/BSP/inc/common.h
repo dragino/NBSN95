@@ -41,7 +41,7 @@
  * @retval None
  */
 
-#define AT_VERSION_STRING 	"v1.2.9"
+#define AT_VERSION_STRING 	"v1.3.4"
 #define stack 							"D-BC95-003"
 
 #define COAP_PRO  0x01
@@ -91,7 +91,7 @@ typedef struct
 	uint16_t 		rxdl;				 		//Receiving time
 	uint8_t    	list_flag;
 	uint8_t     nband_flag;
-	
+  uint8_t     csq_time;	
 	LinkedList 	list;
 	USART				usart;
 }SYSTEM;

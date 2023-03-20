@@ -7,7 +7,10 @@ static uint8_t 	set_band_flag=0;
 uint8_t 	dns_id_flags=0;
 uint8_t 	bc35tobc95_flags=0;
 extern uint8_t downlink_twice_flags;
-	
+extern uint8_t join_network_num;				  
+extern uint8_t join_network_flag;	
+extern uint8_t join_network_time;
+extern uint8_t join_network_timer;
 NB nb = {.net_flag=no_status,.recieve_flag=0,.usart.len=0,.usart.data=recieve_data,
 				 .imei={0},.imsi={0},.singal=0};
 
@@ -164,6 +167,44 @@ NB_TaskStatus nb_cfun_set(const char* param)
 	user_main_debug("NBTask[_AT_CFUN].ATSendStr:%s",NBTask[_AT_CFUN].ATSendStr);
 
 	return nb_at_send(&NBTask[_AT_CFUN]);
+}
+
+/**
+	* @brief  AT_CFUNOFF : close UE Functionality
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_cfunoff_run(const char* param)
+{
+	NBTask[_AT_CFUNOFF].try_num = 10;
+	NBTask[_AT_CFUNOFF].set(param);
+	
+	while(NBTask[_AT_CFUNOFF].try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CFUNOFF]) == NB_CMD_SUCC )
+		{
+			break;
+		}
+	}
+	
+	return NBTask[_AT_CFUNOFF].nb_cmd_status;
+}
+
+NB_TaskStatus nb_cfunoff_get(const char* param)
+{
+	return NBTask[_AT_CFUNOFF].nb_cmd_status;
+}
+
+NB_TaskStatus nb_cfunoff_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	strcat(buff,AT CFUNOFF "=0" NEWLINE);
+
+	NBTask[_AT_CFUNOFF].ATSendStr  = buff;
+	NBTask[_AT_CFUNOFF].len_string = strlen(NBTask[_AT_CFUNOFF].ATSendStr);
+	user_main_debug("NBTask[_AT_CFUNOFF].ATSendStr:%s",NBTask[_AT_CFUNOFF].ATSendStr);
+
+	return nb_at_send(&NBTask[_AT_CFUNOFF]);
 }
 
 /**
@@ -336,6 +377,44 @@ NB_TaskStatus nb_cclk_get(const char* param)
 		user_main_debug("time_stamp:%d",sensor.time_stamp);
 	}
 	return NBTask[_AT_CCLK].nb_cmd_status;
+}
+
+/**
+	* @brief  AT_CCLK2 : Get Time
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_cclk2_run(const char* param)
+{
+	sensor.time_stamp = 0;
+	NBTask[_AT_CCLK2].try_num = 3;
+	while(NBTask[_AT_CCLK2].try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CCLK2])== NB_CMD_SUCC)
+		{
+			NBTask[_AT_CCLK2].nb_cmd_status = nb_cclk2_get(param);
+			break;
+		}
+		else
+			NBTask[_AT_CCLK2].nb_cmd_status = NB_CMD_FAIL;
+	}
+	return NBTask[_AT_CCLK2].nb_cmd_status;
+}
+
+NB_TaskStatus nb_cclk2_get(const char* param)
+{
+	char *p = strstr((char*)nb.usart.data,CCLK2);
+	if( p==NULL)
+		NBTask[_AT_CCLK2].nb_cmd_status = NB_NO_TIME;
+	else
+	{
+		char date[20]={0};
+		strcat(date,"20");
+		memcpy(&date[2],&p[6],17);
+		sensor.time_stamp = GetTick(date);
+		user_main_debug("time_stamp:%d",sensor.time_stamp);
+	}
+	return NBTask[_AT_CCLK2].nb_cmd_status;
 }
 /**
 	* @brief  AT+CGDCONT : Define a PDP Context
@@ -552,6 +631,27 @@ NB_TaskStatus nb_nrb_run(const char* param)
 }
 
 /**
+	* @brief  AT+NRB2 : RESET
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_nrb2_run(const char* param)
+{
+	NBTask[_AT_NRB2].try_num = 3;
+	while(NBTask[_AT_NRB2].try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_NRB2]) == NB_CMD_SUCC )
+		{
+			NBTask[_AT_NRB2].nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+			NBTask[_AT_NRB2].nb_cmd_status = NB_CMD_FAIL;
+	}
+	return NBTask[_AT_NRB2].nb_cmd_status;
+}
+
+/**
 	* @brief  NB task
   * @param  Task instruction code
   * @retval ATCmdNum
@@ -565,7 +665,7 @@ ATCmdNum NBTASK(uint8_t *task)
 case _AT:{
 				if(NBTask[_AT].run(NULL) == NB_CMD_SUCC)
 				{
-					*task = _ATE;
+					*task = _AT_NRB2;
 					user_main_printf("NBIOT has responded.");
 				}
 				else
@@ -574,7 +674,19 @@ case _AT:{
 					user_main_printf("NBIOT did not respond.");			
 				}
 			}
-			break;			
+			break;	
+case _AT_NRB2:{
+				if(NBTask[_AT_NRB2].run(NULL) == NB_CMD_SUCC)
+				{
+					*task = _ATE;
+				}
+				else
+				{
+					at_state = _AT_ERROR;			
+					user_main_printf("No response when shutting down");	
+				}	
+			}				
+			break;		
 case _ATE:{
 				if(NBTask[_ATE].run(NULL) == NB_CMD_SUCC)
 				{
@@ -693,6 +805,20 @@ case _AT_CFUN:{
 				*task=_AT_NBAND;
 			}
 			break;
+case _AT_CFUNOFF:{
+				if(NBTask[_AT_CFUNOFF].run(NULL) == NB_CMD_SUCC)
+				{
+				  *task = _AT_IDLE;
+				  My_AlarmInit(sys.tdc,0);					
+					user_main_printf("Turn off the module receiving and sending RF function.");
+				}
+				else
+				{
+					at_state = _AT_ERROR;
+					*task = _AT_IDLE;
+				}
+			}
+			break;
 case _AT_NCONFIG:{
 				if(NBTask[_AT_NCONFIG].run(NULL) == NB_CMD_SUCC)
 				{
@@ -720,12 +846,14 @@ case _AT_CSQ:{
 						net_acc_status_led = 1;
 					}
 					led_on(500);
+					join_network_timer=0;
+					join_network_time=0;
 				}
 				else
 				{
 					*task = _AT_IDLE;	
-					at_state = _AT_ERROR;
 					nb.net_flag = fail;
+				  join_network_flag=1;
 				}
 			}
 			break;			
@@ -734,6 +862,15 @@ case _AT_CPSMS:{
 					user_main_printf("PSM mode configured ");
 				else 
 					user_main_printf("PSM mode configuration failed ");			
+				*task=_AT_CCLK2;
+			}
+			break;
+case _AT_CCLK2:{
+				if(NBTask[_AT_CCLK2].run(NULL) != NB_CMD_SUCC)
+				{
+					at_state = _AT_ERROR;
+					user_main_printf("Failed to get time");
+				}		
 				*task=_AT_QDNSCFG;
 			}
 			break;
@@ -1302,6 +1439,7 @@ case _AT_NRB:{
 
 				break;
 			}
+
 case _AT_URI:{
 				if(sys.protocol == COAP_PRO)	
 				{

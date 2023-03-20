@@ -46,12 +46,14 @@ typedef enum
 
 #define CGATT				"+CGATT"										/* Connect to the network*/
 #define CFUN				"+CFUN"											/* Set the UE function */
+#define CFUNOFF				"+CFUN"											/* Set the UE function */
 #define NCONFIG 		"+NCONFIG"									/* Configure UE Behaviour */
 #define CEREG				"+CEREG"										/* Query whether the network has been activated. */
 #define NSONMI			"+NSONMI"										/* Disable indication messages unsolicited result code. */
 #define CSCON				"+CSCON"										/* Whether to connect to the network. */
 #define CPSMS				"+CPSMS"										/* PSM Setting. */
 #define CCLK				"+CCLK"										  /* GET time. */
+#define CCLK2				"+CCLK"										  /* GET time. */
 #define CGDCONT			"+CGDCONT"									/* Define a PDP Context. */
 #define CGPADDR 		"+CGPADDR"									/* GET IP. */
 #define CGSN 				"+CGSN=1"										/* GET IMEI. */
@@ -93,10 +95,12 @@ typedef enum
 	_AT_IMEI,			 	//(AT+CGSN=1)
 	_AT_IMSI,      	//(AT+CIMI)
 	_AT_CFUN,			 	//AT+CFUN
+	_AT_CFUNOFF,			 	//AT+CFUN
 	_AT_NCONFIG,		//Configure UE Behaviour
 	_AT_NBAND,		 	//AT+NBAND
 	_AT_CGMM,       // Request Manufacturer Model 
 	_AT_CCLK,				//AT+CCLK?
+	_AT_CCLK2,				//AT+CCLK?
 	_AT_CGDCONT,		//SET APN
 	_AT_CPSMS,     	//Power Saving ModeSetting
 	_AT_CSQ,       	//Singal
@@ -142,6 +146,7 @@ typedef enum
 	_AT_TCP_URI,
 	
 	_AT_NRB,			  //restart
+	_AT_NRB2,			  //restart
 	_AT_URI,
 	_AT_ERROR,
   _AT_IDLE,
@@ -219,6 +224,9 @@ NB_TaskStatus nb_cimi_get(const char* param);
 NB_TaskStatus nb_cfun_run(const char* param);
 NB_TaskStatus nb_cfun_set(const char* param);
 NB_TaskStatus nb_cfun_get(const char* param);
+NB_TaskStatus nb_cfunoff_run(const char* param);
+NB_TaskStatus nb_cfunoff_set(const char* param);
+NB_TaskStatus nb_cfunoff_get(const char* param);
 NB_TaskStatus nb_nconfig_run(const char* param);
 
 NB_TaskStatus nb_nband_run(const char* param);
@@ -230,6 +238,9 @@ NB_TaskStatus nb_cgmm_get(const char* param);
 
 NB_TaskStatus nb_cclk_run(const char* param);
 NB_TaskStatus nb_cclk_get(const char* param);
+
+NB_TaskStatus nb_cclk2_run(const char* param);
+NB_TaskStatus nb_cclk2_get(const char* param);
 
 NB_TaskStatus nb_cgdcont_run(const char* param);
 NB_TaskStatus nb_cgdcont_set(const char* param);
@@ -248,6 +259,7 @@ NB_TaskStatus nb_qdns_get(const char* param);
 
 NB_TaskStatus nb_csq_get(const char* param);
 NB_TaskStatus nb_nrb_run(const char* param);
+NB_TaskStatus nb_nrb2_run(const char* param);
 
 NB_TaskStatus nb_COAP_open_run(const char* param);
 NB_TaskStatus nb_COAP_open_set(const char* param);
@@ -440,6 +452,19 @@ static struct NBTASK NBTask[] =
 		.get						= nb_cfun_get,
 		.nb_cmd_status  = NB_IDIE,
   },
+/**************** CFUNOFF	****************/
+	{		
+    .ATSendStr 			= NULL,
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_CFUNOFF,
+		.len_string 		= 0,
+		.time_out 			= 2000,
+    .run 						= nb_cfunoff_run,
+		.set						= nb_cfunoff_set,
+		.get						= nb_cfunoff_get,
+		.nb_cmd_status  = NB_IDIE,
+  },
 /**************** NCONFIG	****************/
 	{		
     .ATSendStr 			= AT NCONFIG "=AUTOCONNECT,TRUE" NEWLINE,
@@ -490,6 +515,19 @@ static struct NBTASK NBTask[] =
     .run 						= nb_cclk_run,
 		.set						= nb_null_run,
 		.get						= nb_cclk_get,
+		.nb_cmd_status  = NB_IDIE,
+  },
+/**************** CCLK2	****************/
+	{		
+    .ATSendStr 			= AT CCLK2 "?" NEWLINE,
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_CCLK2,
+		.len_string 		= sizeof(AT CCLK2 "?" NEWLINE) - 1,
+		.time_out 			= 300,
+    .run 						= nb_cclk2_run,
+		.set						= nb_null_run,
+		.get						= nb_cclk2_get,
 		.nb_cmd_status  = NB_IDIE,
   },
 /**************** CGDCONT	****************/
@@ -1029,8 +1067,21 @@ static struct NBTASK NBTask[] =
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_NRB,
 		.len_string 		= sizeof(AT NRB NEWLINE) - 1,
-		.time_out 			= 10000,
+		.time_out 			= 2000,
     .run 						= nb_nrb_run,
+		.set						= nb_null_run,
+		.get						= nb_null_run,
+		.nb_cmd_status  = NB_IDIE,
+  },
+/**************** NRB2	****************/
+	{
+    .ATSendStr 			= AT NRB NEWLINE,
+		.ATRecStrOK  		= "REBOOTING",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_NRB2,
+		.len_string 		= sizeof(AT NRB NEWLINE) - 1,
+		.time_out 			= 2000,
+    .run 						= nb_nrb2_run,
 		.set						= nb_null_run,
 		.get						= nb_null_run,
 		.nb_cmd_status  = NB_IDIE,
