@@ -1,7 +1,29 @@
 #include "time_server.h"
-#include "time.h"
-#include <time.h>
 #include "hw.h"
+
+/* 365.25 = (366 + 365 + 365 + 365)/4 */
+#define DIV_365_25( X )                               ( ( ( X ) * 91867 + 22750 ) >> 25 )
+
+#define DIV_APPROX_86400( X )                       ( ( ( X ) >> 18 ) + ( ( X ) >> 17 ) )
+
+#define DIV_APPROX_1000( X )                        ( ( ( X ) >> 10 ) +( ( X ) >> 16 ) + ( ( X ) >> 17 ) )
+
+#define DIV_APPROX_60( X )                          ( ( ( X ) * 17476 ) >> 20 )
+
+#define DIV_APPROX_61( X )                          ( ( ( X ) * 68759 ) >> 22 )
+
+#define MODULO_7( X )                               ( ( X ) -( ( ( ( ( X ) + 1 ) * 299593 ) >> 21 ) * 7 ) )
+
+#define	leapyear(year)		((year) % 4 == 0)
+#define	days_in_year(a) 	(leapyear(a) ? 366 : 365)
+#define	days_in_month(a) 	(month_days[(a) - 1])
+
+static int month_days[12] = {	31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+//static uint32_t CalendarGetMonth( uint32_t days, uint32_t year );
+static void CalendarDiv86400( uint32_t in, uint32_t* out, uint32_t* remainder );
+//static uint32_t CalendarDiv61( uint32_t in );
+static void CalendarDiv60( uint32_t in, uint32_t* out, uint32_t* remainder );
+
 void get_time(void)
 {
 	RTC_DateTypeDef sdatestructureget;			
@@ -453,4 +475,129 @@ static void TimerSetTimeout( TimerEvent_t *obj )
     obj->Timestamp = HW_RTC_GetTimerElapsedTime(  ) + minTicks;
   }
   HW_RTC_SetAlarm( obj->Timestamp );
+}
+
+static void CalendarDiv86400( uint32_t in, uint32_t* out, uint32_t* remainder )
+{
+#if 0
+    *remainder = in % SECONDS_IN_1DAY;
+    *out       = in / SECONDS_IN_1DAY;
+#else
+    uint32_t outTemp = 0;
+    uint32_t divResult = DIV_APPROX_86400( in );
+
+    while( divResult >=1 )
+    {
+        outTemp += divResult;
+        in -= divResult * 86400;
+        divResult= DIV_APPROX_86400( in );
+    }
+    if( in >= 86400 )
+    {
+        outTemp += 1;
+        in -= 86400;
+    }
+
+    *remainder = in;
+    *out = outTemp;
+#endif
+}
+
+static void CalendarDiv60( uint32_t in, uint32_t* out, uint32_t* remainder )
+{
+#if 0
+    *remainder = in % 60;
+    *out       = in / 60;
+#else
+    uint32_t outTemp = 0;
+    uint32_t divResult = DIV_APPROX_60( in );
+
+    while( divResult >=1 )
+    {
+        outTemp += divResult;
+        in -= divResult * 60;
+        divResult = DIV_APPROX_60( in );
+    }
+    if( in >= 60 )
+    {
+        outTemp += 1;
+        in -= 60;
+    }
+    *remainder = in;
+    *out = outTemp;
+#endif
+}
+
+void SysTimeLocalTime( const uint32_t timestamp, struct tm *localtime )
+{
+    uint32_t seconds;
+    uint32_t minutes;
+    uint32_t days;
+    uint32_t divOut;
+    uint32_t divReminder;
+    uint16_t i;
+		
+    CalendarDiv86400( timestamp , &days, &seconds );
+
+    // Calculates seconds
+    CalendarDiv60( seconds, &minutes, &divReminder );
+    localtime->tm_sec = ( uint8_t )divReminder;
+
+    // Calculates minutes and hours
+    CalendarDiv60( minutes, &divOut, &divReminder);
+    localtime->tm_min = ( uint8_t )divReminder;
+    localtime->tm_hour = ( uint8_t )divOut;
+
+		for (i = 1970; days >= days_in_year(i); i++) {
+			days -= days_in_year(i);
+		}
+		localtime->tm_year = i-1900;
+
+		if (leapyear(localtime->tm_year)) {
+			days_in_month(2) = 29;
+		}
+		
+		if(localtime->tm_year==200)
+		{
+			days_in_month(2) = 28;
+		}
+		
+		for (i = 1; days >= days_in_month(i); i++) {
+			days -= days_in_month(i);
+		}
+		days_in_month(2) = 28;
+		localtime->tm_mon = i;
+
+		localtime->tm_mday = days + 1;
+		
+		localtime->tm_isdst = -1;
+}
+
+SysTime_t SysTimeAdd( SysTime_t a, SysTime_t b )
+{
+    SysTime_t c =  { .Seconds = 0, .SubSeconds = 0 };
+
+    c.Seconds = a.Seconds + b.Seconds;
+    c.SubSeconds = a.SubSeconds + b.SubSeconds;
+    if( c.SubSeconds >= 1000 )
+    {
+        c.Seconds++;
+        c.SubSeconds -= 1000;
+    }
+    return c;
+}
+
+SysTime_t SysTimeGet( void )
+{
+    SysTime_t calendarTime = { .Seconds = 0, .SubSeconds = 0 };
+    SysTime_t sysTime = { .Seconds = 0, .SubSeconds = 0 };
+    SysTime_t DeltaTime;
+
+    calendarTime.Seconds = HW_RTC_GetCalendarTime( ( uint16_t* )&calendarTime.SubSeconds );
+
+    HW_RTC_BKUPRead( &DeltaTime.Seconds, ( uint32_t* )&DeltaTime.SubSeconds );
+
+    sysTime = SysTimeAdd( DeltaTime, calendarTime );
+
+    return sysTime;
 }

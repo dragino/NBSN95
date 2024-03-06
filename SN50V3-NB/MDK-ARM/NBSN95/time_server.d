@@ -61,12 +61,11 @@ nbsn95\time_server.o: ..\Drivers\BSP\inc\ultrasound.h
 nbsn95\time_server.o: ..\Drivers\BSP\inc\weight.h
 nbsn95\time_server.o: ..\Drivers\BSP\inc\ult.h
 nbsn95\time_server.o: ..\Drivers\BSP\inc\maxsonar.h
-nbsn95\time_server.o: ../Inc/rtc.h
+nbsn95\time_server.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\time.h
 nbsn95\time_server.o: ../Inc/utilities.h
 nbsn95\time_server.o: ../Inc/hw_conf.h
 nbsn95\time_server.o: ../Inc/stm32l0xx_nucleo.h
 nbsn95\time_server.o: ../Inc/stm32l0xx_hw_conf.h
-nbsn95\time_server.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\time.h
 nbsn95\time_server.o: ../Inc/hw.h
 nbsn95\time_server.o: ../Inc/hw_rtc.h
 nbsn95\time_server.o: ../Inc/trace.h

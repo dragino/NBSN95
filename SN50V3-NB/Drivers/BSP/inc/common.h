@@ -41,14 +41,8 @@
  * @retval None
  */
 
-#define AT_VERSION_STRING 	"v1.1.0"
-#define stack 							"D-BC660K-001"
+#define AT_VERSION_STRING 	"v1.2.1"
 #define product_id 					 0x04
-
-#define UDP_PRO   0x02
-#define MQTT_PRO  0x03
-#define TCP_PRO   0x04
-
 
 typedef enum
 {
@@ -80,9 +74,7 @@ typedef struct
 	uint8_t  		protocol;		 		//protocol
 	uint8_t  		cfm;					 	//Confirm mode flag
 	uint16_t 		rxdl;				 		//Receiving time
-	uint16_t 		tr_time;				//Time interval of sensor recording data 
-	uint16_t 		tr_count;		
-	uint8_t			tr_flag;
+	uint8_t 		tr_time;				//Time interval of sensor recording data 
 	uint8_t     csq_time;
   uint8_t     dns_time;	
   uint8_t     dns_timer;	
@@ -92,7 +84,9 @@ typedef struct
 	uint8_t  		platform;		
 	bool  		tlsmod;		 
 	uint8_t  		cert;		
-
+	uint8_t			log_seq;
+	bool        clock_switch;
+	uint16_t    strat_time;
 }SYSTEM;
 
 typedef struct
@@ -130,7 +124,6 @@ typedef struct
 	uint16_t  data_len;
 }SENSOR;
 
-
 #ifdef __cplusplus
 }
 #endif
@@ -160,5 +153,8 @@ void shtDataINIT(void);
 void shtDataWrite(void);
 void shtDataPrint(void);
 void shtDataClear(void);
+void DatalogPrint(void);
+void DatalogClear(void);
+void get_sensorvalue(void);
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -51,7 +51,7 @@ nbsn95\at.o: ../Inc/i2c.h
 nbsn95\at.o: ..\Drivers\BSP\inc\at.h
 nbsn95\at.o: ..\Drivers\BSP\inc\time_server.h
 nbsn95\at.o: ..\Drivers\BSP\inc\common.h
-nbsn95\at.o: ../Inc/rtc.h
+nbsn95\at.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\time.h
 nbsn95\at.o: ../Inc/utilities.h
 nbsn95\at.o: ../Inc/hw_conf.h
 nbsn95\at.o: ../Inc/stm32l0xx_nucleo.h
@@ -66,3 +66,5 @@ nbsn95\at.o: ..\Drivers\BSP\inc\weight.h
 nbsn95\at.o: ..\Drivers\BSP\inc\ult.h
 nbsn95\at.o: ..\Drivers\BSP\inc\maxsonar.h
 nbsn95\at.o: ..\Drivers\BSP\inc\flash_eraseprogram.h
+nbsn95\at.o: ..\Drivers\BSP\inc\nbInit.h
+nbsn95\at.o: ../Inc/tiny_sscanf.h

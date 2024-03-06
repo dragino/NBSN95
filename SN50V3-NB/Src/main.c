@@ -113,12 +113,14 @@ char MCU_pwd_tem[20];
 __IO bool ble_sleep_flags=0;
 __IO bool ble_sleep_command=0;
 bool sleep_status=0;//AT+SLEEP
+bool tdc_clock_log_flag=0;
 /* USER CODE END PV */
 TimerEvent_t TxTimer;
 TimerEvent_t CheckBLETimesTimer;
 TimerEvent_t PressButtonTimesLedTimer;
 TimerEvent_t PressButtonTimeoutTimer;
 TimerEvent_t nb_intTimeoutTimer;
+TimerEvent_t timesampleTimer;
 void LoraStartTx(void);
 void OnTxTimerEvent( void );
 void OnCheckBLETimesEvent(void);
@@ -130,6 +132,8 @@ void LoraStartCheckBLE(void);
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 void user_key_event(void);
+void OntimesampleEvent(void);
+void compare_time(uint16_t time);
 /* USER CODE BEGIN PFP */
 static void USERTASK(void);
 void HW_GetUniqueId( uint8_t *id );
@@ -255,7 +259,7 @@ int main(void)
 
 	
 			if(is_time_to_send==1 && nb.uplink_flag == no_status && sleep_status==0)
-	{			
+	{		
        if(nb.net_flag == no_status)
 	   {
 		   task_num = _AT_FLAG_INIT;
@@ -293,6 +297,7 @@ int main(void)
 		   	sleep_status=1;
 			  TimerStop(&CheckBLETimesTimer);
 				TimerStop(&TxTimer);
+			  TimerStop(&timesampleTimer);
 			  task_num = _AT_CFUNOFF;	
 			  NBTASK(&task_num);	
 				
@@ -439,81 +444,13 @@ static void USERTASK(void)
 		memset(nb.usart.data,0,NB_RX_SIZE);
 	}
 
-	if(sys.tr_flag==1 && nb.uplink_flag !=send && sleep_status==0)
+	if(tdc_clock_log_flag==1 && sys.clock_switch==1 && nb.uplink_flag !=send && sleep_status==0)
 	{
-		sys.tr_count = sys.tr_time/10;
-			if((sys.mod==model1)||(sys.mod==model3))
-  {
-		MX_I2C1_Init();
-    if(detect_flags == 1)
-			sht20Data();
-		else if(detect_flags == 2)
-			sht31Data();
-    HAL_I2C_MspDeInit(&hi2c1);	
-		HAL_Delay(20);
-	}
-			if((sys.mod!=model6))
-  {
-		adc0_datalog = ADCModel(ADC_CHANNEL_4);
-		if((sys.mod!=model3))
-		{
-		 DS18B20_GetTemp_SkipRom(1);
-		 DS18B20_IoDeInit(1);
-		}
-	}
-			if(sys.mod==model2)
-  {
-		 if(mode2_flag==1)
-		{
-			distance_datalog = LidarLite();
-			HAL_I2C_MspDeInit(&hi2c1);	
-		}
-		else if(mode2_flag==2)
-		{
-     distance_datalog = ULT_distance();
-		 GPIO_ULT_INPUT_DeInit();
-		 GPIO_ULT_OUTPUT_DeInit();
-		}
-    else if(mode2_flag==3)
-		{	
-		 ULT_Rest();
-     MX_USART1_UART_Init	();		
-     uart1_Init();
-		 HAL_UART_Receive_IT(&huart1,(uint8_t*)&rxbuf_u1,RXSIZE);
-	   HAL_Delay(100);
-		 ULT_getData();
-		 uart1_IoDeInit();
-		 distance_datalog = ULT_Data_processing();	
-		}
-		else
-		{
-			distance_datalog = 0;			
-		}
-	}
-			if(sys.mod==model3)
-  {
-	  adc1_datalog = ADCModel(ADC_CHANNEL_1);
-		adc4_datalog = ADCModel(ADC_CHANNEL_0);
-	}
-			if(sys.mod==model4)
-  {	
-		DS18B20_GetTemp_SkipRom(2);
-		DS18B20_IoDeInit(2);
-		DS18B20_GetTemp_SkipRom(3);
-		DS18B20_IoDeInit(3);
-	}
-	if(sys.mod == model5)
-	{
-			  WEIGHT_SCK_Init();
-	  WEIGHT_DOUT_Init();
-		int32_t Weight = Get_Weight();	
-	  WEIGHT_SCK_DeInit();
-	  WEIGHT_DOUT_DeInit();			
-	}		
+    get_sensorvalue();
 		nb_cclk_run(NULL);
 		memset((char*)nb.usart.data,0,sizeof(nb.usart.data));	
 		shtDataWrite();
-		sys.tr_flag = 0;
+		tdc_clock_log_flag=0;
 	}
 	if(/*nb.recieve_flag == NB_RECIEVE &&*/ nb.dns_flag == running )
 	{
@@ -634,13 +571,6 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 	else 
 		uplink_time_num = 0;
 
-	if(sys.tr_flag == 0 && sleep_status==0)
-	{
-		sys.tr_count--;
-		if(sys.tr_count==0)
-			sys.tr_flag = 1;
-	}
-
 	if(join_network_timer==1 && sleep_status==0)
 	{
 		join_network_time++;
@@ -696,6 +626,13 @@ void nb_intTimeoutEvent(void)
 	TimerStop(&nb_intTimeoutTimer);
 	if(sleep_status==0)
 	  task_num = _AT;
+}
+
+void OntimesampleEvent(void)
+{
+	TimerSetValue( &timesampleTimer, sys.tr_time * 60000); 
+	TimerStart( &timesampleTimer);	
+  tdc_clock_log_flag=1;
 }
 
 void GPIO_BLE_STATUS_Ioinit(void)
@@ -846,6 +783,7 @@ void user_key_event(void)
 				sleep_status=1;
 			  TimerStop(&CheckBLETimesTimer);
 				TimerStop(&TxTimer);
+				TimerStop(&timesampleTimer);
 			  task_num = _AT_CFUNOFF;	
 			  NBTASK(&task_num);	
 				
@@ -909,7 +847,29 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 
 }
-
+void compare_time(uint16_t time)
+{
+	uint16_t time_temp;
+	if(time<=sys.strat_time)
+	{
+		time_temp=sys.strat_time-time;
+	}
+	else
+	{
+		time_temp=sys.strat_time+3600-time;
+	}
+	
+	if(sys.strat_time==65535)
+	{
+		TimerSetValue( &timesampleTimer,  sys.tr_time*60000); 
+		TimerStart( &timesampleTimer);		
+	}
+	else
+	{
+		TimerSetValue( &timesampleTimer,  time_temp*1000); 
+		TimerStart( &timesampleTimer);
+	}		
+}
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
 //	if(huart == (&hlpuart1))

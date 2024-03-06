@@ -1,5 +1,6 @@
 #include "sht20.h"
 extern uint16_t tem_store,hum_store;
+extern bool tdc_clock_log_flag;
 uint8_t sht2x_Detect(void)
 {	
 	uint8_t sht2x_state_send[1]={0xE7};
@@ -46,14 +47,14 @@ void sht20Data(void)
 	{
 		tem = 126.0;
 	}
-	 		if(sys.tr_flag==0)
+	 		if(tdc_clock_log_flag==0)
 	{
   user_main_printf("Humidity =%.2f %%rh",hum);
 	user_main_printf("tem =%.2f C",tem);	
 	}
 	sensor.temSHT = (tem>=0.0)?(int)(tem*10):((int)(tem*10*-1))|0xF000;
 	sensor.humSHT = (int)(hum*10);
-	 		if(sys.tr_flag==1)
+	 		if(tdc_clock_log_flag==1)
 	{
 	hum_store=(int)(hum*10);
 	tem_store=(int)(tem*10);

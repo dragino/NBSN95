@@ -3,6 +3,7 @@
 extern uint8_t rxbuf_u1;
 extern uint8_t rxDATA_u1[100];
 extern uint8_t rxlen_u1 ;
+extern bool tdc_clock_log_flag;
 static uint16_t receive_data_ult_check[10]={0};
 
 void ULT_Rest(void)
@@ -47,7 +48,7 @@ int ULT_Data_processing(void)
 	uint16_t	distanceSum=0;
 
 	distanceSum = (receive_data_ult_check[0] +receive_data_ult_check[1])/2;
-	if(sys.tr_flag==0) 
+	if(tdc_clock_log_flag==0) 
 	user_main_printf("distance:%d",distanceSum);
 	return distanceSum;
 }

@@ -5,7 +5,7 @@ float ds1820_value3=0.0;
 #define MaxSensorNum 1  
 uint8_t DS18B20_ID[1][8]; 
 uint8_t ds18b20_connect_status=0;
-
+extern bool tdc_clock_log_flag;
 void DS18B20_delay(uint16_t time)
 {
 	uint8_t i;
@@ -589,7 +589,7 @@ do
 					break;
 				}	
 		 }while(f_tem==85 && j<2);	
-	 		if(sys.tr_flag==0)
+	 		if(tdc_clock_log_flag==0)
 	{
 		user_main_printf("DS18B20(%d) temp is %.1f ",num,f_tem);
 	}		

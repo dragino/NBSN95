@@ -15,6 +15,12 @@ typedef enum
 
 #include "common.h"
 
+#define stack 							"D-BC660K-002"
+#define UDP_PRO   0x02
+#define MQTT_PRO  0x03
+#define TCP_PRO   0x04
+
+
 #ifdef __cplusplus
  extern "C" {
 #endif
@@ -995,7 +1001,7 @@ static struct NBTASK NBTask[] =
 #ifdef __cplusplus
 }
 #endif
-
+void stored_datalog(void);
 NB_TaskStatus nb_at_send(struct NBTASK *NB_Task);
 ATCmdNum NBTASK(uint8_t *task);
 #endif 

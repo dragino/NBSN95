@@ -37,7 +37,7 @@ NB_TaskStatus nb_TCP_open_set(const char* param)
 			if(strlen((char*)user.add_ip)!=0)
 	{	
 	  char* pos = strchr((char*)user.add_ip,',');		
-	  memcpy(buff+strlen(buff),user.add_ip+1,(pos-(char*)user.add_ip)-1);	
+	  memcpy(buff+strlen(buff),user.add_ip,(pos-(char*)user.add_ip));	
 	}
 	else
 	{
@@ -133,9 +133,8 @@ NB_TaskStatus nb_TCP_read_get(const char* param)
 		memset(downlink_data,0,sizeof(downlink_data));
 		char*	end    = pch;
 		char* start  = strrchr((char*)nb.usart.data,'\"'); 
-		end++;
 
-		memcpy(downlink_data,nb.usart.data +(start - (char*)nb.usart.data),end-start);
+		memcpy(downlink_data,&nb.usart.data[end-((char*)nb.usart.data)+2],(start-end-2));	
 		user_main_printf("Received downlink data:%s",downlink_data);
 		
 		NBTask[_AT_TCP_READ].nb_cmd_status = NB_READ_DATA;

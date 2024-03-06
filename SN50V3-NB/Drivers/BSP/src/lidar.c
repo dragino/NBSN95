@@ -1,5 +1,5 @@
 #include "lidar.h"
-
+extern bool tdc_clock_log_flag;
 uint16_t LidarLite(void)
 {
 	  MX_I2C1_Init();
@@ -17,21 +17,21 @@ uint16_t LidarLite(void)
 			distance=(rxdata1[0]<<8)+rxdata2[0];
 			if(distance>4000)
 			{
-				if(sys.tr_flag==0) 
+				if(tdc_clock_log_flag==0) 
 				user_main_printf("Distance is out of range");
 				distance=65535;			
 				return distance;			
 			}
 			else
 			{
-				if(sys.tr_flag==0) 
+				if(tdc_clock_log_flag==0) 
 				user_main_printf("Distance =%dcm",distance);
 				return distance;	
 			}			
 		}
 		else
 		{
-			if(sys.tr_flag==0) 
+			if(tdc_clock_log_flag==0) 
 	    user_main_printf("lidar_lite is not connect");
 	    distance=4095;
 	    return distance;			

@@ -3,14 +3,15 @@
 #include <time.h>
 
 char buff[2000]={0};
-static char downlink_data[1000]={0};
+static char downlink_data[600]={0};
 uint8_t at_downlink_flag=0;
 extern float hum_value;
 extern float tem_value;
 extern float ds1820_value;
 extern float ds1820_value2;
 extern float ds1820_value3;
-void pro_data2(void);
+extern void pro_data(void);
+extern void pro_data_thingspeak(void);
 extern uint8_t mqtt_qos;
 extern bool DNS_RE_FLAG;
 /**
@@ -295,9 +296,6 @@ NB_TaskStatus nb_MQTT_pub1_run(const char* param)
 
 NB_TaskStatus nb_MQTT_pub1_set(const char* param)
 {
-	uint16_t batteryLevel_mV=getVoltage();
-  char buff1[500]={0};
-	memset(buff1,0,sizeof(buff1));
 	memset(buff,0,sizeof(buff));
 	if(mqtt_qos==2)
 	strcat(buff,AT QMTPUB"=0,1,2,0,\"channels/");
@@ -309,70 +307,7 @@ NB_TaskStatus nb_MQTT_pub1_set(const char* param)
 	strcat(buff,(char*)user.pubtopic);
 	strcat(buff,(char*)"/publish");
 	strcat(buff,(char*)"\",");
-	sprintf(buff1, "field1=%d&field2=%.2f&field3=%d&",sys.mod-0x30,batteryLevel_mV/1000.0,nb.singal);	
-	if(sys.mod == model1)
-	{
-  sprintf(buff1+strlen(buff1), "field4=%.1f&",ds1820_value);	
-			if(sys.inmod =='0')
-        sprintf(buff1+strlen(buff1), "field5=%d&",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff1+strlen(buff1), "field5=%d&",sensor.exit_state);		
-	sprintf(buff1+strlen(buff1), "field6=%d&",sensor.adc1);	
-	sprintf(buff1+strlen(buff1), "field7=%.1f&field8=%.1f",tem_value,hum_value);	
-	}
-	else if(sys.mod == model2)
-	{
-  sprintf(buff1+strlen(buff1), "field4=%.1f&",ds1820_value);	
-			if(sys.inmod =='0')
-        sprintf(buff1+strlen(buff1), "field5=%d&",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff1+strlen(buff1), "field5=%d&",sensor.exit_state);		
-	sprintf(buff1+strlen(buff1), "field6=%d&",sensor.adc1);
-	sprintf(buff1+strlen(buff1), "field7=%d",sensor.distance);			
-	}
-	else if(sys.mod == model3)
-	{
-	 sprintf(buff1+strlen(buff1), "field4=%d&",sensor.adc1);
-				if(sys.inmod =='0')
-        sprintf(buff1+strlen(buff1), "field5=%d&",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff1+strlen(buff1), "field5=%d&",sensor.exit_state);
-	 sprintf(buff1+strlen(buff1), "field6=%d&",sensor.adc2);	
-	sprintf(buff1+strlen(buff1), "field7=%.1f,field8=%.1f&",tem_value,hum_value);				
-	 sprintf(buff1+strlen(buff1), "field9=%d",sensor.adc3);					
-	}		
-	else if(sys.mod == model4)
-	{
-   sprintf(buff1+strlen(buff1), "field4=%.1f&",ds1820_value);	
-	 sprintf(buff1+strlen(buff1), "field5=%d&",sensor.adc1);
-			if(sys.inmod =='0')
-        sprintf(buff1+strlen(buff1), "field6=%d&",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff1+strlen(buff1), "field6=%d&",sensor.exit_state);
-   sprintf(buff1+strlen(buff1), "field7=%.1f&",ds1820_value2);	
-   sprintf(buff1+strlen(buff1), "field8=%.1f",ds1820_value3);				
-	}	
-	else if(sys.mod == model5)
-	{
-   sprintf(buff1+strlen(buff1), "field4=%.1f&",ds1820_value);	
-	 sprintf(buff1+strlen(buff1), "field5=%d&",sensor.adc1);
-			if(sys.inmod =='0')
-        sprintf(buff1+strlen(buff1), "field6=%d&",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff1+strlen(buff1), "field6=%d&",sensor.exit_state);
-	  WEIGHT_SCK_Init();
-	  WEIGHT_DOUT_Init();
-		int32_t Weight = Get_Weight();	
-	  WEIGHT_SCK_DeInit();
-	  WEIGHT_DOUT_DeInit();					
-	 sprintf(buff1+strlen(buff1), "field7=%d",Weight);	
-	}		
-	else if(sys.mod == model6)
-	{
-	sprintf(buff1+strlen(buff1), "field4=%d",sensor.exit_count);		
-	}
-	
-	sprintf(buff+strlen(buff), "%d,%s\r\n",strlen(buff1),buff1);	
+  pro_data_thingspeak();
 	
 	NBTask[_AT_MQTT_PUB1].ATSendStr  = buff;
 	NBTask[_AT_MQTT_PUB1].len_string = strlen(NBTask[_AT_MQTT_PUB1].ATSendStr);
@@ -412,7 +347,7 @@ NB_TaskStatus nb_MQTT_pub2_set(const char* param)
 	strcat(buff,AT QMTPUB"=0,1,1,0,\"");
 	strcat(buff,(char*)user.pubtopic);
 	strcat(buff,(char*)"\",");
-	pro_data2();	
+	pro_data();	
 	strcat(buff,"\r\n");	
 	NBTask[_AT_MQTT_PUB2].ATSendStr  = buff;
 	NBTask[_AT_MQTT_PUB2].len_string = strlen(NBTask[_AT_MQTT_PUB2].ATSendStr);
@@ -443,9 +378,6 @@ NB_TaskStatus nb_MQTT_pub3_run(const char* param)
 
 NB_TaskStatus nb_MQTT_pub3_set(const char* param)
 {
-	uint16_t batteryLevel_mV=getVoltage();
-  char buff1[500]={0};
-	memset(buff1,0,sizeof(buff1));
 	memset(buff,0,sizeof(buff));
 	if(mqtt_qos==2)
 	strcat(buff,AT QMTPUB"=0,1,2,0,\"");
@@ -456,70 +388,8 @@ NB_TaskStatus nb_MQTT_pub3_set(const char* param)
 	
 	strcat(buff,(char*)user.pubtopic);
 	strcat(buff,(char*)"\",");
-	sprintf(buff1, "{\"IMEI\":\"%s\",\"Model\":\"SN50V3-NB\",\"mod\":%d,\"battery\":%.2f,\"signal\":%d,",user.deui,sys.mod-0x30,batteryLevel_mV/1000.0,nb.singal);	
-	if(sys.mod == model1)
-	{
-  sprintf(buff1+strlen(buff1), "\"DS18B20_Temp\":%.1f,",ds1820_value);	
-			if(sys.inmod =='0')
-        sprintf(buff1+strlen(buff1), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff1+strlen(buff1), "\"interrupt\":%d,",sensor.exit_state);		
-	sprintf(buff1+strlen(buff1), "\"adc1\":%d,",sensor.adc1);	
-	sprintf(buff1+strlen(buff1), "\"temperature\":%.1f,\"humidity\":%.1f}",tem_value,hum_value);	
-	}
-	else if(sys.mod == model2)
-	{
-  sprintf(buff1+strlen(buff1), "\"DS18B20_Temp\":%.1f,",ds1820_value);	
-			if(sys.inmod =='0')
-        sprintf(buff1+strlen(buff1), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff1+strlen(buff1), "\"interrupt\":%d,",sensor.exit_state);		
-	sprintf(buff1+strlen(buff1), "\"adc1\":%d,",sensor.adc1);
-	sprintf(buff1+strlen(buff1), "\"distance\":%d}",sensor.distance);			
-	}
-	else if(sys.mod == model3)
-	{
-	 sprintf(buff1+strlen(buff1), "\"adc1\":%d,",sensor.adc1);
-				if(sys.inmod =='0')
-        sprintf(buff1+strlen(buff1), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff1+strlen(buff1), "\"interrupt\":%d,",sensor.exit_state);
-	 sprintf(buff1+strlen(buff1), "\"adc2\":%d,",sensor.adc2);	
-	sprintf(buff1+strlen(buff1), "\"temperature\":%.1f,\"humidity\":%.1f,",tem_value,hum_value);				
-	 sprintf(buff1+strlen(buff1), "\"adc3\":%d}",sensor.adc3);					
-	}		
-	else if(sys.mod == model4)
-	{
-   sprintf(buff1+strlen(buff1), "\"DS18B20_Temp\":%.1f,",ds1820_value);	
-	 sprintf(buff1+strlen(buff1), "\"adc1\":%d,",sensor.adc1);
-			if(sys.inmod =='0')
-        sprintf(buff1+strlen(buff1), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff1+strlen(buff1), "\"interrupt\":%d,",sensor.exit_state);
-   sprintf(buff1+strlen(buff1), "\"DS18B20_Temp2\":%.1f,",ds1820_value2);	
-   sprintf(buff1+strlen(buff1), "\"DS18B20_Temp3\":%.1f}",ds1820_value3);				
-	}	
-	else if(sys.mod == model5)
-	{
-   sprintf(buff1+strlen(buff1), "\"DS18B20_Temp\":%.1f,",ds1820_value);	
-	 sprintf(buff1+strlen(buff1), "\"adc1\":%d,",sensor.adc1);
-			if(sys.inmod =='0')
-        sprintf(buff1+strlen(buff1), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff1+strlen(buff1), "\"interrupt\":%d,",sensor.exit_state);
-	  WEIGHT_SCK_Init();
-	  WEIGHT_DOUT_Init();
-		int32_t Weight = Get_Weight();	
-	  WEIGHT_SCK_DeInit();
-	  WEIGHT_DOUT_DeInit();					
-	 sprintf(buff1+strlen(buff1), "\"weight\":%d}",Weight);	
-	}		
-	else if(sys.mod == model6)
-	{
-	sprintf(buff1+strlen(buff1), "\"count\":%d}",sensor.exit_count);		
-	}
-	
-	sprintf(buff+strlen(buff), "%d,%s\r\n",strlen(buff1),buff1);	
+  pro_data();
+	strcat(buff,"\r\n");			
 	NBTask[_AT_MQTT_PUB3].ATSendStr  = buff;
 	NBTask[_AT_MQTT_PUB3].len_string = strlen(NBTask[_AT_MQTT_PUB3].ATSendStr);
 	user_main_debug("NBTask[_AT_MQTT_PUB].ATSendStr:%s",NBTask[_AT_MQTT_PUB3].ATSendStr);
@@ -553,10 +423,10 @@ NB_TaskStatus nb_MQTT_pub5_set(const char* param)
 	else if(mqtt_qos==0)		
 	strcat(buff,AT QMTPUB"=0,0,0,0,\"");
 	else if(mqtt_qos==1)	
-	strcat(buff,AT QMTPUB"=0,0,1,0,\"");
+	strcat(buff,AT QMTPUB"=0,1,1,0,\"");
 	strcat(buff,(char*)user.pubtopic);
 	strcat(buff,(char*)"\",");
-	pro_data2();
+	pro_data();
 	strcat(buff,"\r\n");			
 	NBTask[_AT_MQTT_PUB5].ATSendStr  = buff;
 	NBTask[_AT_MQTT_PUB5].len_string = strlen(NBTask[_AT_MQTT_PUB5].ATSendStr);
@@ -603,7 +473,7 @@ NB_TaskStatus nb_MQTT_data_read_run(const char* param)
 
 NB_TaskStatus nb_MQTT_data_read_set(const char* param)
 {
-	memset(downlink_data,0,1000);		
+	memset(downlink_data,0,600);		
 	char* pos_start  = strstr((char*)nb.usart.data,"\",\"");	user_main_debug("pos_start:%p",&pos_start);
 	if(pos_start[3]=='{')
 	{
@@ -706,173 +576,4 @@ NB_TaskStatus nb_MQTT_uri_run(const char* param)
 		NBTask[_AT_MQTT_URI].nb_cmd_status = NB_ERROR;
 	}
 	return NBTask[_AT_MQTT_URI].nb_cmd_status;
-}
-
-void pro_data2(void)
-{
-		uint16_t str_end,str_beg=0;
-		uint16_t batteryLevel_mV=getVoltage();
-		for(uint8_t j=0;j<2;j++)
-		{
-     if(j==1)
-		 {
-       sprintf(buff+str_beg,"%d,",str_end-str_beg);
-		 }
-		 str_beg=strlen(buff);		
-	sprintf(buff+strlen(buff),"{\"IMEI\":\"%s\",\"Model\":\"SN50V3-NB\",\"mod\":%d,\"battery\":%.2f,\"signal\":%d,",user.deui,sys.mod-0x30,batteryLevel_mV/1000.0,nb.singal);	
-	if(sys.mod == model1)
-	{
-  sprintf(buff+strlen(buff), "\"DS18B20_Temp\":%.1f,",ds1820_value);	
-			if(sys.inmod =='0')
-        sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);		
-	sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);	
-	sprintf(buff+strlen(buff), "\"temperature\":%.1f,\"humidity\":%.1f",tem_value,hum_value);	
-	}
-	else if(sys.mod == model2)
-	{
-  sprintf(buff+strlen(buff), "\"DS18B20_Temp\":%.1f,",ds1820_value);	
-			if(sys.inmod =='0')
-        sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);		
-	sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
-	sprintf(buff+strlen(buff), "\"distance\":%d",sensor.distance);			
-	}
-	else if(sys.mod == model3)
-	{
-	 sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
-				if(sys.inmod =='0')
-        sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);
-	 sprintf(buff+strlen(buff), "\"adc2\":%d,",sensor.adc2);	
-	sprintf(buff+strlen(buff), "\"temperature\":%.1f,\"humidity\":%.1f,",tem_value,hum_value);				
-	 sprintf(buff+strlen(buff), "\"adc3\":%d",sensor.adc3);					
-	}		
-	else if(sys.mod == model4)
-	{
-   sprintf(buff+strlen(buff), "\"DS18B20_Temp\":%.1f,",ds1820_value);	
-	 sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
-			if(sys.inmod =='0')
-        sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);
-   sprintf(buff+strlen(buff), "\"DS18B20_Temp2\":%.1f,",ds1820_value2);	
-   sprintf(buff+strlen(buff), "\"DS18B20_Temp3\":%.1f",ds1820_value3);				
-	}	
-	else if(sys.mod == model5)
-	{
-   sprintf(buff+strlen(buff), "\"DS18B20_Temp\":%.1f,",ds1820_value);	
-	 sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
-			if(sys.inmod =='0')
-        sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-			else
-	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);
-	  WEIGHT_SCK_Init();
-	  WEIGHT_DOUT_Init();
-		int32_t Weight = Get_Weight();	
-	  WEIGHT_SCK_DeInit();
-	  WEIGHT_DOUT_DeInit();					
-	 sprintf(buff+strlen(buff), "\"weight\":%d",Weight);	
-	}		
-	else if(sys.mod == model6)
-	{
-	sprintf(buff+strlen(buff), "\"count\":%d",sensor.exit_count);		
-	}
-		int num = sys.sht_seq;
-		int16_t tem,hum,d1,d2,d3;
-		uint16_t ad0,ad1,ad4,distance;
-		uint32_t count;
-	  int32_t weight;
-		time_t curtime;
-	  struct tm *info;
-	  int num2 = sys.sht_noud;
-	  if(num2>=24)
-			num2=24;
-		
-		for(uint8_t i=0;i<num2;i++)
-		{	
-			num--;
-			if(num<0)
-				num=32+num;
-			uint32_t r_time=*(__IO uint32_t *)(EEPROM_TIME_START_ADD+num*0x04);		
-	    curtime = r_time;	
-      info = localtime( &curtime );			
-      char mini[80];
-			memset(mini,0,sizeof(mini));
-			strftime(mini, 80, "%Y/%m/%d %H:%M:%S", info);	
-			
-			if((sys.mod!=model6))
-     {
-			 uint32_t r_d1_ad0_data=*(__IO uint32_t *)(EEPROM_D1_AD0_START_ADD+num*0x04);
-			 ad0 = ((r_d1_ad0_data>>16)&0xFFFF);
-			  if((sys.mod!=model3))
-		   {
-				 d1 = (r_d1_ad0_data&0xFFFF);
-			 }
-		 }
-			if((sys.mod==model1)||(sys.mod==model3))
-     {
-			uint32_t r_sht_data=*(__IO uint32_t *)(EEPROM_SHT_START_ADD+num*0x04);
-			tem = ((r_sht_data>>16)&0xFFFF);
-			hum = (r_sht_data&0xFFFF);
-		 }
-			if(sys.mod==model2)
-    {	
-			uint32_t r_distance_data=*(__IO uint32_t *)(EEPROM_DISTANCE_START_ADD+num*0x04);
-			distance = (r_distance_data&0xFFFF);
-		}
-			if(sys.mod==model3)
-    {	
-			uint32_t r_ad1_ad4_data=*(__IO uint32_t *)(EEPROM_AD1_AD4_START_ADD+num*0x04);
-			ad1 = ((r_ad1_ad4_data>>16)&0xFFFF);
-			ad4 = (r_ad1_ad4_data&0xFFFF);
-		}
-			if(sys.mod==model4)
-    {	
-			uint32_t r_d2_d3_data=*(__IO uint32_t *)(EEPROM_D2D3_START_ADD+num*0x04);
-			d2 = ((r_d2_d3_data>>16)&0xFFFF);
-			d3 = (r_d2_d3_data&0xFFFF);
-		}
-			if(sys.mod==model5)
-    {	
-			uint32_t r_weight_data=*(__IO uint32_t *)(EEPROM_WEIGHT_START_ADD+num*0x04);
-			weight = r_weight_data;
-		}
-			if(sys.mod==model6)
-    {	
-			uint32_t r_count_data=*(__IO uint32_t *)(EEPROM_COUNT_START_ADD+num*0x04);
-			count = r_count_data;
-		}					
-			sprintf(buff+strlen(buff),",\"%d\":",i+1);	
-					if(sys.mod==model1)
-       {
-			  sprintf(buff+strlen(buff),"{%.1f,%.1f,%d,%.1f,%s}",(float)tem/10.0,(float)hum/10.0,ad0,(float)d1/10.0,mini);	
-		   }
-			 	else if(sys.mod==model2)
-       {
-			  sprintf(buff+strlen(buff),"{%d,%d,%.1f,%s}",distance,ad0,(float)d1/10.0,mini);	
-		   }
-			 	else if(sys.mod==model3)
-       {
-			  sprintf(buff+strlen(buff),"{%.1f,%.1f,%d,%d,%d,%s}",(float)tem/10.0,(float)hum/10.0,ad0,ad1,ad4,mini);	
-		   }
-			 	else if(sys.mod==model4)
-       {
-			  sprintf(buff+strlen(buff),"{%d,%.1f,%.1f,%.1f,%s}",ad0,(float)d1/10.0,(float)d2/10.0,(float)d3/10.0,mini);	
-		   }
-			 	else if(sys.mod==model5)
-       {
-			  sprintf(buff+strlen(buff),"{%d,%.1f,%d,%s}",ad0,(float)d1/10.0,weight,mini);	
-		   }
-			 	else if(sys.mod==model6)
-       {
-			  sprintf(buff+strlen(buff),"{%d,%s}",count,mini);	
-		   }
-		}	
-			strcat(buff,(char*)"}");	
-      str_end=strlen(buff);
-	}
 }

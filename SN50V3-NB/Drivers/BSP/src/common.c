@@ -6,6 +6,7 @@ static char sensor_data[1200]={0};
 uint8_t detect_flags=0;
 uint8_t mode2_flag=0;
 extern uint8_t rxbuf_u1;
+extern uint8_t mqtt_qos;
 SYSTEM sys    = {.pwd=sys_pwd};
 SENSOR sensor ={.data=sensor_data};
 USER user={0};
@@ -16,6 +17,7 @@ extern float ds1820_value;
 extern float ds1820_value2;
 extern float ds1820_value3;
 extern int32_t Weight_Shiwu;
+extern uint8_t record_log[512];
 uint16_t 	adc0_datalog,adc1_datalog,adc4_datalog;
 uint16_t distance_datalog;
 static uint8_t mod5_init_flag = 0;
@@ -25,10 +27,18 @@ extern __IO bool ble_sleep_flags;
 static char at_downlink_data[220]={0};
 void product_information_print(void)
 {
+#ifdef NB_1D	
+	#if defined NB_NS
+	printf("\r\nDRAGINO SN50V3-NS-1D NB-IoT Sensor Node\r\n"
+	#else	
+	printf("\r\nDRAGINO SN50V3-NB-1D NB-IoT Sensor Node\r\n"
+	#endif
+#else	
 	#if defined NB_NS
 	printf("\r\nDRAGINO SN50V3-NS-GE NB-IoT Sensor Node\r\n"
 	#else	
 	printf("\r\nDRAGINO SN50V3-NB-GE NB-IoT Sensor Node\r\n"
+	#endif
 	#endif
 										"Image Version: "AT_VERSION_STRING "\r\n"
 										"NB-IoT Stack : "stack	 "\r\n"
@@ -276,12 +286,8 @@ void txPayLoadDeal(SENSOR* Sensor)
 		
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));
-		
-		if(sys.inmod =='0')
-			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
-		else
-			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
-		
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temSHT>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x", (Sensor->temSHT>=0)?Sensor->temSHT:Sensor->temSHT*(-1));
@@ -321,10 +327,8 @@ void txPayLoadDeal(SENSOR* Sensor)
 		
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
-		if(sys.inmod =='0')
-			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
-		else
-			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->distance);
 	}
@@ -343,10 +347,8 @@ void txPayLoadDeal(SENSOR* Sensor)
 		HAL_Delay(20);
 		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
-		if(sys.inmod =='0')
-			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
-		else
-			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc2);
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temSHT>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x", (Sensor->temSHT>=0)?Sensor->temSHT:Sensor->temSHT*(-1));
@@ -363,10 +365,8 @@ void txPayLoadDeal(SENSOR* Sensor)
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
-		if(sys.inmod =='0')
-			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
-		else
-			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_2>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_2>=0)?Sensor->temDs18b20_2:Sensor->temDs18b20_2*(-1));		
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_3>=0)?'0':'F');
@@ -398,10 +398,8 @@ void txPayLoadDeal(SENSOR* Sensor)
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_1>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
-		if(sys.inmod =='0')
-			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
-		else
-			sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Weight);
 	}
 	else if(sys.mod == model6)
@@ -479,96 +477,13 @@ void txPayLoadDeal(SENSOR* Sensor)
 	
 void txPayLoadDeal2(SENSOR* Sensor)
 {	
-	memset(Sensor->data,0,sizeof((char*)Sensor->data));
-
-	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_RESET);
-	HAL_Delay(500+sys.power_time);
 	user_main_printf("remaining battery =%d mv",Sensor->batteryLevel_mV);	
 	Sensor->batteryLevel_mV = getVoltage();
-
-	if(sys.mod == model1)
-	{
-		Sensor->temDs18b20_1 = (int)(DS18B20_GetTemp_SkipRom(1)*10);
-		Sensor->adc1 = ADCModel(ADC_CHANNEL_4);
-		
-		MX_I2C1_Init();
-		if(detect_flags == 1)
-			sht20Data();
-		else if(detect_flags == 2)
-			sht31Data();
-    HAL_I2C_MspDeInit(&hi2c1);	
-		HAL_Delay(20);
-	}
-	else if(sys.mod == model2)
-	{
-		Sensor->temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
-		Sensor->adc1 = ADCModel(ADC_CHANNEL_4);
-		 if(mode2_flag==1)
-		{
-			Sensor->distance = LidarLite();
-			HAL_I2C_MspDeInit(&hi2c1);	
-		}
-		else if(mode2_flag==2)
-		{
-     sensor.distance = ULT_distance();
-		 GPIO_ULT_INPUT_DeInit();
-		 GPIO_ULT_OUTPUT_DeInit();
-		}
-    else if(mode2_flag==3)
-		{	
-		 ULT_Rest();
-     MX_USART1_UART_Init	();		
-     uart1_Init();
-		 HAL_UART_Receive_IT(&huart1,(uint8_t*)&rxbuf_u1,RXSIZE);
-	   HAL_Delay(100);
-		 ULT_getData();
-		 uart1_IoDeInit();
-		 Sensor->distance = ULT_Data_processing();	
-		}
-		else
-		{
-			Sensor->distance = 0;			
-			user_main_printf("distance:%d",Sensor->distance);
-		}
-
-	}
-	else if(sys.mod == model3)
-	{
-		Sensor->adc1 = ADCModel(ADC_CHANNEL_4);
-		Sensor->adc2 = ADCModel(ADC_CHANNEL_1);
-		Sensor->adc3 = ADCModel(ADC_CHANNEL_0);
-	
-		MX_I2C1_Init();
-		if(detect_flags == 1)
-			sht20Data();
-		else if(detect_flags == 2)
-			sht31Data();
-    HAL_I2C_MspDeInit(&hi2c1);	
-		HAL_Delay(20);	
-	}
-	else if(sys.mod == model4)
-	{
-		Sensor->adc1 = ADCModel(ADC_CHANNEL_4);
-		Sensor->temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;DS18B20_IoDeInit(1);
-		Sensor->temDs18b20_2 = DS18B20_GetTemp_SkipRom(2)*10;DS18B20_IoDeInit(2);
-		Sensor->temDs18b20_3 = DS18B20_GetTemp_SkipRom(3)*10;DS18B20_IoDeInit(3);	
-	}
-	else if(sys.mod == model5)
-	{
-		Sensor->temDs18b20_1 = DS18B20_GetTemp_SkipRom(1)*10;
-		Sensor->adc1 = ADCModel(ADC_CHANNEL_4);
-	  WEIGHT_SCK_Init();
-	  WEIGHT_DOUT_Init();
-		int32_t Weight = Get_Weight();	
-	  WEIGHT_SCK_DeInit();
-	  WEIGHT_DOUT_DeInit();			
-		user_main_printf("Weight is %d g",Weight);
-	}
-	else if(sys.mod == model6)
+  get_sensorvalue();
+	if(sys.mod == model6)
 	{
 	user_main_printf("count is %d ",sensor.exit_count);
 	}
-	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_SET);
 }
 
 
@@ -583,118 +498,80 @@ void rxPayLoadDeal(char* payload)
 {
 	if(at_downlink_flag==1)
 	{
-//		at_downlink_flag=0;
-//		memset(at_downlink_data,0,220);		
-//	  char* pos_start  = strstr((char*)payload,"AT+SERVADDR=");
-//	  char* pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-14));		
-//		memset(user.add,0,sizeof(user.add));
-//	  memcpy(user.add,at_downlink_data,strlen(at_downlink_data));	
-//	 
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+CLIENT=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+10],(pos_end-pos_start-12));		
-//		memset(user.client,0,sizeof(user.client));
-//	  memcpy(user.client,at_downlink_data,strlen(at_downlink_data));	
+		at_downlink_flag=0;
+		char* pos_start;
+		char* pos_end;
+	
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+SERVADDR\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+14],(pos_end-pos_start-16));		
+		memset(user.add,0,sizeof(user.add));
+	  memcpy(user.add,at_downlink_data,strlen(at_downlink_data));	
 
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+UNAME=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));		
-//		memset(user.uname,0,sizeof(user.uname));
-//	  memcpy(user.uname,at_downlink_data,strlen(at_downlink_data));	
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+CLIENT\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-14));		
+		memset(user.client,0,sizeof(user.client));
+	  memcpy(user.client,at_downlink_data,strlen(at_downlink_data));	
 
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+PWD=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+7],(pos_end-pos_start-9));		
-//		memset(user.pwd,0,sizeof(user.pwd));
-//	  memcpy(user.pwd,at_downlink_data,strlen(at_downlink_data));	
-//		
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+PUBTOPIC=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-14));		
-//		memset(user.pubtopic,0,sizeof(user.pubtopic));
-//	  memcpy(user.pubtopic,at_downlink_data,strlen(at_downlink_data));	
-//		
-//	  memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+SUBTOPIC=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-14));		
-//		memset(user.subtopic,0,sizeof(user.subtopic));
-//	  memcpy(user.subtopic,at_downlink_data,strlen(at_downlink_data));	
-//		
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+TDC=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+7],(pos_end-pos_start-9));	
-//	  uint32_t tdc = atoi(at_downlink_data);		
-//	  sys.tdc = tdc;
-//		
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+INTMOD=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+10],(pos_end-pos_start-12));		
-//		sys.inmod=at_downlink_data[0];
-//		EX_GPIO_Init(sys.inmod-0x30);
-//		
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+APN=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+7],(pos_end-pos_start-9));		
-//		memset(user.apn,0,sizeof(user.apn));
-//	  memcpy(user.apn,at_downlink_data,strlen(at_downlink_data));	
-//		
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+5VT=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+7],(pos_end-pos_start-9));
-//    uint16_t power_time = atoi(at_downlink_data);		
-//		sys.power_time = power_time;	
-//		
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+PRO=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+7],(pos_end-pos_start-9));		
-//		uint8_t protocol = at_downlink_data[0]-0x30;
-//	  sys.protocol = protocol;
-//		
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+TR=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+6],(pos_end-pos_start-8));		
-//    uint16_t tr = atoi(at_downlink_data);		
-//   	sys.tr_time = tr;
-//   	sys.tr_count = sys.tr_time/10;
-//		
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+NOUD=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+8],(pos_end-pos_start-10));		
-//    uint8_t noud = atoi(at_downlink_data);	
-//	  sys.sht_noud = noud;
-//		
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+CSQTIME=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+11],(pos_end-pos_start-13));		
-//    uint8_t csqtdc = atoi(at_downlink_data);	
-//		sys.csq_time = csqtdc;
-//		
-//		memset(at_downlink_data,0,220);		
-//	  pos_start  = strstr((char*)payload,"AT+DNSTIMER=");
-//	  pos_end    = strchr(pos_start,'\n');	
-//	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-13));		
-//	  uint16_t dnstdc = atoi(at_downlink_data);	
-//		if(dnstdc==0)
-//	  sys.dns_timer = 0;
-//    else	
-//	  sys.dns_timer = 1;	
-//	 sys.dns_time = dnstdc;
-//		
-//	config_Set();	
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+UNAME\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+11],(pos_end-pos_start-13));		
+		memset(user.uname,0,sizeof(user.uname));
+	  memcpy(user.uname,at_downlink_data,strlen(at_downlink_data));	
+
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+PWD\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));		
+		memset(user.pwd,0,sizeof(user.pwd));
+	  memcpy(user.pwd,at_downlink_data,strlen(at_downlink_data));	
+
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+PUBTOPIC\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+14],(pos_end-pos_start-16));		
+		memset(user.pubtopic,0,sizeof(user.pubtopic));
+	  memcpy(user.pubtopic,at_downlink_data,strlen(at_downlink_data));	
+
+	  memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+SUBTOPIC\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+14],(pos_end-pos_start-16));		
+		memset(user.subtopic,0,sizeof(user.subtopic));
+	  memcpy(user.subtopic,at_downlink_data,strlen(at_downlink_data));	
+
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+TDC\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));	
+	  uint32_t tdc = atoi(at_downlink_data);		
+	  sys.tdc = tdc;
+
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+APN\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));		
+		memset(user.apn,0,sizeof(user.apn));
+	  memcpy(user.apn,at_downlink_data,strlen(at_downlink_data));	
+
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+PRO\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-10));		
+		uint8_t protocol = at_downlink_data[0]-0x30;
+	  sys.protocol = protocol;
+		sys.platform =at_downlink_data[2]-0x30;
+		
+	  config_Set();	
+	  if(strstr((char*)at_downlink_data,"ATZ") != NULL)
+		{
+		 user_main_printf("Reset the device after receiving the downlink...");		
+	   NVIC_SystemReset();
+		}
 	}
 	else
   {
@@ -775,7 +652,7 @@ void new_firmware_update(void)
 		HAL_FLASHEx_DATAEEPROM_Unlock();
 		HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_ADD,update_flags);//store hardversion
 		HAL_FLASHEx_DATAEEPROM_Lock();
-		at_fdr_run(NULL);
+		at_fdr1_run(NULL);
 	}
 }
 void StrToHex(char *pbDest, char *pszSrc, int nLen)
@@ -1124,4 +1001,102 @@ void shtDataPrint(void)
 		}
 		num++;
 	}
+}
+void DatalogPrint(void)
+{
+	uint32_t add;
+for(uint8_t num=0;num<20;num++)
+{
+	add= FLASH_USER_START_DATALOG+num*FLASH_PAGE_SIZE*4;
+	memset(record_log,0,sizeof(record_log));
+	for(uint16_t i=0,j=0;i<128;i++,j=j+4)
+	{
+		uint32_t temp  = FLASH_read(add+i*4);
+		record_log[j] 	 = (temp>>24) & 0x000000FF;
+		record_log[j+1] 	 = (temp>>16) & 0x000000FF;
+		record_log[j+2] 	 = (temp>>8)  & 0x000000FF;
+		record_log[j+3] 		 = (temp)     & 0x000000FF;
+	}
+	printf("%s",record_log);	
+}
+}
+
+void DatalogClear(void)
+{
+	FLASH_erase(FLASH_USER_START_DATALOG,(FLASH_USER_END_DATALOG - FLASH_USER_START_DATALOG) / FLASH_PAGE_SIZE);	
+}
+
+void get_sensorvalue(void)
+{
+		HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_RESET);	
+	  HAL_Delay(500+sys.power_time);
+			if((sys.mod==model1)||(sys.mod==model3))
+  {
+		MX_I2C1_Init();
+    if(detect_flags == 1)
+			sht20Data();
+		else if(detect_flags == 2)
+			sht31Data();
+    HAL_I2C_MspDeInit(&hi2c1);	
+		HAL_Delay(20);
+	}
+			if((sys.mod!=model6))
+  {
+		adc0_datalog = ADCModel(ADC_CHANNEL_4);
+		if((sys.mod!=model3))
+		{
+		 DS18B20_GetTemp_SkipRom(1);
+		 DS18B20_IoDeInit(1);
+		}
+	}
+			if(sys.mod==model2)
+  {
+		 if(mode2_flag==1)
+		{
+			distance_datalog = LidarLite();
+			HAL_I2C_MspDeInit(&hi2c1);	
+		}
+		else if(mode2_flag==2)
+		{
+     distance_datalog = ULT_distance();
+		 GPIO_ULT_INPUT_DeInit();
+		 GPIO_ULT_OUTPUT_DeInit();
+		}
+    else if(mode2_flag==3)
+		{	
+		 ULT_Rest();
+     MX_USART1_UART_Init	();		
+     uart1_Init();
+		 HAL_UART_Receive_IT(&huart1,(uint8_t*)&rxbuf_u1,RXSIZE);
+	   HAL_Delay(100);
+		 ULT_getData();
+		 uart1_IoDeInit();
+		 distance_datalog = ULT_Data_processing();	
+		}
+		else
+		{
+			distance_datalog = 0;			
+		}
+	}
+			if(sys.mod==model3)
+  {
+	  adc1_datalog = ADCModel(ADC_CHANNEL_1);
+		adc4_datalog = ADCModel(ADC_CHANNEL_0);
+	}
+			if(sys.mod==model4)
+  {	
+		DS18B20_GetTemp_SkipRom(2);
+		DS18B20_IoDeInit(2);
+		DS18B20_GetTemp_SkipRom(3);
+		DS18B20_IoDeInit(3);
+	}
+	if(sys.mod == model5)
+	{
+			  WEIGHT_SCK_Init();
+	  WEIGHT_DOUT_Init();
+		int32_t Weight = Get_Weight();	
+	  WEIGHT_SCK_DeInit();
+	  WEIGHT_DOUT_DeInit();			
+	}		
+  HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_SET);
 }

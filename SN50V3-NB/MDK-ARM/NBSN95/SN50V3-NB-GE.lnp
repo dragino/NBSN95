@@ -31,6 +31,8 @@
 "nbsn95\ult.o"
 "nbsn95\maxsonar.o"
 "nbsn95\lidar.o"
+"nbsn95\nb_payload.o"
+"nbsn95\tiny_sscanf.o"
 "nbsn95\nbinit.o"
 "nbsn95\nb_mqtt.o"
 "nbsn95\nb_udp.o"

@@ -1,5 +1,5 @@
 #include "ultrasound.h"
-
+extern bool tdc_clock_log_flag;
 void GPIO_ULT_INPUT_Init(void)	//ECHO
 {
 	GPIO_InitTypeDef GPIO_InitStruct={0};
@@ -81,14 +81,14 @@ uint16_t ULT_distance(void)
 			time= HAL_GetTick() - time;
 
 			distance=(time*10000)/58;
-			if(sys.tr_flag==0) 
+			if(tdc_clock_log_flag==0) 
 			{
 			user_main_debug("time:%d",time);
 			user_main_debug("distance:%d",distance);
 			}
 			if((distance<240)||(distance>6000))
 			{
-				if(sys.tr_flag==0) 
+				if(tdc_clock_log_flag==0) 
 				user_main_printf("Distance is out of range");
 				error_num++;
 				if(error_num==9)				
@@ -96,7 +96,7 @@ uint16_t ULT_distance(void)
 			}
 			else
 			{
-				if(sys.tr_flag==0) 
+				if(tdc_clock_log_flag==0) 
 				user_main_printf("Distance=%d mm",distance);
 				return distance;
 			}
@@ -106,7 +106,7 @@ uint16_t ULT_distance(void)
 	else
 	{
 		distance=4095;
-		if(sys.tr_flag==0) 
+		if(tdc_clock_log_flag==0) 
 		user_main_printf("ULT is not connect");
 		return distance;
 	}	

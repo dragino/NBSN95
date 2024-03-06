@@ -52,7 +52,7 @@ nbsn95\nbinit.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\ctype.h
 nbsn95\nbinit.o: ..\Drivers\BSP\inc\common.h
 nbsn95\nbinit.o: ..\Drivers\BSP\inc\flash_eraseprogram.h
 nbsn95\nbinit.o: ..\Drivers\BSP\inc\time_server.h
-nbsn95\nbinit.o: ../Inc/rtc.h
+nbsn95\nbinit.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\time.h
 nbsn95\nbinit.o: ../Inc/utilities.h
 nbsn95\nbinit.o: ../Inc/hw_conf.h
 nbsn95\nbinit.o: ../Inc/stm32l0xx_nucleo.h
@@ -66,3 +66,4 @@ nbsn95\nbinit.o: ..\Drivers\BSP\inc\ultrasound.h
 nbsn95\nbinit.o: ..\Drivers\BSP\inc\weight.h
 nbsn95\nbinit.o: ..\Drivers\BSP\inc\ult.h
 nbsn95\nbinit.o: ..\Drivers\BSP\inc\maxsonar.h
+nbsn95\nbinit.o: ../Inc/gpio.h

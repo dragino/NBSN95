@@ -20,6 +20,7 @@
 #define SERVADDR   "+SERVADDR"
 
 #define FDR        "+FDR"
+#define FDR1        "+FDR1"
 #define TDC        "+TDC"
 #define PWORD      "+PWORD"
 #define CFG        "+CFG"
@@ -43,15 +44,17 @@
 #define CDP     	 "+CDP"
 #define LDATA      "+LDATA"
 
-#define TR      	 "+TR" 		//Time recording 
+
 #define GETSENSORVALUE      "+GETSENSORVALUE"
 #define DNSCFG     "+DNSCFG"	//DNS Server
-#define NOUD     	 "+NOUD"		//Number of uploaded sht data
+
 #define CSQTIME     "+CSQTIME"
 #define DNSTIMER     "+DNSTIMER"
 #define TLSMOD     "+TLSMOD"
 #define SLEEP     "+SLEEP"
 #define MQOS      "+MQOS"
+#define GETLOG      "+GETLOG"
+#define CLOCKLOG    "+CLOCKLOG"
 /**********************************************/
 
 typedef enum
@@ -83,6 +86,7 @@ ATEerror_t at_mod_get(const char *param);
 ATEerror_t at_pword_get(const char *param);
 ATEerror_t at_pword_set(const char *param);
 ATEerror_t at_fdr_run(const char *param);
+ATEerror_t at_fdr1_run(const char *param);
 ATEerror_t at_cfg_run(const char *param);
 
 ATEerror_t at_deui_set(const char *param);
@@ -125,11 +129,6 @@ ATEerror_t at_ext_set(const char *param);
 ATEerror_t at_cdp_run(const char *param);
 ATEerror_t at_cdp_set(const char *param);
 
-ATEerror_t at_tr_get(const char *param);
-ATEerror_t at_tr_set(const char *param);
-
-ATEerror_t at_noud_get(const char *param);
-ATEerror_t at_noud_set(const char *param);
 ATEerror_t at_ldata_get(const char *param);
 ATEerror_t at_dnscfg_get(const char *param);
 ATEerror_t at_dnscfg_set(const char *param);
@@ -154,6 +153,12 @@ ATEerror_t at_sleep_set(const char *param);
 ATEerror_t at_sleep_get(const char *param);
 ATEerror_t at_mqos_set(const char *param);
 ATEerror_t at_mqos_get(const char *param);
+
+ATEerror_t at_getlog_run(const char *param);
+ATEerror_t at_getlog_set(const char *param);
+
+ATEerror_t at_clocklog_set(const char *param);
+ATEerror_t at_clocklog_get(const char *param);
 /*Other*/
 char *rtrim(char *str);
 uint8_t hexDetection(char* str);
@@ -228,6 +233,17 @@ static const struct ATCommand_s ATCommand[] =
     .get = at_pword_get,
     .set = at_pword_set,
     .run = at_return_error,
+  },	
+		/** AT+FDR1 **/	
+	{
+    .string = AT FDR1,
+		.size_string = sizeof(FDR1) - 1,
+#ifndef NO_HELP
+    .help_string = AT FDR1 "     : Reset parameters to factory default values except for passwords",
+#endif
+    .get = at_return_error,
+    .set = at_return_error,
+    .run = at_fdr1_run,
   },	
 		/** AT+FDR **/	
 	{
@@ -427,17 +443,6 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_ext_set,
     .run = at_return_error,
   },
-			/** AT+TR **/	
-	{
-    .string = AT TR,
-		.size_string = sizeof(TR) - 1,
-#ifndef NO_HELP
-    .help_string = AT TR "    : Get or set SHT record time",
-#endif
-    .get = at_tr_get,
-    .set = at_tr_set,
-    .run = at_return_error,
-  },
 			/** AT+CDP **/	
 	{
     .string = AT CDP,
@@ -448,18 +453,6 @@ static const struct ATCommand_s ATCommand[] =
     .get = at_return_error,
     .set = at_cdp_set,
     .run = at_cdp_run,
-  },
-  
-			/** AT+NOUD **/	
-	{
-    .string = AT NOUD,
-		.size_string = sizeof(NOUD) - 1,
-#ifndef NO_HELP
-    .help_string = AT NOUD "    : Get or Set the number of SHT data to be uploaded ",
-#endif
-    .get = at_noud_get,
-    .set = at_noud_set,
-    .run = at_return_error,
   },
 			/** AT+LDATA **/	
 	{
@@ -549,6 +542,28 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_mqos_set,
     .run = at_return_error,
   },
+				/** AT+GETLOG **/	
+	{
+    .string = AT GETLOG,
+		.size_string = sizeof(GETLOG) - 1,
+#ifndef NO_HELP
+    .help_string = AT GETLOG "  : Print serial port logs",
+#endif
+    .get = at_return_error,
+    .set = at_getlog_set,
+    .run = at_getlog_run,
+  },
+				/** AT+CLOCKLOG **/			
+	{
+	  .string = AT CLOCKLOG,
+    .size_string = sizeof(AT CLOCKLOG) - 1,
+#ifndef NO_HELP
+    .help_string = AT CLOCKLOG ": Get or set SHT record time",
+#endif
+    .get = at_clocklog_get,
+    .set = at_clocklog_set,
+    .run = at_return_error,
+	},
 };
 
 ATEerror_t ATInsPro( char* at);

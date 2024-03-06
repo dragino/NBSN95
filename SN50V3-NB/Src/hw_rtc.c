@@ -646,5 +646,33 @@ static TimerTime_t HW_RTC_GetCalendarValue( RTC_DateTypeDef* RTC_DateStruct, RTC
   return( calendarValue );
 }
 
+/*!
+ * \brief Get system time
+ * \param [IN]   pointer to ms
+ *
+ * \return uint32_t seconds
+ */
+uint32_t HW_RTC_GetCalendarTime(uint16_t *mSeconds)
+{
+  RTC_TimeTypeDef RTC_TimeStruct ;
+  RTC_DateTypeDef RTC_DateStruct;
+  uint32_t ticks;
+
+  uint64_t calendarValue = HW_RTC_GetCalendarValue(&RTC_DateStruct, &RTC_TimeStruct);
+
+  uint32_t seconds = (uint32_t)(calendarValue >> N_PREDIV_S);
+
+  ticks = (uint32_t) calendarValue & PREDIV_S;
+
+  *mSeconds = HW_RTC_Tick2ms(ticks);
+
+  return seconds;
+}
+
+void HW_RTC_BKUPRead(uint32_t *Data0, uint32_t *Data1)
+{
+  *Data0 = HAL_RTCEx_BKUPRead(&RtcHandle, RTC_BKP_DR0);
+  *Data1 = HAL_RTCEx_BKUPRead(&RtcHandle, RTC_BKP_DR1);
+}
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
 

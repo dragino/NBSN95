@@ -2,6 +2,7 @@
 float hum_value;
 float tem_value;
 extern uint16_t tem_store,hum_store;
+extern bool tdc_clock_log_flag;
 void sht31Init(void)
 {
 	uint8_t SHT3X_Modecommand_Buffer[2]={0x20,0x32};
@@ -55,14 +56,14 @@ void sht31Data(void)
 	}
   hum_value=hum;
   tem_value=tem;
-	 		if(sys.tr_flag==0)
+ 		if(tdc_clock_log_flag==0)
 	{
   user_main_printf("Humidity =%.2f %%rh",hum);
 	user_main_printf("tem =%.2f C",tem);	
 	}
 	sensor.temSHT = (int)(tem*10);
 	sensor.humSHT = (int)(hum*10);
- 		if(sys.tr_flag==1)
+ 		if(tdc_clock_log_flag==1)
 	{
 	hum_store=(int)(hum*10);
 	tem_store=(int)(tem*10);

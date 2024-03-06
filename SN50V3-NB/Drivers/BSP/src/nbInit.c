@@ -1,5 +1,5 @@
 #include "nbInit.h"
-
+#include "gpio.h"
 static uint8_t net_acc_status_led = 0;
 static char buff[200]={0};
 static uint8_t	recieve_data[NB_RX_SIZE] = {0};	   	 			//Receive data
@@ -15,15 +15,25 @@ extern uint8_t nds_timer_flag2;
 extern uint8_t is_time_to_send;
 extern uint8_t sleep_status;
 extern uint8_t nbmodel_int;
+extern uint8_t  qband_flag;
 static uint8_t mqtt_close_flag = 0;
 static uint8_t resend_flag = 0;
+static uint8_t no_response_flag = 0;
+static uint8_t no_response_time = 0;
 uint8_t read_flag = 0;
+char record_log[512]={0};
 bool DNS_RE_FLAG = false;
+bool first_sample=0;
 static uint8_t tcp_fail_flag = 0;
+static uint8_t csq_fail_log = 0;
+static uint8_t two_data_log = 0;
 extern void OnTxTimerEvent( void );
 extern void nb_intTimeoutEvent( void );
 extern TimerEvent_t TxTimer;
 extern TimerEvent_t nb_intTimeoutTimer;
+extern void compare_time(uint16_t time);
+extern TimerEvent_t timesampleTimer;
+extern void OntimesampleEvent(void);
 
 NB nb = {.net_flag=no_status,.recieve_flag=0,.usart.len=0,.usart.data=recieve_data,
 				 .imei={0},.imsi={0},.singal=0};
@@ -411,8 +421,13 @@ NB_TaskStatus nb_qband_run(const char* param)
 	{
 		if(nb_at_send(&NBTask[_AT_QBAND])== NB_CMD_SUCC)
 		{
+			if(qband_flag==0)
+      {
 			NBTask[_AT_QBAND].nb_cmd_status = NBTask[_AT_QBAND].get(NULL);
 			break;
+			}
+			qband_flag=0;
+			NBTask[_AT_QBAND].set(NULL);
 		}
 	}
 	
@@ -422,6 +437,9 @@ NB_TaskStatus nb_qband_run(const char* param)
 NB_TaskStatus nb_qband_set(const char* param)
 {
 	memset(buff,0,sizeof(buff));
+	if(qband_flag==1)
+	strcat(buff,AT QBAND "=10,8,20,28,2,4,12,13,66,85,5" NEWLINE);		
+	else
 	strcat(buff,AT QBAND "?" NEWLINE);
 	
 	NBTask[_AT_QBAND].ATSendStr  = buff;
@@ -516,6 +534,16 @@ NB_TaskStatus nb_cclk_get(const char* param)
 		strcat(date,"20");
 		memcpy(&date[2],&p[7],17);
 		sensor.time_stamp = GetTick(date);
+		if(first_sample==0)
+		{
+			uint16_t time_test=0;
+			struct tm localtime;
+			SysTimeLocalTime( sensor.time_stamp, &localtime );
+			time_test=localtime.tm_min*60+localtime.tm_sec;
+			TimerInit( &timesampleTimer,  OntimesampleEvent); 
+			compare_time(time_test);
+			first_sample=1;			
+		}
 		user_main_debug("time_stamp:%d",sensor.time_stamp);
 	}
 	return NBTask[_AT_CCLK].nb_cmd_status;
@@ -554,6 +582,16 @@ NB_TaskStatus nb_cclk2_get(const char* param)
 		strcat(date,"20");
 		memcpy(&date[2],&p[7],17);
 		sensor.time_stamp = GetTick(date);
+		if(first_sample==0)
+		{
+			uint16_t time_test=0;
+			struct tm localtime;
+			SysTimeLocalTime( sensor.time_stamp, &localtime );
+			time_test=localtime.tm_min*60+localtime.tm_sec;
+			TimerInit( &timesampleTimer,  OntimesampleEvent); 
+			compare_time(time_test);
+			first_sample=1;			
+		}
 		user_main_debug("time_stamp:%d",sensor.time_stamp);
 	}
 	return NBTask[_AT_CCLK2].nb_cmd_status;
@@ -648,7 +686,7 @@ NB_TaskStatus nb_csq_get(const char* param)
 	if(nb_at_send(&NBTask[_AT_CSQ])== NB_CMD_SUCC)
 	{
 		char singalBuff[5]={0}; 	
-		char *pch1 = strchr((char*)nb.usart.data,':');
+		char *pch1 = strrchr((char*)nb.usart.data,':');
 		char *pch2 = strchr((char*)nb.usart.data,',');
 		for(int i =0;i<(pch2 - pch1)-1;i++)
 			sprintf(singalBuff+strlen(singalBuff), "%c", nb.usart.data[7+i]);
@@ -745,6 +783,7 @@ NB_TaskStatus nb_qdns_get(const char* param)
 	if(p1==NULL || q1==NULL)
 	{
 		user_main_printf("Domain name resolution failed");
+	  sprintf(record_log+strlen(record_log), "Domain name resolution failed\r\n");		
 		NBTask[_AT_QDNS].nb_cmd_status = NB_CMD_FAIL;
 	}
 	else
@@ -755,6 +794,7 @@ NB_TaskStatus nb_qdns_get(const char* param)
 		memcpy(user.add_ip+strlen((char*)user.add_ip),p1+2,p2-p1-3);
 		memcpy(user.add_ip+strlen((char*)user.add_ip),q1,strlen(q1));
 		user_main_printf("Domain IP:%s",user.add_ip);
+	  sprintf(record_log+strlen(record_log), "Domain IP:%s\r\n",user.add_ip);	
 		NBTask[_AT_QDNS].nb_cmd_status = NB_CMD_SUCC;
 	}	
 
@@ -810,6 +850,7 @@ ATCmdNum NBTASK(uint8_t *task)
 case _AT:{
 				if(NBTask[_AT].run(NULL) == NB_CMD_SUCC)
 				{
+					no_response_time=0;
 					*task = _AT_QRST2;				
 					user_main_printf("NBIOT has responded.");
 				}
@@ -972,6 +1013,8 @@ case _AT_CFUNEND:{
 					at_state = _AT_ERROR;
 				}
 				nb.uplink_flag = no_status;
+				stored_datalog();
+				user_main_printf("Enter sleep mode");	
 			}
 			break;
 
@@ -986,25 +1029,31 @@ case _AT_CFUNOFF:{
             TimerStart( &TxTimer);						
 					}						
 					user_main_printf("Turn off the module receiving and sending RF function.");
+					sprintf(record_log+strlen(record_log), "Turn off the module receiving and sending RF function.\r\n");
 				}
 				else
 				{
 					at_state = _AT_ERROR;
 					*task = _AT_QSCLK;
 				}
+				csq_fail_log=0;
 			}
 			break;	
 
 case _AT_QSCLKOFF:{
+		     memset(record_log,0,sizeof(record_log));
 				if(NBTask[_AT_QSCLKOFF].run(NULL) == NB_CMD_SUCC)
 				{
 					if(NBTask[_AT_QSCLKOFF].run(NULL) == NB_CMD_SUCC)
-				                   *task = _AT_CFUNSTA;				
+				                   *task = _AT_CFUNSTA;	
+          user_main_printf("Exit sleep mode");						
+					sprintf(record_log, "Exit sleep mode\r\n");
 				}
 				else
 				{
 					at_state = _AT_ERROR;
 					user_main_printf("No response");	
+					sprintf(record_log, "No response\r\n");
 				}
 			}
 			break;
@@ -1018,6 +1067,7 @@ case _AT_CFUNSTA:{
 				{
 					at_state = _AT_ERROR;
 					user_main_printf("No response");	
+					sprintf(record_log, "No response\r\n");
 				}
 			}
 			break;
@@ -1025,6 +1075,8 @@ case _AT_CFUNSTA:{
 case _AT_CSQ:{
 				NBTask[_AT_CSQ].get((char*)NBTask[_AT_CSQ].cmd_num);
 				user_main_printf("Signal Strength:%d",nb.singal);
+	      if(csq_fail_log<5)
+	      sprintf(record_log+strlen(record_log), "Signal Strength:%d\r\n",nb.singal);
 				if(NBTask[_AT_CSQ].nb_cmd_status == NB_CMD_SUCC)
 				{
 					*task=(net_acc_status_led == 0)?_AT_CPSMS:_AT_CCLK;				
@@ -1038,9 +1090,11 @@ case _AT_CSQ:{
 					join_network_timer=0;
 					join_network_time=0;
 					is_time_to_send=0;
+					csq_fail_log=0;
 				}
 				else
 				{
+					csq_fail_log++;
 					*task = _AT_IDLE;	
 				  join_network_flag=1;
 					nb.net_flag = fail;
@@ -1049,9 +1103,15 @@ case _AT_CSQ:{
 			break;			
 case _AT_CPSMS:{
 				if(NBTask[_AT_CPSMS].run(NULL) == NB_CMD_SUCC)
+				{
 					user_main_printf("PSM mode configured ");
+				  sprintf(record_log+strlen(record_log), "PSM mode configured\r\n");
+				}
 				else 
-					user_main_printf("PSM mode configuration failed ");			
+				{
+					user_main_printf("PSM mode configuration failed ");	
+					sprintf(record_log+strlen(record_log), "PSM mode configuration failed\r\n");
+				}					
 				*task=_AT_CCLK2;
 			}
 			break;
@@ -1060,6 +1120,7 @@ case _AT_CCLK2:{
 				{
 					at_state = _AT_ERROR;
 					user_main_printf("Failed to get time");
+					sprintf(record_log+strlen(record_log), "Failed to get time\r\n");
 				}		
 				*task=_AT_QDNSCFG;
 			}
@@ -1067,9 +1128,15 @@ case _AT_CCLK2:{
 			
 case _AT_QDNSCFG:{
 				if(NBTask[_AT_QDNSCFG].run(NULL) == NB_CMD_SUCC)
+				{
 					user_main_printf("DNS configuration is successful");
+					sprintf(record_log+strlen(record_log), "DNS configuration is successful\r\n");
+				}
 				else 
+				{
 					user_main_printf("DNS configuration failed");	
+					sprintf(record_log+strlen(record_log), "DNS configuration failed\r\n");
+				}
 				HAL_Delay(5000);	
        if(sys.tlsmod==0)				
 				*task=_AT_QDNS;
@@ -1112,14 +1179,16 @@ case _AT_QDNS:{
 				if((is_ipv4_addr((char*)user.add) == 1) ||(is_ipv4_addr((char*)user.add) == 2) || (nds_timer_flag2==1) || (is_ipv6_addr((char*)user.add) == 1)|| (is_ipv6_addr((char*)user.add) == 2) )
 				{
           *task = _AT_UPLOAD_START;
-					user_main_printf("No DNS resolution required");					
+					user_main_printf("No DNS resolution required");		
+					sprintf(record_log+strlen(record_log), "No DNS resolution required\r\n");					
 				}
 				else  
 				{
 					NB_TaskStatus nbtask_state = NBTask[_AT_QDNS].run(NULL);
 					if(nbtask_state == NB_CMD_SUCC)
 					{
-						user_main_printf("Resolving domain name...");			
+						user_main_printf("Resolving domain name...");		
+					  sprintf(record_log+strlen(record_log), "Resolving domain name...\r\n");									
 						*task = _AT_IDLE;
 						nb.dns_flag = running;
 						nb.uplink_flag = no_status;
@@ -1133,6 +1202,7 @@ case _AT_CCLK:{
 				{
 					at_state = _AT_ERROR;
 					user_main_printf("Failed to get time");
+					sprintf(record_log+strlen(record_log), "Failed to get time\r\n");
 				}		
 				*task=_AT_UPLOAD_START;
 			}
@@ -1141,9 +1211,10 @@ case _AT_UPLOAD_START:{
 				nb.uplink_flag = send;
 				nb.recieve_flag = NB_IDIE;
 
-      if(sys.protocol == UDP_PRO)	{*task=_AT_UDP_SEND;}
+      if(sys.protocol == UDP_PRO)	{*task=_AT_UDP_OPEN;}
 			else if(sys.protocol == MQTT_PRO)	{*task=_AT_MQTT_Config;}
 			else if(sys.protocol == TCP_PRO)	{*task=_AT_TCP_OPEN;}
+      sprintf(record_log+strlen(record_log), "*****Upload start:%d*****\r\n",sys.uplink_count);				
 			user_main_printf("*****Upload start:%d*****",sys.uplink_count++);
 			txPayLoadDeal(&sensor);
 			memset((char*)nb.usart.data,0,sizeof(nb.usart.data));
@@ -1152,10 +1223,11 @@ case _AT_UPLOAD_START:{
 
 /***************************************************MQTT******************************************************************************/		
 case _AT_MQTT_Config:
-			if(strstr((char*)user.add,"NULL") != NULL || strstr((char*)user.client,"NULL") != NULL || strstr((char*)user.pubtopic,"NULL") != NULL )
+			if(strstr((char*)user.add,"NULL") != NULL || strstr((char*)user.pubtopic,"NULL") != NULL )
 			{
 				*task=_AT_UPLOAD_END;
 				user_main_printf("MQTT parameter configuration error");
+				sprintf(record_log+strlen(record_log), "MQTT parameter configuration error\r\n");
 				break;
 			}
 			if(NBTask[_AT_MQTT_Config].set(NULL) == NB_CMD_SUCC)
@@ -1168,6 +1240,7 @@ case _AT_MQTT_Config:
 				at_state = _AT_ERROR;
 				*task = _AT_UPLOAD_END;
 				user_main_printf("MQTT configuration failed");
+				sprintf(record_log+strlen(record_log),"MQTT configuration failed\r\n");
 			}
 			break;
 
@@ -1181,6 +1254,7 @@ case _AT_MQTT_OPEN:
 				at_state = _AT_ERROR;
 				*task = _AT_MQTT_CLOSE;
 				user_main_printf("Failed to open the MQTT client network");
+				sprintf(record_log+strlen(record_log), "Failed to open the MQTT client network\r\n");				
 			}
 			break;
 
@@ -1194,6 +1268,7 @@ case _AT_MQTT_CONN:
 				at_state = _AT_ERROR;
 				*task = _AT_MQTT_CLOSE;
 				user_main_printf("Failed to connect to server");
+				sprintf(record_log+strlen(record_log), "Failed to connect to server\r\n");				
 			}
 			break;
 			
@@ -1207,6 +1282,7 @@ case _AT_MQTT_SUB:
 				at_state = _AT_ERROR;
 				*task = _AT_MQTT_CLOSE;
 				user_main_printf("Failed to subscribe to topic");
+				sprintf(record_log+strlen(record_log), "Failed to subscribe to topic\r\n");				
 			}
 			break;
 case _AT_MQTT_PUB1:
@@ -1219,6 +1295,7 @@ case _AT_MQTT_PUB1:
 				at_state = _AT_ERROR;
 				*task = _AT_MQTT_CLOSE;
 				user_main_printf("Failed to Set PUB");
+				sprintf(record_log+strlen(record_log), "Failed to Set PUB\r\n");				
 			}
 				break;	
 case _AT_MQTT_PUB2:
@@ -1231,6 +1308,7 @@ case _AT_MQTT_PUB2:
 				at_state = _AT_ERROR;
 				*task = _AT_MQTT_CLOSE;
 				user_main_printf("Failed to Set PUB");
+				sprintf(record_log+strlen(record_log), "Failed to Set PUB\r\n");				
 			}
 				break;	
 case _AT_MQTT_PUB3:
@@ -1243,6 +1321,7 @@ case _AT_MQTT_PUB3:
 				at_state = _AT_ERROR;
 				*task = _AT_MQTT_CLOSE;
 				user_main_printf("Failed to Set PUB");
+				sprintf(record_log+strlen(record_log), "Failed to Set PUB\r\n");				
 			}
 				break;				
 case _AT_MQTT_PUB5:
@@ -1255,6 +1334,7 @@ case _AT_MQTT_PUB5:
 				at_state = _AT_ERROR;
 				*task = _AT_MQTT_CLOSE;
 				user_main_printf("Failed to Set PUB");
+				sprintf(record_log+strlen(record_log), "Failed to Set PUB\r\n");				
 			}
 				break;				
 case _AT_MQTT_PUB:
@@ -1267,6 +1347,7 @@ case _AT_MQTT_PUB:
 				at_state = _AT_ERROR;
 				*task = _AT_MQTT_CLOSE;
 				user_main_printf("Failed to Set PUB");
+				sprintf(record_log+strlen(record_log), "Failed to Set PUB\r\n");				
 				break;
 			}
 			
@@ -1280,6 +1361,7 @@ case _AT_MQTT_SEND:
 				at_state = _AT_ERROR;
 				*task = _AT_MQTT_CLOSE;
 				user_main_printf("Failed to upload data");
+				sprintf(record_log+strlen(record_log), "Failed to upload data\r\n");				
 			}
 			break;
 case _AT_MQTT_READ:
@@ -1301,6 +1383,7 @@ case _AT_MQTT_CLOSE:
 				at_state = _AT_ERROR;
 				*task=_AT_UPLOAD_FAIL;
 				user_main_printf("Failed to close the port");
+				sprintf(record_log+strlen(record_log), "Failed to close the port\r\n");				
 			}
 			break;
 			
@@ -1311,6 +1394,7 @@ case _AT_MQTT_URI:
 				case NB_OPEN_SUCC:
 							*task=_AT_MQTT_CONN;
 							user_main_printf("Opened the MQTT client network successfully");
+				      sprintf(record_log+strlen(record_log), "Opened the MQTT client network successfully\r\n");				
 						break;
 				case NB_CONN_SUCC:
 					   if(sys.platform==0)
@@ -1324,18 +1408,22 @@ case _AT_MQTT_URI:
 						 else if(sys.platform==5)
 							*task=_AT_MQTT_PUB5; 
 							user_main_printf("Successfully connected to the server");
+				      sprintf(record_log+strlen(record_log), "Successfully connected to the server\r\n");						 
 						break;
 				case NB_SUB_SUCC:
 							*task=_AT_MQTT_READ;
 							user_main_printf("Subscribe to topic successfully");	
+							sprintf(record_log+strlen(record_log), "Subscribe to topic successfully\r\n");
 						break;
 				case NB_PUB_SUCC:
 							*task=_AT_MQTT_SUB;
 							user_main_printf("Upload data successfully");	
+							sprintf(record_log+strlen(record_log), "Upload data successfully\r\n");
 						break;
 				case NB_CLOSE_SUCC:
 							*task = _AT_UPLOAD_SUCC;
 							user_main_printf("Close the port successfully");
+							sprintf(record_log+strlen(record_log), "Close the port successfully\r\n");
 						break;
 				case NB_ERROR:
 							at_state = _AT_ERROR;
@@ -1348,38 +1436,43 @@ case _AT_MQTT_URI:
 			
 			break;
 /**************************************************UDP***********************************************************************************/
-case _AT_UDP_OPEN:		
+case _AT_UDP_OPEN:	
+			if(strstr((char*)user.add,"NULL") != NULL)
+			{
+				*task=_AT_UPLOAD_END;
+				user_main_printf("UDP parameter configuration error");
+				sprintf(record_log+strlen(record_log), "UDP parameter configuration error\r\n");				
+				break;
+			}		
 			if(NBTask[_AT_UDP_OPEN].run(NULL) == NB_CMD_SUCC)
 			{
 				*task=_AT_UDP_SEND;
 				user_main_printf("Open a Socket Service successfully");
+				sprintf(record_log+strlen(record_log), "Open a Socket Service successfully\r\n");				
 			}
 			else 
 			{
 				at_state = _AT_ERROR;
 			 *task=_AT_UDP_CLOSE;
 				user_main_printf("Failed to open a Socket Service");
+				sprintf(record_log+strlen(record_log),"Failed to open a Socket Service\r\n");				
 			}
 			break;
 
-case _AT_UDP_SEND:
-			if(strstr((char*)user.add,"NULL") != NULL)
-			{
-				*task=_AT_UPLOAD_END;
-				user_main_printf("UDP parameter configuration error");
-				break;
-			}	
-			
-			if(NBTask[_AT_UDP_SEND].run(NULL) != NB_CMD_SUCC)
+case _AT_UDP_SEND:	
+			if(NBTask[_AT_UDP_SEND].run(NULL) == NB_CMD_SUCC)
 			{		
-        *task = _AT_UDP_OPEN;														
-			}
-			else
-			{
 				if(resend_flag==3)
 				*task = _AT_UDP_CLOSE;					
 				else
-				*task = _AT_IDLE;
+				*task = _AT_IDLE;												
+			}
+			else
+			{
+				at_state = _AT_ERROR;
+			 *task=_AT_UDP_CLOSE;
+				user_main_printf("Failed to send");
+				sprintf(record_log+strlen(record_log), "Failed to send\r\n");				
 			}
 				break;	
 case _AT_UDP_READ:
@@ -1395,16 +1488,22 @@ case _AT_UDP_CLOSE:
 			{
 				read_flag=0;
 				resend_flag=0;
-				user_main_printf("Close the port successfully");
+				if(succes_Status==true)
+				*task = _AT_UPLOAD_SUCC;
+				else
+				*task=_AT_UPLOAD_FAIL;
+			user_main_printf("Close the port successfully");
+				sprintf(record_log+strlen(record_log), "Close the port successfully\r\n");				
 			}
 			else
 			{
 				read_flag=0;
 				resend_flag=0;
+				*task=_AT_UPLOAD_FAIL;
 				at_state = _AT_ERROR;				
 				user_main_printf("Failed to close the port");
+				sprintf(record_log+strlen(record_log),"Failed to close the port\r\n");				
 			}
-			*task=_AT_UPLOAD_FAIL;
 			break;
 case _AT_UDP_URI:
 			uri_state = NBTask[_AT_UDP_URI].run(NULL);
@@ -1412,18 +1511,22 @@ case _AT_UDP_URI:
 			{
 				resend_flag=0;
 				read_flag=0;
-				*task = _AT_UPLOAD_SUCC;
+				*task = _AT_UDP_CLOSE;
 				user_main_printf("Datagram is sent by RF");
+				sprintf(record_log+strlen(record_log), "Datagram is sent by RF\r\n");				
 			}
 			else if(uri_state == NB_SEND_SUCC)			
 			{
 				*task = _AT_UDP_READ;		
+				user_main_printf("Upload data successfully");	
+				sprintf(record_log+strlen(record_log), "Upload data successfully\r\n");				
 			}
 			else if(uri_state == NB_SEND_FAIL)			
 			{
 				resend_flag++;
 				*task = _AT_UDP_SEND;		
 				user_main_printf("Failed to upload data,resend data");
+				sprintf(record_log+strlen(record_log), "Failed to upload data,resend data\r\n");				
 			}
 			else
 			{
@@ -1436,13 +1539,15 @@ case _AT_TCP_OPEN:
 			{
 				*task=_AT_UPLOAD_END;
 				user_main_printf("TCP parameter configuration error");
+				sprintf(record_log+strlen(record_log), "TCP parameter configuration error\r\n");				
 				break;
 			}
 			if(NBTask[_AT_TCP_OPEN].run(NULL) == NB_CMD_SUCC)
 			{
 //				*task=_AT_IDLE;		
 				  *task=_AT_TCP_SEND;	
-				user_main_printf("Open a Socket Service successfully");						
+				user_main_printf("Open a Socket Service successfully");			
+				sprintf(record_log+strlen(record_log), "Open a Socket Service successfully\r\n");				
 				
 			}
 			else 
@@ -1451,20 +1556,23 @@ case _AT_TCP_OPEN:
 				tcp_fail_flag=1;
 				*task = _AT_TCP_CLOSE;
 				user_main_printf("Failed to open a Socket Service");
+				sprintf(record_log+strlen(record_log), "Failed to open a Socket Service\r\n");				
 			}
 			break;
 case _AT_TCP_SEND:
 			if(NBTask[_AT_TCP_SEND].run(NULL) == NB_CMD_SUCC)
 			{
 				*task=_AT_TCP_READ;	
-				user_main_printf("Upload data successfully");					
+				user_main_printf("Upload data successfully");		
+				sprintf(record_log+strlen(record_log), "Upload data successfully\r\n");				
 			}
 			else	
 			{
 				at_state = _AT_ERROR;
 				tcp_fail_flag=1;
 				*task = _AT_TCP_CLOSE;
-				user_main_printf("Failed to upload data");						
+				user_main_printf("Failed to upload data");	
+				sprintf(record_log+strlen(record_log), "Failed to upload data\r\n");				
 			}
 				break;					
 case _AT_TCP_READ:
@@ -1482,12 +1590,14 @@ case _AT_TCP_CLOSE:
 				*task=_AT_UPLOAD_SUCC;
 				 tcp_fail_flag=0;
 				user_main_printf("Close the port successfully");
+				sprintf(record_log+strlen(record_log), "Close the port successfully\r\n");
 			}
 			else 
 			{
 				at_state = _AT_ERROR;
 				*task=_AT_UPLOAD_FAIL;
 				user_main_printf("Failed to close the port");
+				sprintf(record_log+strlen(record_log), "Failed to close the port\r\n");				
 			}				
 			break;
 case _AT_TCP_URI:
@@ -1506,18 +1616,26 @@ case _AT_TCP_URI:
 				at_state = _AT_ERROR;
 				*task=_AT_UPLOAD_FAIL;
 				user_main_printf("Message failed");
+				sprintf(record_log+strlen(record_log), "Message failed\r\n");				
 			}
 			break;
 /******************************************************************************************************************************************/			
 case _AT_UPLOAD_END:
 			user_main_printf("*****End of upload*****\r\n");	
+			sprintf(record_log+strlen(record_log), "*****End of upload*****\r\n");
       error_num = 0;
 			memset((char*)nb.usart.data,0,sizeof(nb.usart.data));
 			if(succes_Status==false && reupload_time<3)
 			{
+				if(reupload_time==1)
+			 {
+			 stored_datalog();
+			 memset(record_log,0,sizeof(record_log));
+			 two_data_log=1;
+			 }
 				nb.uplink_flag = send;
 				nb.recieve_flag = NB_IDIE;
-        if(sys.protocol == UDP_PRO)	{*task=_AT_UDP_SEND;}
+        if(sys.protocol == UDP_PRO)	{*task=_AT_UDP_OPEN;}
 		  	else if(sys.protocol == MQTT_PRO)	{*task=_AT_MQTT_Config;}
 			  else if(sys.protocol == TCP_PRO)	{*task=_AT_TCP_OPEN;}
 			  reupload_time++;
@@ -1527,8 +1645,7 @@ case _AT_UPLOAD_END:
 			if(sys.exit_flag == 0)	{TimerInit( &TxTimer, OnTxTimerEvent );
                                TimerSetValue(&TxTimer,sys.tdc*1000); 
                                TimerStart( &TxTimer);	}
-			reupload_time=0;
-			HAL_Delay(5000);												 
+			reupload_time=0;											 
 			*task = _AT_QSCLK;
 		}
 			succes_Status=false;	
@@ -1537,10 +1654,12 @@ case _AT_UPLOAD_END:
 case _AT_UPLOAD_SUCC:
 			*task = _AT_UPLOAD_END;
 			user_main_printf("Send complete");
+				sprintf(record_log+strlen(record_log), "Send complete\r\n");
 			break;
 
 case _AT_UPLOAD_FAIL:
-			user_main_printf("Failed to send");			
+			user_main_printf("Failed to send");	
+				sprintf(record_log+strlen(record_log), "Failed to send\r\n");
 			*task = _AT_UPLOAD_END;
 			break;
 
@@ -1549,14 +1668,31 @@ case _AT_QRST:{
 				{
 					at_state = _AT_ERROR;
 					user_main_printf("No response when shutting down");
+					sprintf(record_log+strlen(record_log), "No response when shutting down\r\n");					
+				  RESET_GPIO_Init();
+				  HAL_Delay(100);
+				  RESET_GPIO_DeInit();
+					HAL_Delay(2000);
+					no_response_flag=1;
+					no_response_time++;
 				}
-		   *task=_AT_IDLE;
+				if(no_response_flag==0||no_response_time==6)
+				{
+					no_response_time=0;
+					no_response_flag=0;
+		      *task=_AT_IDLE;		
+          TimerInit( &TxTimer, OnTxTimerEvent );
+          TimerSetValue( &TxTimer,  sys.tdc*1000); 
+          TimerStart( &TxTimer);	
+				}
+				else
+				{
+				 *task=_AT;
+					no_response_flag=0;
+				}
 				nb.net_flag = no_status;
 				net_acc_status_led = 0;
-				nb.uplink_flag = no_status;				
-        TimerInit( &TxTimer, OnTxTimerEvent );
-        TimerSetValue( &TxTimer,  sys.tdc*1000); 
-        TimerStart( &TxTimer);	
+				nb.uplink_flag = no_status;		
 				
 				break;
 			}
@@ -1592,3 +1728,20 @@ default:
 	}
 	return at_state;
 }
+
+void stored_datalog(void)
+{
+  if(two_data_log!=1)
+	{
+	uint32_t parameters_log[128]={0};
+	for(uint16_t i=0,j=0;i<strlen((char*)record_log);i=i+4,j++)
+		 parameters_log[j]=record_log[i+0]<<24 | record_log[i+1]<<16 | record_log[i+2]<<8 | record_log[i+3];
+		 FLASH_erase(FLASH_USER_START_DATALOG+sys.log_seq * FLASH_PAGE_SIZE*4,((FLASH_USER_START_DATALOG+(sys.log_seq+1) * FLASH_PAGE_SIZE*4	) - (FLASH_USER_START_DATALOG+sys.log_seq * FLASH_PAGE_SIZE*4	)) / FLASH_PAGE_SIZE);
+	   FLASH_program(FLASH_USER_START_DATALOG+sys.log_seq * FLASH_PAGE_SIZE*4,parameters_log, sizeof(parameters_log)/4);	
+     sys.log_seq++;
+     if(sys.log_seq==20)
+        sys.log_seq=0;
+		config_Set();
+	 }
+	two_data_log=0;
+}					

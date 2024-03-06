@@ -1,7 +1,10 @@
 #include "at.h"
+#include "nbInit.h"
+#include "tiny_sscanf.h"
 
 static uint8_t  keep = 0;
 static uint32_t general_parameters[32]={0};
+static uint32_t password_parameters[3]={0};
 static uint32_t servaddr_parameters[32]={0};
 static uint32_t mqtt_parameters_client[32]={0};
 static uint32_t mqtt_parameters_uname[32]={0};
@@ -10,11 +13,13 @@ static uint32_t mqtt_parameters_pubtopic[32]={0};
 static uint32_t mqtt_parameters_subtopic[32]={0};
 static uint8_t  noud_flags = 0;
 static uint8_t  mqtt_qos_flags = 0;
+uint8_t  qband_flag = 0;
 uint8_t mqtt_qos=0;
 extern char MCU_pwd[20];
 uint8_t getsensorvalue_flag=0;
 extern bool at_sleep_flag;
 extern bool sleep_status;
+extern bool first_sample;
 ATEerror_t ATInsPro(char* atdata)
 {
 	uint8_t i = 0;
@@ -90,10 +95,18 @@ ATEerror_t at_model_get(const char *param)
 {
 	if(keep)
 		printf(AT MODEL"=");
+#ifdef NB_1D	
+	#if defined NB_NS
+	printf("SN50V3-NS-1D,%s\r\n",AT_VERSION_STRING);
+	#else	
+	printf("SN50V3-NB-1D,%s\r\n",AT_VERSION_STRING);
+	#endif
+#else	
 	#if defined NB_NS
 	printf("SN50V3-NS-GE,%s\r\n",AT_VERSION_STRING);
 	#else	
 	printf("SN50V3-NB-GE,%s\r\n",AT_VERSION_STRING);
+	#endif	
 	#endif
 	return AT_OK;
 }
@@ -166,7 +179,13 @@ ATEerror_t at_pword_set(const char *param)
 	
 	memset(sys.pwd,0,8);
 	memcpy(sys.pwd,&pos[1],strlen(param) - (pos-param)-1);
+
+	password_parameters[0]=sys.pwd[0]<<24 | sys.pwd[1]<<16 	| sys.pwd[2]<<8 | sys.pwd[3];
+	password_parameters[1]=sys.pwd[4]<<24 | sys.pwd[5]<<16 	| sys.pwd[6]<<8 | sys.pwd[7];	
 	
+	FLASH_erase(FLASH_USER_START_PASSWORD,(FLASH_USER_END - FLASH_USER_START_PASSWORD) / FLASH_PAGE_SIZE);
+	FLASH_program(FLASH_USER_START_PASSWORD,password_parameters, sizeof(password_parameters)/4);
+
   return AT_OK;
 }
 
@@ -208,11 +227,32 @@ ATEerror_t at_fdr_run(const char *param)
 	HAL_FLASHEx_DATAEEPROM_Unlock();
 	HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_FDR_FLAG,0x01);//store fdr_flag
 	HAL_FLASHEx_DATAEEPROM_Lock();
+	FLASH_erase(FLASH_USER_START_PASSWORD,(FLASH_USER_END - FLASH_USER_START_PASSWORD) / FLASH_PAGE_SIZE);
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);
+	sys.clock_switch=1;
+	sys.strat_time=65535;
+	qband_flag=1;
+	config_Set();		
+	DatalogClear();
 	NVIC_SystemReset();
   return AT_OK;
 }
 
+/************** 			AT+FDR1		 **************/
+ATEerror_t at_fdr1_run(const char *param)
+{
+	HAL_FLASHEx_DATAEEPROM_Unlock();
+	HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_FDR_FLAG,0x01);//store fdr_flag
+	HAL_FLASHEx_DATAEEPROM_Lock();
+	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);
+	sys.clock_switch=1;
+	sys.strat_time=65535;
+	qband_flag=1;	
+	config_Set();			
+	DatalogClear();
+	NVIC_SystemReset();
+  return AT_OK;
+}
 /************** 			AT+CFG		 **************/
 ATEerror_t at_cfg_run(const char *param)
 {
@@ -598,48 +638,6 @@ ATEerror_t at_cdp_set(const char *param)
 	return AT_OK;
 }
 
-/************** 			AT+TR		**************/
-ATEerror_t at_tr_get(const char *param)
-{
-	if(keep)
-		printf(AT TR"=");
-	printf("%d\r\n",sys.tr_time);
-	return AT_OK;
-}
-
-ATEerror_t at_tr_set(const char *param)
-{
-	char* pos = strchr(param,'=');
-	uint16_t tr = atoi((param+(pos-param)+1));
-	if(tr > 0xFFFF || tr<180)
-	{
-		return AT_PARAM_ERROR;
-	}
-	sys.tr_time = tr;
-	sys.tr_count = sys.tr_time/10;
-  return AT_OK;
-}
-/************** 			AT+NOUD		**************/
-ATEerror_t at_noud_get(const char *param)
-{
-	if(keep)
-		printf(AT NOUD"=");
-	printf("%d\r\n",sys.sht_noud);	
-	return AT_OK;
-}
-
-ATEerror_t at_noud_set(const char *param)
-{
-	char* pos = strchr(param,'=');
-	uint8_t noud = atoi((param+(pos-param)+1));
-	if(noud > 32)
-	{
-		return AT_PARAM_ERROR;
-	}
-	sys.sht_noud = noud;
-	noud_flags=1;
-	return AT_OK;
-}
 /************** 			AT+EXT		**************/
 ATEerror_t at_ext_get(const char *param)
 {
@@ -861,6 +859,68 @@ ATEerror_t at_mqos_set(const char *param)
 	mqtt_qos_flags=1;
 	return AT_OK;
 }
+/************** 			AT+GETLOG		**************/
+ATEerror_t at_getlog_run(const char *param)
+{
+	DatalogPrint();
+	return AT_OK;
+}
+
+ATEerror_t at_getlog_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	uint8_t cdp = param[(pos-param)+1];
+	if(cdp != '0')
+	{
+		return AT_PARAM_ERROR;
+	}
+	DatalogClear();
+	sys.log_seq=0;
+	return AT_OK;
+}
+
+/************** 			AT+CLOCKLOG		 **************/
+ATEerror_t at_clocklog_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	bool aa;
+  uint16_t bb;	
+	uint8_t cc,dd;
+	char *param_temp;
+	uint8_t char_number=0;
+  for(uint8_t t=(pos-param)+1;t<strlen(param);t++)
+	{
+		param_temp[char_number++]=param[t];
+	}
+	param_temp[char_number]='\0';
+	
+	if((tiny_sscanf(param_temp, "%d,%d,%d,%d", &aa,&bb,&cc,&dd) != 4))
+	{
+		return AT_PARAM_ERROR;
+	}
+	if(((bb<3600)||(bb==65535))&&(cc<=255)&&(dd<=32))
+	{
+		sys.clock_switch=aa;
+		sys.strat_time=bb;
+		sys.tr_time=cc;
+		sys.sht_noud=dd;
+		first_sample=0;
+		nb_cclk_run(NULL);
+	}
+  else
+	{
+		return AT_PARAM_ERROR;		
+	}		
+	
+  return AT_OK;	
+}
+ATEerror_t at_clocklog_get(const char *param)
+{
+	if(keep)
+		printf("AT+CLOCKLOG=");
+	printf("%d,%d,%d,%d\r\n",sys.clock_switch,sys.strat_time,sys.tr_time,sys.sht_noud);
+  return AT_OK;			
+}
 
 /************** 		Other		 **************/
 char *rtrim(char* str)
@@ -887,16 +947,17 @@ void config_Set(void)
 {
 	memset(general_parameters,0,sizeof(general_parameters));
 	
-	general_parameters[0]=sys.pwd[0]<<24 | sys.pwd[1]<<16 	| sys.pwd[2]<<8 | sys.pwd[3];
-	general_parameters[1]=sys.pwd[4]<<24 | sys.pwd[5]<<16 	| sys.pwd[6]<<8 | sys.pwd[7];
+//	general_parameters[0]=sys.pwd[0]<<24 | sys.pwd[1]<<16 	| sys.pwd[2]<<8 | sys.pwd[3];
+//	general_parameters[1]=sys.pwd[4]<<24 | sys.pwd[5]<<16 	| sys.pwd[6]<<8 | sys.pwd[7];
 	general_parameters[2]=sys.mod<<24    | sys.tdc;
 	general_parameters[3]=sys.inmod<<24  | sys.protocol<<16 | sys.cfm<<8 	| sys.csq_time;
 	general_parameters[4]=sys.rxdl<<16   | sys.power_time;
 	general_parameters[5]=(int)(sensor.GapValue *10000);
 	general_parameters[6]=sensor.exit_count;
-	general_parameters[11]=sys.tr_time<<16 | noud_flags<<8 | sys.sht_noud;
+	general_parameters[11]=qband_flag<<24  |sys.tr_time<<16 | noud_flags<<8 | sys.sht_noud;
 	general_parameters[12]=sys.platform<<24 |sys.dns_timer<<16 |sys.dns_time<<8;
-	general_parameters[28]=mqtt_qos_flags<<24 |mqtt_qos <<16 |sys.cert<<8 |sys.tlsmod;	
+	general_parameters[28]=mqtt_qos_flags<<24 |mqtt_qos <<16 |sys.cert<<8 |sys.tlsmod;
+	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8 |sys.log_seq;	
 	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.deui);i=i+4,j++)
 			general_parameters[7+j]=user.deui[i+0]<<24 | user.deui[i+1]<<16 | user.deui[i+2]<<8 | user.deui[i+3];
@@ -938,7 +999,7 @@ void config_Set(void)
 
 void config_Get(void)
 {
-	uint32_t add = FLASH_USER_START_ADDR_CONFIG;
+	uint32_t add = FLASH_USER_START_PASSWORD;
 	for(uint8_t i=0,j=0;i<2;i++,j=j+4)
 	{
 		uint32_t temp  = FLASH_read(add+i*4);
@@ -956,7 +1017,7 @@ void config_Get(void)
 	{
 		sys.pwd_flag = 2;
 	}
-	
+  add = FLASH_USER_START_ADDR_CONFIG;	
 	sys.mod = FLASH_read(add+8) >>24;
 	if(sys.mod == 0 || sys.mod > model6)
 		sys.mod = model1;
@@ -987,10 +1048,10 @@ void config_Get(void)
 	
 	sensor.exit_count = FLASH_read(add+24);
 	
-	sys.tr_time = (FLASH_read(add+44))>>16&0xFFFF;
+	qband_flag = (FLASH_read(add+44))>>24&0xFF;
+	sys.tr_time = (FLASH_read(add+44))>>16&0xFF;
 	if(sys.tr_time == 0)
-		sys.tr_time = 900;
-	sys.tr_count = sys.tr_time/10;
+		sys.tr_time = 15;
 
 	noud_flags=FLASH_read(add+44)>>8&0xFF;
 	
@@ -1015,6 +1076,12 @@ void config_Get(void)
   mqtt_qos  = FLASH_read(add+112)>>16 &0xFF;	
 	if((mqtt_qos==0)&&(mqtt_qos_flags==0))
 		mqtt_qos = 2;  
+	
+	 sys.log_seq = FLASH_read(add+116) &0xFF;	
+
+	sys.clock_switch = FLASH_read(add+116)>>24 &0xFF;
+	
+	sys.strat_time = FLASH_read(add+116)>>8 &0xFFFF;
 	
   sys.platform	= FLASH_read(add+48)>>24 &0xFF;	
 	
@@ -1043,7 +1110,11 @@ void config_Get(void)
 	}
 	if(strlen((char*)user.apn) == 0)
 	{
+		#ifdef NB_1D
+		sprintf((char*)user.apn, "%s", "iot.1nce.net");
+		#else
 		sprintf((char*)user.apn, "%s", "NULL");
+		#endif
 	}
 	
 		add = FLASH_USER_START_ADDR_CONFIG + 0x04*13;
@@ -1071,7 +1142,11 @@ void config_Get(void)
 	}
 	if(strlen((char*)user.add) == 0)
 	{
+		#ifdef NB_1D
+		sprintf((char*)user.add, "%s", "67.207.76.90,4445");
+		#else
 		sprintf((char*)user.add, "%s", "NULL");
+		#endif
 	}
 	if(sys.protocol == MQTT_PRO)
 	{

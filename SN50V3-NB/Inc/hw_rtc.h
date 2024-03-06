@@ -169,6 +169,11 @@ uint32_t HW_RTC_ms2Tick( TimerTime_t timeMicroSec );
  * @retval returns time in timer milliseconds
  */
 TimerTime_t HW_RTC_Tick2ms( uint32_t tick );
+
+uint32_t HW_RTC_GetCalendarTime(uint16_t *mSeconds);
+
+void HW_RTC_BKUPRead(uint32_t *Data0, uint32_t *Data1);
+
 extern RTC_HandleTypeDef RtcHandle;
 #ifdef __cplusplus
 }
