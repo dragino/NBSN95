@@ -1,0 +1,7 @@
+V1.2.1
+1. Change the JSON format to standard JSON format
+2. Add the AT+GetLOG command so that users can now retrieve previous uplink logs through BLE.
+3. Resolve the issue of "NBIOT not responding", only applicable to v1.3 boards
+4. Set "MQTT client ID" as an optional setting instead of a mandatory setting.
+5. Change the AT+TR and AT+NOUD commands to AT+CLOCKLOG commands
+6. Set the default frequency band to 8,20,28,2,4,12,13,66,85,5
