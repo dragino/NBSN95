@@ -1,0 +1,62 @@
+NBSN95
+
+V1.3.7
+
+1. Increase the reliability of TCP protocol transmission
+
+2. Strengthen the success rate of DNS domain name resolution
+
+
+
+
+V1.3.5
+
+1. Modify to store data packets every time network access is not possible
+
+2. Add RTC timestamps so that subsequent data packets cannot obtain timestamps from the network
+
+
+
+V1.3.4
+
+1. Modify the MOD5 weighing range to 100KG
+
+2. Modify the AT command for weighing
+
+
+
+V1.3.3
+
+1. Add AT+CSQTIME command to control network access time
+
+2. Add network access failure shutdown module RF reception and transmission function
+
+
+
+V1.3.1 test
+
+1. Add AT+DIS-CTL and turn off MCU control
+
+
+
+V1.3.0
+
+1. Modify the bug of missing timestamp in stored data
+
+2. Add the first packet timestamp acquisition function after module restart
+
+V1.2.7
+
+1. Compatible with LDDS45 distance sensor
+
+
+
+V1.2.6
+
+1. Compatible with BC95-G, BC35-G, and BG95-GV modules
+
+
+
+V1.2.3
+
+1. Fix the problem that the COAP protocol has not received ACK and has been waiting
