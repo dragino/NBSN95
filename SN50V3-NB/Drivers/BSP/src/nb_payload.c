@@ -97,6 +97,11 @@ void pro_data(void)
 	   if(num2>=24)
 			num2=24;
 	  }
+		if(sys.protocol == COAP_PRO)	
+		{		 
+	  if(num2>=15)
+			num2=15;
+		}
 		for(uint8_t i=0;i<num2;i++)
 		{	
 			num--;
@@ -179,6 +184,8 @@ void pro_data(void)
 		}	
 			strcat(buff,(char*)"}");	
       str_end=strlen(buff);
+		if(sys.protocol == COAP_PRO)
+			break;
 	}
 }
 
@@ -189,6 +196,7 @@ void mode_data(char *buff)
   sprintf(buff+strlen(buff), "\"DS18B20_Temp\":%.1f,",ds1820_value);	
         sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
 	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);		
+		    sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);	
 	sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);	
 	sprintf(buff+strlen(buff), "\"temperature\":%.1f,\"humidity\":%.1f",tem_value,hum_value);	
 	}
@@ -196,7 +204,8 @@ void mode_data(char *buff)
 	{
   sprintf(buff+strlen(buff), "\"DS18B20_Temp\":%.1f,",ds1820_value);	
         sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);		
+	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);	
+sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);			
 	sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
 	sprintf(buff+strlen(buff), "\"distance\":%d",sensor.distance);			
 	}
@@ -205,6 +214,7 @@ void mode_data(char *buff)
 	 sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
         sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
 	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);
+		sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);	
 	 sprintf(buff+strlen(buff), "\"adc2\":%d,",sensor.adc2);	
 	sprintf(buff+strlen(buff), "\"temperature\":%.1f,\"humidity\":%.1f,",tem_value,hum_value);				
 	 sprintf(buff+strlen(buff), "\"adc3\":%d",sensor.adc3);					
@@ -215,6 +225,7 @@ void mode_data(char *buff)
 	 sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
         sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
 	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);
+		sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);	
    sprintf(buff+strlen(buff), "\"DS18B20_Temp2\":%.1f,",ds1820_value2);	
    sprintf(buff+strlen(buff), "\"DS18B20_Temp3\":%.1f",ds1820_value3);				
 	}	
@@ -224,6 +235,7 @@ void mode_data(char *buff)
 	 sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
         sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
 	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);
+		sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);	
 	  WEIGHT_SCK_Init();
 	  WEIGHT_DOUT_Init();
 		int32_t Weight = Get_Weight();	

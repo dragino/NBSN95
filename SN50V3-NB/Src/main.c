@@ -88,7 +88,7 @@ static uint8_t pwd_time_count = 0;			//Password time count times
 static uint16_t dns_time_count = 0;			//DNS time count times
 
 static uint8_t task_num = _AT_IDLE;			//NB task directory
-
+extern bool no_singal_flag ;
 uint8_t error_num = 0;				    //Error count
 uint8_t press_button_times=0;//Press the button times in a row fast
 uint8_t is_time_to_send=0;
@@ -107,6 +107,11 @@ uint8_t nds_network_time = 0;
 uint8_t nds_timer_flag = 0;
 uint8_t nds_timer_flag2= 0;
 uint8_t user_key_exti_flag=0;
+extern int32_t cal_time_difference;
+extern bool clock_cal_time_flag;
+
+bool first_clock_flag=0;
+uint8_t first_clock_time=0;
 uint8_t MCU_ID[8];
 char MCU_pwd[20];
 char MCU_pwd_tem[20];
@@ -114,6 +119,7 @@ __IO bool ble_sleep_flags=0;
 __IO bool ble_sleep_command=0;
 bool sleep_status=0;//AT+SLEEP
 bool tdc_clock_log_flag=0;
+bool Calibrat_flag=0;
 /* USER CODE END PV */
 TimerEvent_t TxTimer;
 TimerEvent_t CheckBLETimesTimer;
@@ -121,6 +127,7 @@ TimerEvent_t PressButtonTimesLedTimer;
 TimerEvent_t PressButtonTimeoutTimer;
 TimerEvent_t nb_intTimeoutTimer;
 TimerEvent_t timesampleTimer;
+TimerEvent_t CalibrationtimeTimer;
 void LoraStartTx(void);
 void OnTxTimerEvent( void );
 void OnCheckBLETimesEvent(void);
@@ -134,6 +141,7 @@ void SystemClock_Config(void);
 void user_key_event(void);
 void OntimesampleEvent(void);
 void compare_time(uint16_t time);
+void onCalibrationtimeEvent(void);
 /* USER CODE BEGIN PFP */
 static void USERTASK(void);
 void HW_GetUniqueId( uint8_t *id );
@@ -199,6 +207,8 @@ int main(void)
 	HAL_UART_Receive_IT(&hlpuart1,rxbuf_lp,RXSIZE);
 	My_UARTEx_StopModeWakeUp(&huart2);				//Enable serial port wake up
 	My_UARTEx_StopModeWakeUp(&hlpuart1);			//Enable serial port wake up
+  TimerInit( &CalibrationtimeTimer, onCalibrationtimeEvent );
+	onCalibrationtimeEvent();	
   /* USER CODE END 2 */
 	
   /* Infinite loop */
@@ -238,6 +248,9 @@ int main(void)
 			user_main_printf("Restart the module...");
 			task_num = _AT_QRST;
 			error_num = 0;
+			MX_LPUART1_UART_Init();
+			HAL_UART_Receive_IT(&hlpuart1,rxbuf_lp,RXSIZE);	
+			My_UARTEx_StopModeWakeUp(&hlpuart1);	
 		}
 		if(dns_reset_num > 2 )
 		{
@@ -298,6 +311,7 @@ int main(void)
 			  TimerStop(&CheckBLETimesTimer);
 				TimerStop(&TxTimer);
 			  TimerStop(&timesampleTimer);
+			  TimerStop( &CalibrationtimeTimer);
 			  task_num = _AT_CFUNOFF;	
 			  NBTASK(&task_num);	
 				
@@ -447,7 +461,9 @@ static void USERTASK(void)
 	if(tdc_clock_log_flag==1 && sys.clock_switch==1 && nb.uplink_flag !=send && sleep_status==0)
 	{
     get_sensorvalue();
-		nb_cclk_run(NULL);
+		SysTime_t sysTimeCurrent = { 0 };
+		sysTimeCurrent=SysTimeGet();
+    sensor.time_stamp=sysTimeCurrent.Seconds;
 		memset((char*)nb.usart.data,0,sizeof(nb.usart.data));	
 		shtDataWrite();
 		tdc_clock_log_flag=0;
@@ -459,8 +475,9 @@ static void USERTASK(void)
 		nb.dns_flag = no_status;
 		while(dns_num--)
 		{
+		NBTask[_AT_QDNS].run(NULL);			
 	  HAL_IWDG_Refresh(&hiwdg);				
-		HAL_Delay(2000);		
+		HAL_Delay(3000);		
 		if(NBTask[_AT_QDNS].get(NULL) == NB_CMD_SUCC)
 		{
 			if( nds_timer_flag2==0)
@@ -563,7 +580,8 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 		{
 			uplink_time_num = 0;
 			error_num++;
-			if(sys.protocol == UDP_PRO)	{task_num	=	_AT_UDP_CLOSE;}
+			if(sys.protocol == COAP_PRO)	{task_num	=	_AT_COAP_CLOSE;}
+			else if(sys.protocol == UDP_PRO)	{task_num	=	_AT_UDP_CLOSE;}
 			else if(sys.protocol == MQTT_PRO)	{task_num	=	_AT_MQTT_CLOSE;}
 			else if(sys.protocol == TCP_PRO)	{task_num	=	_AT_TCP_CLOSE;}
 		}
@@ -578,6 +596,7 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 		{
 		 join_network_time=0;
 		join_network_timer=0;
+		no_singal_flag=1;
 		nb.net_flag = no_status;
     task_num	=	_AT_CFUNOFF;
 		}
@@ -630,9 +649,71 @@ void nb_intTimeoutEvent(void)
 
 void OntimesampleEvent(void)
 {
-	TimerSetValue( &timesampleTimer, sys.tr_time * 60000); 
-	TimerStart( &timesampleTimer);	
+	if(sys.tr_time!=0)
+	{
+		int8_t time_cmp=0;
+		if(first_clock_flag==0)
+		{
+			uint32_t rtc_time=0;
+			SysTime_t sysTimeCurrent = { 0 };
+			sysTimeCurrent=SysTimeGet();
+			rtc_time=sysTimeCurrent.Seconds;				
+			struct tm localtime;
+			SysTimeLocalTime( rtc_time, &localtime );
+			first_clock_time=localtime.tm_sec;				
+			first_clock_flag=1;
+		}
+		
+		if((clock_cal_time_flag==1)&&(cal_time_difference>-60)&&(cal_time_difference<60))
+		{
+			uint8_t pre_sec=0,first_temp=0;
+			uint32_t rtc_time=0;
+			SysTime_t sysTimeCurrent = { 0 };
+			sysTimeCurrent=SysTimeGet();
+			rtc_time=sysTimeCurrent.Seconds + cal_time_difference;				
+			struct tm localtime;
+			SysTimeLocalTime( rtc_time, &localtime );
+			pre_sec=localtime.tm_sec;
+			if(first_clock_time==0)
+			{
+				first_temp=60;
+			}
+			else
+			{
+				first_temp=first_clock_time;
+			}
+			
+			if(pre_sec==0)
+			{
+				pre_sec=60;
+			}			
+			time_cmp=first_temp-pre_sec;
+			
+			if((time_cmp<=-60)||(time_cmp>=60))
+			{
+				time_cmp=0;
+			}	
+		}
+		
+		if((clock_cal_time_flag==1)&&(cal_time_difference>-60)&&(cal_time_difference<60))
+		{
+			TimerSetValue( &timesampleTimer, sys.tr_time * 60000 + (cal_time_difference+time_cmp)*1000);
+			clock_cal_time_flag=0;
+		}
+		else
+		{
+			TimerSetValue( &timesampleTimer, sys.tr_time * 60000);			
+		}
+		TimerStart( &timesampleTimer);	
+	}
   tdc_clock_log_flag=1;
+}
+
+void onCalibrationtimeEvent(void)
+{
+	TimerSetValue( &CalibrationtimeTimer, 86400000); //1DAY
+  TimerStart( &CalibrationtimeTimer);
+  Calibrat_flag=1;	
 }
 
 void GPIO_BLE_STATUS_Ioinit(void)
@@ -784,6 +865,7 @@ void user_key_event(void)
 			  TimerStop(&CheckBLETimesTimer);
 				TimerStop(&TxTimer);
 				TimerStop(&timesampleTimer);
+				TimerStop( &CalibrationtimeTimer);
 			  task_num = _AT_CFUNOFF;	
 			  NBTASK(&task_num);	
 				
@@ -824,14 +906,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	{		
 		if(sys.mod == model6)
 			sensor.exit_count++;
-		else if(nb.net_flag == success && sys.mod != model6 && (task_num < _AT_UDP_OPEN || task_num > _AT_TCP_CLOSE))
+		else if(nb.net_flag == success && sys.mod != model6 && (task_num < _AT_COAP_CONFIG || task_num > _AT_TCP_CLOSE))
 		{
 			if(nb.uplink_flag == no_status)
 			{
 			task_num = _AT_QSCLKOFF;
 		  nb.uplink_flag = send;
 			sys.exit_flag = 1;
-			//sensor.exit_state = HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_14)==1?1:2;
+			sensor.exit_level = HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_15);
 			sensor.exit_state = 1;
 			LPM_DisableStopMode();	
 			}

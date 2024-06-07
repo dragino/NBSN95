@@ -67,7 +67,7 @@ Maintainer: Miguel Luis and Gregory Cristian
 /* Private typedef -----------------------------------------------------------*/
 typedef struct
 {
-  TimerTime_t Rtc_Time; /* Reference time */
+  uint32_t Rtc_Time; /* Reference time */
   
   RTC_TimeTypeDef RTC_Calndr_Time; /* Reference time in calendar format */
 
@@ -175,7 +175,7 @@ static void HW_RTC_SetAlarmConfig( void );
 
 static void HW_RTC_StartWakeUpAlarm( uint32_t timeoutValue );
 
-static TimerTime_t HW_RTC_GetCalendarValue(  RTC_DateTypeDef* RTC_DateStruct, RTC_TimeTypeDef* RTC_TimeStruct  );
+static uint64_t HW_RTC_GetCalendarValue(  RTC_DateTypeDef* RTC_DateStruct, RTC_TimeTypeDef* RTC_TimeStruct  );
 
 /* Exported functions ---------------------------------------------------------*/
 
@@ -236,7 +236,10 @@ static void HW_RTC_SetConfig( void )
   RTC_TimeStruct.DayLightSaving = RTC_STOREOPERATION_RESET;
   
   HAL_RTC_SetTime(&RtcHandle , &RTC_TimeStruct, RTC_FORMAT_BIN);
-  
+
+	HAL_RTCEx_BKUPWrite(&RtcHandle, RTC_BKP_DR0, 1704067200);//20240101 00:00:00
+	HAL_RTCEx_BKUPWrite(&RtcHandle, RTC_BKP_DR1, 0);
+		
  /*Enable Direct Read of the calendar registers (not through Shadow) */
   HAL_RTCEx_EnableBypassShadow(&RtcHandle);
 	
@@ -607,51 +610,49 @@ static void HW_RTC_StartWakeUpAlarm( uint32_t timeoutValue )
  * @param pointer to RTC_TimeStruct
  * @retval time in ticks
  */
-static TimerTime_t HW_RTC_GetCalendarValue( RTC_DateTypeDef* RTC_DateStruct, RTC_TimeTypeDef* RTC_TimeStruct )
+static uint64_t HW_RTC_GetCalendarValue(RTC_DateTypeDef *RTC_DateStruct, RTC_TimeTypeDef *RTC_TimeStruct)
 {
-  TimerTime_t calendarValue = 0;
+  uint64_t calendarValue = 0;
   uint32_t first_read;
   uint32_t correction;
-  
+  uint32_t seconds;
+
   /* Get Time and Date*/
-  HAL_RTC_GetTime( &RtcHandle, RTC_TimeStruct, RTC_FORMAT_BIN );
- 
-   /* make sure it is correct due to asynchronus nature of RTC*/
-  do {
+  HAL_RTC_GetTime(&RtcHandle, RTC_TimeStruct, RTC_FORMAT_BIN);
+
+  /* make sure it is correct due to asynchronus nature of RTC*/
+  do
+  {
     first_read = RTC_TimeStruct->SubSeconds;
-    HAL_RTC_GetDate( &RtcHandle, RTC_DateStruct, RTC_FORMAT_BIN );
-    HAL_RTC_GetTime( &RtcHandle, RTC_TimeStruct, RTC_FORMAT_BIN );
-  } while (first_read != RTC_TimeStruct->SubSeconds);
- 
+    HAL_RTC_GetDate(&RtcHandle, RTC_DateStruct, RTC_FORMAT_BIN);
+    HAL_RTC_GetTime(&RtcHandle, RTC_TimeStruct, RTC_FORMAT_BIN);
+
+  }
+  while (first_read != RTC_TimeStruct->SubSeconds);
+
   /* calculte amount of elapsed days since 01/01/2000 */
-  calendarValue= DIVC( (DAYS_IN_YEAR*3 + DAYS_IN_LEAP_YEAR)* RTC_DateStruct->Year , 4);
+  seconds = DIVC((DAYS_IN_YEAR * 3 + DAYS_IN_LEAP_YEAR) * RTC_DateStruct->Year, 4);
 
-  correction = ( (RTC_DateStruct->Year % 4) == 0 ) ? DAYS_IN_MONTH_CORRECTION_LEAP : DAYS_IN_MONTH_CORRECTION_NORM ;
- 
-  calendarValue +=( DIVC( (RTC_DateStruct->Month-1)*(30+31) ,2 ) - (((correction>> ((RTC_DateStruct->Month-1)*2) )&0x3)));
+  correction = ((RTC_DateStruct->Year % 4) == 0) ? DAYS_IN_MONTH_CORRECTION_LEAP : DAYS_IN_MONTH_CORRECTION_NORM ;
 
-  calendarValue += (RTC_DateStruct->Date -1);
-  
+  seconds += (DIVC((RTC_DateStruct->Month - 1) * (30 + 31), 2) - (((correction >> ((RTC_DateStruct->Month - 1) * 2)) & 0x3)));
+
+  seconds += (RTC_DateStruct->Date - 1);
+
   /* convert from days to seconds */
-  calendarValue *= SECONDS_IN_1DAY; 
+  seconds *= SECONDS_IN_1DAY;
 
-  calendarValue += ( ( uint32_t )RTC_TimeStruct->Seconds + 
-                     ( ( uint32_t )RTC_TimeStruct->Minutes * SECONDS_IN_1MINUTE ) +
-                     ( ( uint32_t )RTC_TimeStruct->Hours * SECONDS_IN_1HOUR ) ) ;
+  seconds += ((uint32_t)RTC_TimeStruct->Seconds +
+              ((uint32_t)RTC_TimeStruct->Minutes * SECONDS_IN_1MINUTE) +
+              ((uint32_t)RTC_TimeStruct->Hours * SECONDS_IN_1HOUR)) ;
 
 
-  
-  calendarValue = (calendarValue<<N_PREDIV_S) + ( PREDIV_S - RTC_TimeStruct->SubSeconds);
 
-  return( calendarValue );
+  calendarValue = (((uint64_t) seconds) << N_PREDIV_S) + (PREDIV_S - RTC_TimeStruct->SubSeconds);
+
+  return (calendarValue);
 }
 
-/*!
- * \brief Get system time
- * \param [IN]   pointer to ms
- *
- * \return uint32_t seconds
- */
 uint32_t HW_RTC_GetCalendarTime(uint16_t *mSeconds)
 {
   RTC_TimeTypeDef RTC_TimeStruct ;
@@ -669,10 +670,73 @@ uint32_t HW_RTC_GetCalendarTime(uint16_t *mSeconds)
   return seconds;
 }
 
+void HW_RTC_BKUPWrite(uint32_t Data0, uint32_t Data1)
+{
+  HAL_RTCEx_BKUPWrite(&RtcHandle, RTC_BKP_DR0, Data0);
+  HAL_RTCEx_BKUPWrite(&RtcHandle, RTC_BKP_DR1, Data1);
+}
+
 void HW_RTC_BKUPRead(uint32_t *Data0, uint32_t *Data1)
 {
   *Data0 = HAL_RTCEx_BKUPRead(&RtcHandle, RTC_BKP_DR0);
   *Data1 = HAL_RTCEx_BKUPRead(&RtcHandle, RTC_BKP_DR1);
+}
+
+SysTime_t SysTimeAdd( SysTime_t a, SysTime_t b )
+{
+    SysTime_t c =  { .Seconds = 0, .SubSeconds = 0 };
+
+    c.Seconds = a.Seconds + b.Seconds;
+    c.SubSeconds = a.SubSeconds + b.SubSeconds;
+    if( c.SubSeconds >= 1000 )
+    {
+        c.Seconds++;
+        c.SubSeconds -= 1000;
+    }
+    return c;
+}
+
+SysTime_t SysTimeSub( SysTime_t a, SysTime_t b )
+{
+    SysTime_t c = { .Seconds = 0, .SubSeconds = 0 };
+
+    c.Seconds = a.Seconds - b.Seconds;
+    c.SubSeconds = a.SubSeconds - b.SubSeconds;
+    if( c.SubSeconds < 0 )
+    {
+        c.Seconds--;
+        c.SubSeconds += 1000;
+    }
+    return c;
+}
+
+void SysTimeSet( SysTime_t sysTime )
+{
+    SysTime_t DeltaTime;
+  
+    SysTime_t calendarTime = { .Seconds = 0, .SubSeconds = 0 };
+
+    calendarTime.Seconds = HW_RTC_GetCalendarTime( ( uint16_t* )&calendarTime.SubSeconds );
+
+    // sysTime is epoch
+    DeltaTime = SysTimeSub( sysTime, calendarTime );
+
+    HW_RTC_BKUPWrite( DeltaTime.Seconds, ( uint32_t )DeltaTime.SubSeconds );
+}
+
+SysTime_t SysTimeGet( void )
+{
+    SysTime_t calendarTime = { .Seconds = 0, .SubSeconds = 0 };
+    SysTime_t sysTime = { .Seconds = 0, .SubSeconds = 0 };
+    SysTime_t DeltaTime;
+
+    calendarTime.Seconds = HW_RTC_GetCalendarTime( ( uint16_t* )&calendarTime.SubSeconds );
+
+    HW_RTC_BKUPRead( &DeltaTime.Seconds, ( uint32_t* )&DeltaTime.SubSeconds );
+
+    sysTime = SysTimeAdd( DeltaTime, calendarTime );
+
+    return sysTime;
 }
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
 

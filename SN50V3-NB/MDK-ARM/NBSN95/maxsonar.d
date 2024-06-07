@@ -52,6 +52,7 @@ nbsn95\maxsonar.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\ctype.h
 nbsn95\maxsonar.o: ..\Drivers\BSP\inc\common.h
 nbsn95\maxsonar.o: ..\Drivers\BSP\inc\flash_eraseprogram.h
 nbsn95\maxsonar.o: ..\Drivers\BSP\inc\time_server.h
+nbsn95\maxsonar.o: ../Inc/rtc.h
 nbsn95\maxsonar.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\time.h
 nbsn95\maxsonar.o: ../Inc/utilities.h
 nbsn95\maxsonar.o: ../Inc/hw_conf.h

@@ -37,6 +37,7 @@
 "nbsn95\nb_mqtt.o"
 "nbsn95\nb_udp.o"
 "nbsn95\nb_tcp.o"
+"nbsn95\nb_coap.o"
 "nbsn95\stm32l0xx_hal_adc.o"
 "nbsn95\stm32l0xx_hal_adc_ex.o"
 "nbsn95\stm32l0xx_hal.o"

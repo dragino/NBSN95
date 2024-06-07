@@ -572,32 +572,3 @@ void SysTimeLocalTime( const uint32_t timestamp, struct tm *localtime )
 		
 		localtime->tm_isdst = -1;
 }
-
-SysTime_t SysTimeAdd( SysTime_t a, SysTime_t b )
-{
-    SysTime_t c =  { .Seconds = 0, .SubSeconds = 0 };
-
-    c.Seconds = a.Seconds + b.Seconds;
-    c.SubSeconds = a.SubSeconds + b.SubSeconds;
-    if( c.SubSeconds >= 1000 )
-    {
-        c.Seconds++;
-        c.SubSeconds -= 1000;
-    }
-    return c;
-}
-
-SysTime_t SysTimeGet( void )
-{
-    SysTime_t calendarTime = { .Seconds = 0, .SubSeconds = 0 };
-    SysTime_t sysTime = { .Seconds = 0, .SubSeconds = 0 };
-    SysTime_t DeltaTime;
-
-    calendarTime.Seconds = HW_RTC_GetCalendarTime( ( uint16_t* )&calendarTime.SubSeconds );
-
-    HW_RTC_BKUPRead( &DeltaTime.Seconds, ( uint32_t* )&DeltaTime.SubSeconds );
-
-    sysTime = SysTimeAdd( DeltaTime, calendarTime );
-
-    return sysTime;
-}

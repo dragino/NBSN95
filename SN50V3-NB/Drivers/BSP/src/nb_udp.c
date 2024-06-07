@@ -2,13 +2,17 @@
 #include "time.h"
 #include <time.h>
 extern char buff[2000];
-static char downlink_data[50]={0};
+extern char downlink_data[1000];
 extern uint8_t read_flag;
 extern float hum_value;
 extern float tem_value;
 extern float ds1820_value;
 extern float ds1820_value2;
 extern float ds1820_value3;
+extern char 	*ATSendStr;
+extern int 	len_string;
+extern uint8_t  try_num;
+extern NB_TaskStatus  nb_cmd_status;
 extern void pro_data(void);
 /**
 	* @brief  Open UDP port operation
@@ -17,15 +21,15 @@ extern void pro_data(void);
   */
 NB_TaskStatus nb_UDP_open_run(const char* param)
 {
-	NBTask[_AT_UDP_OPEN].try_num = 4;
+	try_num = 4;
 	NBTask[_AT_UDP_OPEN].set(param);
 	
 	if(nb_at_send(&NBTask[_AT_UDP_OPEN]) == NB_CMD_SUCC)
-		NBTask[_AT_UDP_OPEN].nb_cmd_status = NB_CMD_SUCC;
+		nb_cmd_status = NB_CMD_SUCC;
 	else
-		NBTask[_AT_UDP_OPEN].nb_cmd_status = NB_CMD_FAIL;
+		nb_cmd_status = NB_CMD_FAIL;
 	
-	return NBTask[_AT_UDP_OPEN].nb_cmd_status;
+	return nb_cmd_status;
 }
 
 NB_TaskStatus nb_UDP_open_set(const char* param)
@@ -48,11 +52,12 @@ NB_TaskStatus nb_UDP_open_set(const char* param)
 	strcat(buff,(char*)&user.add[(pos-(char*)user.add)]);
 	strcat(buff,",1\r\n");
 	
-	NBTask[_AT_UDP_OPEN].ATSendStr = buff;
-	NBTask[_AT_UDP_OPEN].len_string = strlen(NBTask[_AT_UDP_OPEN].ATSendStr);
+	ATSendStr  = NULL;
+	ATSendStr = buff;
+	len_string = strlen(ATSendStr);
 	
-	user_main_debug("openPayload:%s",NBTask[_AT_UDP_OPEN].ATSendStr);	
-	return NBTask[_AT_UDP_OPEN].nb_cmd_status;	
+	user_main_debug("openPayload:%s",ATSendStr);	
+	return nb_cmd_status;	
 }
 
 /**
@@ -62,17 +67,17 @@ NB_TaskStatus nb_UDP_open_set(const char* param)
   */
 NB_TaskStatus nb_UDP_send_run(const char* param)
 {
-	NBTask[_AT_UDP_SEND].try_num = 4;
+	try_num = 4;
 	NBTask[_AT_UDP_SEND].set(param);
 
 	if(nb_at_send(&NBTask[_AT_UDP_SEND]) == NB_CMD_SUCC)
 	{
-		NBTask[_AT_UDP_SEND].nb_cmd_status = NB_CMD_SUCC;
+		nb_cmd_status = NB_CMD_SUCC;
 	}
 	else
-		NBTask[_AT_UDP_SEND].nb_cmd_status = NB_CMD_FAIL;
+		nb_cmd_status = NB_CMD_FAIL;
 	
-	return NBTask[_AT_UDP_SEND].nb_cmd_status;
+	return nb_cmd_status;
 }
 
 NB_TaskStatus nb_UDP_send_set(const char* param)
@@ -102,6 +107,7 @@ NB_TaskStatus nb_UDP_send_set(const char* param)
 	{
    pro_data();
 	}
+	
 	if(sys.platform==0)	
 	{		
 	sprintf(buff+strlen(buff), "%d,\"", sensor.data_len);		
@@ -109,11 +115,12 @@ NB_TaskStatus nb_UDP_send_set(const char* param)
 	}		
 	strcat(buff,"\"\r\n");	
 	
-	NBTask[_AT_UDP_SEND].ATSendStr = buff;
-	NBTask[_AT_UDP_SEND].len_string = strlen(NBTask[_AT_UDP_SEND].ATSendStr);
+	ATSendStr  = NULL;
+	ATSendStr = buff;
+	len_string = strlen(ATSendStr);
 	
-	user_main_debug("NBTask[_AT_UDP_SEND].ATSendStr:%s",NBTask[_AT_UDP_SEND].ATSendStr);
-	return NBTask[_AT_UDP_SEND].nb_cmd_status;
+	user_main_debug("NBTask[_AT_UDP_SEND].ATSendStr:%s",ATSendStr);
+	return nb_cmd_status;
 }
 
 ///**
@@ -127,14 +134,14 @@ NB_TaskStatus nb_UDP_read_run(const char* param)
 		{			
 			rxPayLoadDeal(downlink_data);
 		}
-	return NBTask[_AT_UDP_READ].nb_cmd_status;
+	return nb_cmd_status;
 }
 
 NB_TaskStatus nb_UDP_read_get(const char* param)
 {
 	char *pch = strrchr((char*)nb.usart.data,','); 
 	if(pch == NULL)
-		NBTask[_AT_UDP_READ].nb_cmd_status = NB_READ_NODATA;
+		nb_cmd_status = NB_READ_NODATA;
 	else
 	{
 		memset(downlink_data,0,sizeof(downlink_data));
@@ -144,9 +151,9 @@ NB_TaskStatus nb_UDP_read_get(const char* param)
 		memcpy(downlink_data,&nb.usart.data[end-((char*)nb.usart.data)+2],(start-end-2));	
 		user_main_printf("Received downlink data:%s",downlink_data);
 		
-		NBTask[_AT_UDP_READ].nb_cmd_status = NB_READ_DATA;
+		nb_cmd_status = NB_READ_DATA;
 	}
-	return NBTask[_AT_UDP_READ].nb_cmd_status;
+	return nb_cmd_status;
 }
 /**
 	* @brief  Close UDP port
@@ -155,28 +162,32 @@ NB_TaskStatus nb_UDP_read_get(const char* param)
   */
 NB_TaskStatus nb_UDP_close_run(const char* param)
 {
-	NBTask[_AT_UDP_CLOSE].try_num = 3;
+	ATSendStr  = NULL;
+	ATSendStr = AT QICLOSE"=0" NEWLINE;
+	len_string = sizeof(AT QICLOSE"=0" NEWLINE) - 1;
+	
+	try_num = 3;
 	NBTask[_AT_UDP_CLOSE].set(NULL);
 
-			while(NBTask[_AT_UDP_CLOSE].try_num--)
+			while(try_num--)
 	{
 		if(nb_at_send(&NBTask[_AT_UDP_CLOSE]) == NB_CMD_SUCC )
 		{
-			NBTask[_AT_UDP_CLOSE].nb_cmd_status = NB_CMD_SUCC;
+			nb_cmd_status = NB_CMD_SUCC;
 			break;
 		}
 		else
-			NBTask[_AT_UDP_CLOSE].nb_cmd_status = NB_CMD_FAIL;
+			nb_cmd_status = NB_CMD_FAIL;
 	}
 		
-	return NBTask[_AT_UDP_CLOSE].nb_cmd_status;
+	return nb_cmd_status;
 }
 
 NB_TaskStatus nb_UDP_close_set(const char* param)
 {
-	user_main_debug("NBTask[_AT_UDP_CLOSE].ATSendStr:%s",NBTask[_AT_UDP_CLOSE].ATSendStr);
+	user_main_debug("NBTask[_AT_UDP_CLOSE].ATSendStr:%s",ATSendStr);
 	
-	return NBTask[_AT_UDP_CLOSE].nb_cmd_status;
+	return nb_cmd_status;
 }
 
 /**
@@ -189,30 +200,32 @@ NB_TaskStatus nb_UDP_uri_run(const char* param)
 	user_main_debug("uri:%s",nb.usart.data);
 	
 	//Judgment issued and received 
+if(read_flag==1)
+{		
 	if(strstr((char*)nb.usart.data,"QIURC: \"recv\"") != NULL)
 	{
 		nb_UDP_read_run(NULL);
-		NBTask[_AT_UDP_URI].nb_cmd_status = NB_STA_SUCC;
+		nb_cmd_status = NB_STA_SUCC;
 	}
 	else
 	{
-		NBTask[_AT_UDP_URI].nb_cmd_status = NB_STA_SUCC;	
+		nb_cmd_status = NB_STA_SUCC;	
 	}
-
-if(read_flag==0)
+}
+else
 {	
 	if(strstr((char*)nb.usart.data,"SEND OK") != NULL)
 	{
-		NBTask[_AT_UDP_URI].nb_cmd_status = NB_SEND_SUCC;	
+		nb_cmd_status = NB_SEND_SUCC;	
 	}
 	else if(strstr((char*)nb.usart.data,"SEND FAIL") != NULL)
 	{
-		NBTask[_AT_UDP_URI].nb_cmd_status = NB_SEND_FAIL;	
+		nb_cmd_status = NB_SEND_FAIL;	
 	}
 	else
 	{
-		NBTask[_AT_UDP_URI].nb_cmd_status = NB_OTHER;	
+		nb_cmd_status = NB_OTHER;	
 	}	
 }
-	return NBTask[_AT_UDP_URI].nb_cmd_status;
+	return nb_cmd_status;
 }

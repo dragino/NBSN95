@@ -73,7 +73,43 @@ Maintainer: Miguel Luis and Gregory Cristian
 /* External variables --------------------------------------------------------*/
 /* Exported macros -----------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */ 
+typedef struct SysTime_s
+{
+    uint32_t Seconds;
+    int16_t  SubSeconds;
+}SysTime_t;
 
+uint32_t HW_RTC_GetCalendarTime(uint16_t *mSeconds);
+
+void HW_RTC_BKUPWrite(uint32_t Data0, uint32_t Data1);
+
+void HW_RTC_BKUPRead(uint32_t *Data0, uint32_t *Data1);
+
+SysTime_t SysTimeAdd( SysTime_t a, SysTime_t b );
+
+/*!
+ * \brief Subtracts 2 SysTime_t values
+ *
+ * \param a Value
+ * \param b Value to be subtracted
+ *
+ * \retval result Subtraction result (SysTime_t value)
+ */
+SysTime_t SysTimeSub( SysTime_t a, SysTime_t b );
+
+/*!
+ * \brief Sets new system time
+ *
+ * \param  sysTime    New seconds/sub-seconds since UNIX epoch origin
+ */
+void SysTimeSet( SysTime_t sysTime );
+
+/*!
+ * \brief Gets current system time
+ *
+ * \retval sysTime    Current seconds/sub-seconds since UNIX epoch origin
+ */
+SysTime_t SysTimeGet( void );
 /*!
  * @brief Initializes the RTC timer
  * @note The timer is based on the RTC
@@ -169,11 +205,6 @@ uint32_t HW_RTC_ms2Tick( TimerTime_t timeMicroSec );
  * @retval returns time in timer milliseconds
  */
 TimerTime_t HW_RTC_Tick2ms( uint32_t tick );
-
-uint32_t HW_RTC_GetCalendarTime(uint16_t *mSeconds);
-
-void HW_RTC_BKUPRead(uint32_t *Data0, uint32_t *Data1);
-
 extern RTC_HandleTypeDef RtcHandle;
 #ifdef __cplusplus
 }

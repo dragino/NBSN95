@@ -53,6 +53,7 @@ nbsn95\main.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
 nbsn95\main.o: ..\Drivers\BSP\inc\at.h
 nbsn95\main.o: ..\Drivers\BSP\inc\time_server.h
 nbsn95\main.o: ..\Drivers\BSP\inc\common.h
+nbsn95\main.o: ../Inc/rtc.h
 nbsn95\main.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\time.h
 nbsn95\main.o: ../Inc/utilities.h
 nbsn95\main.o: ../Inc/hw_conf.h

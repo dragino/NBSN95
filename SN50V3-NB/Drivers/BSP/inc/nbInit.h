@@ -15,7 +15,8 @@ typedef enum
 
 #include "common.h"
 
-#define stack 							"D-BC660K-002"
+#define stack 							"D-BC660K-003"
+#define COAP_PRO  0x01
 #define UDP_PRO   0x02
 #define MQTT_PRO  0x03
 #define TCP_PRO   0x04
@@ -70,6 +71,13 @@ typedef enum
 #define QDNS 				"+QIDNSGIP"											/* QDNS. */
 #define QIDNSCFG		"+QIDNSCFG"									/* QDNS config. */
 
+#define QCOAPCFG		 "+QCOAPCFG"
+#define QCOAPOPEN		 "+QCOAPOPEN"
+#define QCOAPHEAD		 "+QCOAPHEAD"
+#define QCOAPOPTION		"+QCOAPOPTION"
+#define QCOAPSEND		"+QCOAPSEND"
+#define QCOAPCLOSE		"+QCOAPCLOSE"
+
 #define QICFG				  "+QICFG"										
 #define QICLOSE				"+QICLOSE"										/* closed socked */
 #define QIOPEN				"+QIOPEN"										/* Create SOCKET */
@@ -109,6 +117,20 @@ typedef enum
 	_AT_QDNSCFG,    //DNSCFG
 	_AT_QDNS,       //DNS
 
+/*COAP*/
+  _AT_COAP_CONFIG,
+	_AT_COAP_OPEN,
+	_AT_COAP_QCOAPHEAD,
+	_AT_COAP_OPTION1,
+	_AT_COAP_OPTION2,
+	_AT_COAP_OPTION3,
+	_AT_COAP_OPTION4,
+  _AT_COAP_SEND_CONFIG,
+	_AT_COAP_SEND,
+	_AT_COAP_SEND_HEX,
+  _AT_COAP_READ,
+	_AT_COAP_CLOSE,
+	_AT_COAP_URI,
 /*UDP*/
 	_AT_UDP_OPEN,		//OPEN UDP PORT
 	_AT_UDP_SEND,   //SEND DATA
@@ -198,6 +220,7 @@ typedef enum   //BC95-G Status flag
 	NB_QBAND_NOSET,
 	NB_OTHER,
 	NB_STA_SUCC,
+  NB_QCOAPOPEN_SUCC,
 }NB_TaskStatus;
 
 
@@ -266,6 +289,43 @@ NB_TaskStatus nb_csq_get(const char* param);
 NB_TaskStatus nb_qrst_run(const char* param);
 NB_TaskStatus nb_qrst2_run(const char* param);
 
+NB_TaskStatus nb_COAP_config_set(const char* param);
+
+NB_TaskStatus nb_COAP_open_run(const char* param);
+NB_TaskStatus nb_COAP_open_set(const char* param);
+
+NB_TaskStatus nb_COAP_head_run(const char* param);
+NB_TaskStatus nb_COAP_head_set(const char* param);
+
+NB_TaskStatus nb_COAP_option1_run(const char* param);
+NB_TaskStatus nb_COAP_option1_set(const char* param);	
+
+NB_TaskStatus nb_COAP_option2_run(const char* param);
+NB_TaskStatus nb_COAP_option2_set(const char* param);	
+
+NB_TaskStatus nb_COAP_option3_run(const char* param);
+NB_TaskStatus nb_COAP_option3_set(const char* param);	
+
+NB_TaskStatus nb_COAP_option4_run(const char* param);
+NB_TaskStatus nb_COAP_option4_set(const char* param);	
+
+NB_TaskStatus nb_COAP_send_config_run(const char* param);
+NB_TaskStatus nb_COAP_send_config_set(const char* param);
+	
+NB_TaskStatus nb_COAP_send_run(const char* param);
+NB_TaskStatus nb_COAP_send_set(const char* param);
+	
+NB_TaskStatus nb_COAP_send_hex_run(const char* param);
+NB_TaskStatus nb_COAP_send_hex_set(const char* param);
+
+NB_TaskStatus nb_COAP_read_run(const char* param);
+NB_TaskStatus nb_COAP_read_get(const char* param);	
+
+NB_TaskStatus nb_COAP_close_run(const char* param);
+NB_TaskStatus nb_COAP_close_set(const char* param);	
+
+NB_TaskStatus nb_COAP_uri_run(const char* param);
+	
 NB_TaskStatus nb_UDP_open_run(const char* param);
 NB_TaskStatus nb_UDP_open_set(const char* param);
 NB_TaskStatus nb_UDP_open_get(const char* param);
@@ -343,658 +403,841 @@ NB_TaskStatus nb_TCP_uri_run(const char* param);
 
 struct NBTASK 
 {
-  char 				*ATSendStr;															/*< send command */
+
 	const char 	*ATRecStrOK;                       			/*< Pre-correctly received data */
 	const char 	*ATRecStrError;                      		/*< Pre-correctly received data */
 	const int 	cmd_num;																/*< CMD number*/
-	int 				len_string;															/*< length of the command string, not including the final \0 */
+													
 	uint16_t 		time_out;																/*< Instruction timeout,unit: ms*/
-	uint8_t 		try_num;																/*< Number of attempts */
+														
   NB_TaskStatus (*run)(const char* param);      			/*< Function entry */
 	NB_TaskStatus (*set)(const char* param);      			/*< Function entry */
 	NB_TaskStatus (*get)(const char* param);      			/*< Function entry */
 	
-	NB_TaskStatus  nb_cmd_status;
+
 };
 
-static struct NBTASK NBTask[] =
+static const struct NBTASK NBTask[] =
 {
 /**************** AT	****************/
 	{		
-    .ATSendStr 	 		= AT NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = NULL,
 		.cmd_num        = _AT,
-		.len_string 		= sizeof(AT  NEWLINE) - 1,
+
 		.time_out 			= 300,
-		.try_num        = 3,
+
     .run 						= nb_at_run,
 		.set						= nb_null_run,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** ATE	****************/
 	{		
-    .ATSendStr 	 		= ATE"0" NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _ATE,
-		.len_string 		= sizeof(ATE"0" NEWLINE) - 1,
+
 		.time_out 			= 300,
     .run 						= nb_ate_run,
 		.set						= nb_null_run,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** QCFGEV	****************/
 	{		
-    .ATSendStr 	 		= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QCFGEV,
-		.len_string 		= 0,
+
 		.time_out 			= 300,
-		.try_num        = 2,		
+		
     .run 						= nb_qcfgev_run,
 		.set						= nb_qcfgev_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** CGSN	****************/
 	{		
-    .ATSendStr      = AT CGSN NEWLINE,
+
 		.ATRecStrOK     = "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_IMSI,
-		.len_string 		= sizeof(AT CGSN NEWLINE) - 1,
+
 		.time_out 			= 300,
     .run 						= nb_null_run,
 		.set						= nb_null_run,
 		.get						= nb_cgsn_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** CIMI	****************/
 	{		
-    .ATSendStr 			= AT CIMI NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_IMEI,
-		.len_string 		= sizeof(AT CIMI NEWLINE) - 1,
+
 		.time_out 			= 300,
     .run 						= nb_null_run,
 		.set						= nb_null_run,
 		.get						= nb_cimi_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /****************QICFG	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QICFG,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
     .run 						= nb_qicfg_run,
 		.set						= nb_qicfg_set,
 		.get						= nb_qicfg_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** CFUNSTA	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_CFUNSTA,
-		.len_string 		= 0,
+
 		.time_out 			= 2000,
     .run 						= nb_cfunsta_run,
 		.set						= nb_cfunsta_set,
 		.get						= nb_cfunsta_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** CFUNOFF	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_CFUNOFF,
-		.len_string 		= 0,
+
 		.time_out 			= 2000,
     .run 						= nb_cfunoff_run,
 		.set						= nb_cfunoff_set,
 		.get						= nb_cfunoff_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** CFUNEND	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_CFUNEND,
-		.len_string 		= 0,
+
 		.time_out 			= 2000,
     .run 						= nb_cfun_run,
 		.set						= nb_cfun_set,
 		.get						= nb_cfun_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** QSCLK	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QSCLK,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
     .run 						= nb_qsclk_run,
 		.set						= nb_qsclk_set,
 		.get						= nb_qsclk_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** QSCLKOFF	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QSCLKOFF,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
     .run 						= nb_qsclkoff_run,
 		.set						= nb_qsclkoff_set,
 		.get						= nb_qsclkoff_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** QBAND	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QBAND,
-		.len_string 		= 0,
+
 		.time_out 			= 300,
     .run 						= nb_qband_run,
 		.set						= nb_qband_set,
 		.get						= nb_qband_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** CGMM	****************/
 	{		
-    .ATSendStr 			=  AT CGMM NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_CGMM,
-		.len_string 		= sizeof(AT CGMM  NEWLINE) - 1,
+
 		.time_out 			= 300,
     .run 						= nb_cgmm_run,
 		.set						= nb_null_run,
 		.get						= nb_cgmm_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** CCLK	****************/
 	{		
-    .ATSendStr 			= AT CCLK "?" NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_CCLK,
-		.len_string 		= sizeof(AT CCLK "?" NEWLINE) - 1,
+
 		.time_out 			= 300,
     .run 						= nb_cclk_run,
 		.set						= nb_null_run,
 		.get						= nb_cclk_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** CCLK2	****************/
 	{		
-    .ATSendStr 			= AT CCLK2 "?" NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_CCLK2,
-		.len_string 		= sizeof(AT CCLK2 "?" NEWLINE) - 1,
+
 		.time_out 			= 300,
     .run 						= nb_cclk2_run,
 		.set						= nb_null_run,
 		.get						= nb_cclk2_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** CGDCONT	****************/
 	{
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_CGDCONT,
-		.len_string 		= 0,
+
 		.time_out 			= 300,
     .run 						= nb_cgdcont_run,
 		.set						= nb_cgdcont_set,
 		.get						= nb_cgdcont_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** CPSMS	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_CPSMS,
-		.len_string 		= 0,
+
 		.time_out 			= 300,
-		.try_num        = 2,
+
     .run 						= nb_cpsms_run,
 		.set						= nb_cpsms_set,
 		.get						= nb_cpsms_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** CSQ	****************/
 	{		
-    .ATSendStr 			= AT CSQ NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_CSQ,
-		.len_string 		= sizeof(AT CSQ NEWLINE) - 1,
+
 		.time_out 			= 300,
-		.try_num        = 4,
+
     .run 						= nb_null_run,
 		.set						= nb_null_run,
 		.get						= nb_csq_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** QDNSCFG	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QDNSCFG,
-		.len_string 		= 0,
+
 		.time_out 			= 300,
-		.try_num        = 4,
+
     .run 						= nb_qdnscfg_run,
 		.set						= nb_qdnscfg_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** QDNS	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QDNS,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
-		.try_num        = 4,
+
     .run 						= nb_qdns_run,
 		.set						= nb_qdns_set,
 		.get						= nb_qdns_get,
-		.nb_cmd_status  = NB_IDIE,
+
+  },
+/**************** COAP_QCOAPCFG	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_CONFIG,
+
+		.time_out 			= 500,
+
+    .run 						= nb_null_run,
+		.set						= nb_COAP_config_set,
+		.get						= nb_null_run,
+
+  },
+/**************** COAP_OPEN	****************/
+	{
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_OPEN,
+
+		.time_out 			= 1500,
+
+    .run 						= nb_COAP_open_run,
+		.set						= nb_COAP_open_set,
+		.get						= nb_null_run,
+
+  },
+/**************** COAP_QCOAPHEADER	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_QCOAPHEAD,
+
+		.time_out 			= 500,
+
+    .run 						= nb_COAP_head_run,
+		.set						= nb_COAP_head_set,
+		.get						= nb_null_run,
+
+  },
+/**************** COAP_QCOAPOPTION1	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_OPTION1,
+
+		.time_out 			= 500,
+
+    .run 						= nb_COAP_option1_run,
+		.set						= nb_COAP_option1_set,
+		.get						= nb_null_run,
+
+  },
+/**************** COAP_QCOAPOPTION2	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_OPTION2,
+
+		.time_out 			= 500,
+
+    .run 						= nb_COAP_option2_run,
+		.set						= nb_COAP_option2_set,
+		.get						= nb_null_run,
+
+  },
+/**************** COAP_QCOAPOPTION3	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_OPTION3,
+
+		.time_out 			= 500,
+
+    .run 						= nb_COAP_option3_run,
+		.set						= nb_COAP_option3_set,
+		.get						= nb_null_run,
+
+  },
+/**************** COAP_QCOAPOPTION4	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_OPTION4,
+
+		.time_out 			= 500,
+
+    .run 						= nb_COAP_option4_run,
+		.set						= nb_COAP_option4_set,
+		.get						= nb_null_run,
+
+  },
+/**************** COAP_SEND_CONFIG	****************/
+	{		
+
+		.ATRecStrOK  		= ">",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_SEND_CONFIG,
+	
+		.time_out 			= 500,
+
+    .run 						= nb_COAP_send_config_run,
+		.set						= nb_COAP_send_config_set,
+		.get						= nb_null_run,
+
+  },
+/**************** COAP_SEND	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_SEND,
+
+		.time_out 			= 1000,
+
+    .run 						= nb_COAP_send_run,
+		.set						= nb_COAP_send_set,
+		.get						= nb_null_run,
+
+  },
+/**************** COAP_SEND_HEX	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_SEND_HEX,
+
+		.time_out 			= 1000,
+
+    .run 						= nb_COAP_send_hex_run,
+		.set						= nb_COAP_send_hex_set,
+		.get						= nb_null_run,
+
+  },	
+/**************** COAP_READ	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_READ,
+
+		.time_out 			= 500,
+
+    .run 						= nb_COAP_read_run,
+		.set						= nb_null_run,
+		.get						= nb_COAP_read_get,
+
+  },
+/**************** COAP_CLOSED	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COAP_CLOSE,
+
+		.time_out 			= 500,
+
+    .run 						= nb_COAP_close_run,
+		.set						= nb_COAP_close_set,
+		.get						= nb_null_run,
+
+  },		
+/**************** COAP_URI	****************/
+
+	{		
+
+		.ATRecStrOK  		= NULL,
+		.ATRecStrError  = NULL,
+		.cmd_num        = _AT_COAP_URI,
+
+		.time_out 			= 0,
+
+    .run 						= nb_COAP_uri_run,
+		.set						= nb_null_run,
+		.get						= nb_null_run,
+
   },
 
 /**************** UDP_OPEN	****************/
 	{
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_UDP_OPEN,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
-		.try_num        = 4,
+
     .run 						= nb_UDP_open_run,
 		.set						= nb_UDP_open_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 	
 /**************** UDP_SEND	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_UDP_SEND,
-		.len_string 		= 0,
+
 		.time_out 			= 1000,
-		.try_num        = 4,
+
     .run 						= nb_UDP_send_run,
 		.set						= nb_UDP_send_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 
 /**************** UDP_READ	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_UDP_READ,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
-		.try_num        = 4,
+
     .run 						= nb_UDP_read_run,
 		.set						= nb_null_run,
 		.get						= nb_UDP_read_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** UDP_CLOSED	****************/
 	{		
-    .ATSendStr 			= AT QICLOSE"=0" NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_UDP_CLOSE,
-		.len_string 		= sizeof(AT QICLOSE"=0" NEWLINE) - 1,
+
 		.time_out 			= 500,
-		.try_num        = 2,
+
     .run 						= nb_UDP_close_run,
 		.set						= nb_UDP_close_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** UDP_URI	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= NULL,
 		.ATRecStrError  = NULL,
 		.cmd_num        = _AT_UDP_URI,
-		.len_string 		= 0,
+
 		.time_out 			= 0,
-		.try_num        = 0,
+
     .run 						= nb_UDP_uri_run,
 		.set						= nb_null_run,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** QSSLCFG	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QSSLCFG,
-		.len_string 		= 0,
+
 		.time_out 			= 300,
-		.try_num        = 4,
+
     .run 						= nb_QSSLCFG_run,
 		.set						= nb_QSSLCFG_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },	
 /**************** QMTCFGSSL	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QMTCFG_SSL,
-		.len_string 		= 0,
+
 		.time_out 			= 300,
-		.try_num        = 4,
+
     .run 						= nb_QMTCFGSSL_run,
 		.set						= nb_QMTCFGSSL_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT configuration	****************/
 	{		
-    .ATSendStr 			= AT QMTCFG "=\"version\",0,1" NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_Config,
-		.len_string 		= sizeof(AT QMTCFG "=\"version\",0,1" NEWLINE) - 1,
+
 		.time_out 			= 200,
-		.try_num        = 4,
+
     .run 						= nb_null_run,
 		.set						= nb_MQTT_config_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_OPEN	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_OPEN,
-		.len_string 		= 0,
+
 		.time_out 			= 1200,
-		.try_num        = 4,
+
     .run 						= nb_MQTT_open_run,
 		.set						= nb_MQTT_open_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_CONN	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_CONN,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
-		.try_num        = 4,
+
     .run 						= nb_MQTT_conn_run,
 		.set						= nb_MQTT_conn_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_SUB	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_SUB,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
     .run 						= nb_MQTT_sub_run,
 		.set						= nb_MQTT_sub_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_PUB	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= ">",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_PUB,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
     .run 						= nb_MQTT_pub_run,
 		.set						= nb_MQTT_pub_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_PUB1	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_PUB1,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
     .run 						= nb_MQTT_pub1_run,
 		.set						= nb_MQTT_pub1_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_PUB2	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_PUB2,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
     .run 						= nb_MQTT_pub2_run,
 		.set						= nb_MQTT_pub2_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_PUB3	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_PUB3,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
     .run 						= nb_MQTT_pub3_run,
 		.set						= nb_MQTT_pub3_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_PUB5	****************/
 	{		
-    .ATSendStr 			= NULL,
+ 
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_PUB5,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
     .run 						= nb_MQTT_pub5_run,
 		.set						= nb_MQTT_pub5_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_SEND	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_SEND,
-		.len_string 		= 0,
+
 		.time_out 			= 1000,
     .run 						= nb_MQTT_send_run,
 		.set						= nb_MQTT_send_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_READ	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_READ,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
     .run 						= nb_MQTT_data_read_run,
 		.set						= nb_MQTT_data_read_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_CLOSE	****************/
 	{		
-    .ATSendStr 			= AT QMTDISC"=0" NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_MQTT_CLOSE,
-		.len_string 		= sizeof(AT QMTDISC"=0" NEWLINE) - 1,
+
 		.time_out 			= 500,
-		.try_num        = 2,
+
     .run 						= nb_MQTT_close_run,
 		.set						= nb_MQTT_close_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** MQTT_URI	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= NULL,
 		.ATRecStrError  = NULL,
 		.cmd_num        = _AT_MQTT_URI,
-		.len_string 		= 0,
+
 		.time_out 			= 0,
-		.try_num        = 0,
+
     .run 						= nb_MQTT_uri_run,
 		.set						= nb_null_run,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** TCP_OPEN	****************/
 	{		
-    .ATSendStr 			= NULL,
+ 
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_TCP_OPEN,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
-		.try_num        = 4,
+
     .run 						= nb_TCP_open_run,
 		.set						= nb_TCP_open_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** TCP_SEND	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_TCP_SEND,
-		.len_string 		= 0,
+
 		.time_out 			= 1000,
-		.try_num        = 4,
+
     .run 						= nb_TCP_send_run,
 		.set						= nb_TCP_send_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** TCP_READ	****************/
 	{		
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_TCP_READ,
-		.len_string 		= 0,
+
 		.time_out 			= 500,
-		.try_num        = 4,
+
     .run 						= nb_TCP_read_run,
 		.set						= nb_null_run,
 		.get						= nb_TCP_read_get,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** TCP_CLOSED	****************/
 	{		
-    .ATSendStr 			= AT QICLOSE"=0" NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_TCP_CLOSE,
-		.len_string 		= sizeof(AT QICLOSE"=0" NEWLINE) - 1,
+
 		.time_out 			= 500,
-		.try_num        = 2,
+
     .run 						= nb_TCP_close_run,
 		.set						= nb_TCP_close_set,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /**************** TCP_URI	****************/
 	{
-    .ATSendStr 			= NULL,
+
 		.ATRecStrOK  		= NULL,
 		.ATRecStrError  = NULL,
 		.cmd_num        = _AT_TCP_URI,
-		.len_string 		= 0,
+
 		.time_out 			= 0,
-		.try_num        = 0,
+
     .run 						= nb_TCP_uri_run,
 		.set						= nb_null_run,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /****************QRST	****************/
 	{
-    .ATSendStr 			= AT QRST "=1" NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QRST,
-		.len_string 		= sizeof(AT QRST "=1" NEWLINE) - 1,
+
 		.time_out 			= 2000,
     .run 						= nb_qrst_run,
 		.set						= nb_null_run,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 /****************QRST2	****************/
 	{
-    .ATSendStr 			= AT QRST2 "=1" NEWLINE,
+
 		.ATRecStrOK  		= "OK",
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QRST2,
-		.len_string 		= sizeof(AT QRST2 "=1" NEWLINE) - 1,
+
 		.time_out 			= 2000,
     .run 						= nb_qrst2_run,
 		.set						= nb_null_run,
 		.get						= nb_null_run,
-		.nb_cmd_status  = NB_IDIE,
+
   },
 };
 
@@ -1002,7 +1245,7 @@ static struct NBTASK NBTask[] =
 }
 #endif
 void stored_datalog(void);
-NB_TaskStatus nb_at_send(struct NBTASK *NB_Task);
+NB_TaskStatus nb_at_send(const struct NBTASK *NB_Task);
 ATCmdNum NBTASK(uint8_t *task);
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

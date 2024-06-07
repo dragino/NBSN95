@@ -53,6 +53,7 @@ nbsn95\nb_payload.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\ctype.h
 nbsn95\nb_payload.o: ..\Drivers\BSP\inc\common.h
 nbsn95\nb_payload.o: ..\Drivers\BSP\inc\flash_eraseprogram.h
 nbsn95\nb_payload.o: ..\Drivers\BSP\inc\time_server.h
+nbsn95\nb_payload.o: ../Inc/rtc.h
 nbsn95\nb_payload.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\time.h
 nbsn95\nb_payload.o: ../Inc/utilities.h
 nbsn95\nb_payload.o: ../Inc/hw_conf.h

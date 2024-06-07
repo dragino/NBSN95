@@ -37,7 +37,6 @@
 #define _5VT    	 "+5VT"
 #define EXT      	 "+EXT"
 #define PRO     	 "+PRO"
-#define CFM     	 "+CFM"
 #define RXDL     	 "+RXDL"
 #define WEIGRE     "+WEIGRE"
 #define WEIGAP     "+WEIGAP"
@@ -55,6 +54,10 @@
 #define MQOS      "+MQOS"
 #define GETLOG      "+GETLOG"
 #define CLOCKLOG    "+CLOCKLOG"
+#define URI1    "+URI1"
+#define URI2    "+URI2"
+#define URI3    "+URI3"
+#define URI4    "+URI4"
 /**********************************************/
 
 typedef enum
@@ -115,8 +118,6 @@ ATEerror_t at_cntfac_set(const char *param);
 ATEerror_t at_cntfac_get(const char *param);
 ATEerror_t at_pro_set(const char *param);
 ATEerror_t at_pro_get(const char *param);
-ATEerror_t at_cfm_set(const char *param);
-ATEerror_t at_cfm_get(const char *param);
 ATEerror_t at_rxdl_set(const char *param);
 ATEerror_t at_rxdl_get(const char *param);
 
@@ -159,6 +160,15 @@ ATEerror_t at_getlog_set(const char *param);
 
 ATEerror_t at_clocklog_set(const char *param);
 ATEerror_t at_clocklog_get(const char *param);
+
+ATEerror_t at_uri1_set(const char *param);
+ATEerror_t at_uri1_get(const char *param);
+ATEerror_t at_uri2_set(const char *param);
+ATEerror_t at_uri2_get(const char *param);
+ATEerror_t at_uri3_set(const char *param);
+ATEerror_t at_uri3_get(const char *param);
+ATEerror_t at_uri4_set(const char *param);
+ATEerror_t at_uri4_get(const char *param);
 /*Other*/
 char *rtrim(char *str);
 uint8_t hexDetection(char* str);
@@ -388,17 +398,6 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_pro_set,
     .run = at_return_error,
   },
-			/** AT+CFM **/	
-	{
-    .string = AT CFM,
-		.size_string = sizeof(CFM) - 1,
-#ifndef NO_HELP
-    .help_string = AT CFM "     : Get or Set confirmation mode (0: Off 1: On)",
-#endif
-    .get = at_cfm_get,
-    .set = at_cfm_set,
-    .run = at_return_error,
-  },
 			/** AT+RXDL **/	
 	{
     .string = AT RXDL,
@@ -562,6 +561,47 @@ static const struct ATCommand_s ATCommand[] =
 #endif
     .get = at_clocklog_get,
     .set = at_clocklog_set,
+    .run = at_return_error,
+	},
+				/** AT+URI **/			
+	{
+	  .string = AT URI1,
+    .size_string = sizeof(AT URI1) - 1,
+#ifndef NO_HELP
+    .help_string = AT URI1 ": Get or set CoAP option 1",
+#endif
+    .get = at_uri1_get,
+    .set = at_uri1_set,
+    .run = at_return_error,
+	},
+	{
+	  .string = AT URI2,
+    .size_string = sizeof(AT URI2) - 1,
+#ifndef NO_HELP
+    .help_string = AT URI2 ": Get or set CoAP option 2",
+#endif
+    .get = at_uri2_get,
+    .set = at_uri2_set,
+    .run = at_return_error,
+	},
+	{
+	  .string = AT URI3,
+    .size_string = sizeof(AT URI3) - 1,
+#ifndef NO_HELP
+    .help_string = AT URI3 ": Get or set CoAP option 3",
+#endif
+    .get = at_uri3_get,
+    .set = at_uri3_set,
+    .run = at_return_error,
+	},
+	{
+	  .string = AT URI4,
+    .size_string = sizeof(AT URI4) - 1,
+#ifndef NO_HELP
+    .help_string = AT URI4 ": Get or set CoAP option 4",
+#endif
+    .get = at_uri4_get,
+    .set = at_uri4_set,
     .run = at_return_error,
 	},
 };

@@ -41,7 +41,7 @@
  * @retval None
  */
 
-#define AT_VERSION_STRING 	"v1.2.1"
+#define AT_VERSION_STRING 	"v1.2.3"
 #define product_id 					 0x04
 
 typedef enum
@@ -72,7 +72,6 @@ typedef struct
 	uint16_t 		power_time;	 		//Power on time 
 	uint16_t 		uplink_count; 	//Number of postings
 	uint8_t  		protocol;		 		//protocol
-	uint8_t  		cfm;					 	//Confirm mode flag
 	uint16_t 		rxdl;				 		//Receiving time
 	uint8_t 		tr_time;				//Time interval of sensor recording data 
 	uint8_t     csq_time;
@@ -101,11 +100,16 @@ typedef struct
 	uint8_t  pwd[201];
 	uint8_t  pubtopic[129];
 	uint8_t  subtopic[129];
+	uint8_t  uri1[129];
+	uint8_t  uri2[129];
+	uint8_t  uri3[129];
+	uint8_t  uri4[129];	
 }USER;
 
 typedef struct
 {
 	uint8_t  	exit_state;
+	uint8_t  	exit_level;
 	uint8_t  	singal;
 	uint32_t 	exit_count;
 	uint32_t 	time_stamp;

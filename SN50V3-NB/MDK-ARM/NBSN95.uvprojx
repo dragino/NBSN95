@@ -640,6 +640,11 @@
               <FileType>1</FileType>
               <FilePath>..\Drivers\BSP\src\nb_tcp.c</FilePath>
             </File>
+            <File>
+              <FileName>nb_coap.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\BSP\src\nb_coap.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

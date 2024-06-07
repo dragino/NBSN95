@@ -3,6 +3,7 @@
 #define __TIME_SERVER_H__
 
 #include "common.h"
+#include "rtc.h"
 #include "time.h"
 
 #ifdef __cplusplus
@@ -31,14 +32,6 @@ typedef struct TimerEvent_s
     void ( *Callback )( void ); //! Timer IRQ callback function
     struct TimerEvent_s *Next;  //! Pointer to the next Timer object.
 } TimerEvent_t;
-
-typedef struct SysTime_s
-{
-    uint32_t Seconds;
-    int16_t  SubSeconds;
-}SysTime_t;
-
-SysTime_t SysTimeGet( void );
 
 void My_AlarmInit(uint32_t timer,uint8_t alarmX);
 void MyRtcInit(void);

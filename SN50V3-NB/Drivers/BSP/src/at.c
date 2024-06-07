@@ -11,8 +11,12 @@ static uint32_t mqtt_parameters_uname[32]={0};
 static uint32_t mqtt_parameters_pwd[50]={0};
 static uint32_t mqtt_parameters_pubtopic[32]={0};
 static uint32_t mqtt_parameters_subtopic[32]={0};
+static uint32_t coap_parameters1[32]={0};
+static uint32_t coap_parameters2[32]={0};
+static uint32_t coap_parameters3[32]={0};
+static uint32_t coap_parameters4[32]={0};
 static uint8_t  noud_flags = 0;
-static uint8_t  mqtt_qos_flags = 0;
+uint8_t  mqtt_qos_flags = 0;
 uint8_t  qband_flag = 0;
 uint8_t mqtt_qos=0;
 extern char MCU_pwd[20];
@@ -228,12 +232,16 @@ ATEerror_t at_fdr_run(const char *param)
 	HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_FDR_FLAG,0x01);//store fdr_flag
 	HAL_FLASHEx_DATAEEPROM_Lock();
 	FLASH_erase(FLASH_USER_START_PASSWORD,(FLASH_USER_END - FLASH_USER_START_PASSWORD) / FLASH_PAGE_SIZE);
-	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);
+	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);	
+	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);	
+	DatalogClear();
+	memset(general_parameters,0,sizeof(general_parameters));	
 	sys.clock_switch=1;
 	sys.strat_time=65535;
-	qband_flag=1;
-	config_Set();		
-	DatalogClear();
+	qband_flag=1;	
+  general_parameters[11]=qband_flag<<24;
+	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8;		
+	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);		
 	NVIC_SystemReset();
   return AT_OK;
 }
@@ -244,12 +252,16 @@ ATEerror_t at_fdr1_run(const char *param)
 	HAL_FLASHEx_DATAEEPROM_Unlock();
 	HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_FDR_FLAG,0x01);//store fdr_flag
 	HAL_FLASHEx_DATAEEPROM_Lock();
-	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);
+	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);		
+	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);		
+	DatalogClear();
+	memset(general_parameters,0,sizeof(general_parameters));	
 	sys.clock_switch=1;
 	sys.strat_time=65535;
 	qband_flag=1;	
-	config_Set();			
-	DatalogClear();
+  general_parameters[11]=qband_flag<<24;
+	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8;		
+	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);			
 	NVIC_SystemReset();
   return AT_OK;
 }
@@ -486,7 +498,7 @@ ATEerror_t at_pro_set(const char *param)
 	uint8_t protocol = param[(pos-param)+1];
 	uint8_t platform;
 	protocol = protocol - 0x30;
-	if(protocol != UDP_PRO && protocol != MQTT_PRO && protocol != TCP_PRO)
+	if(protocol != COAP_PRO &&protocol != UDP_PRO && protocol != MQTT_PRO && protocol != TCP_PRO)
 	{
 		return AT_PARAM_ERROR;
 	}
@@ -496,7 +508,7 @@ ATEerror_t at_pro_set(const char *param)
   }	
   platform =  atoi(param+(strchr(pos,',')-param)+1);
   
-	if(protocol==UDP_PRO||protocol==TCP_PRO)
+	if(protocol==UDP_PRO||protocol==TCP_PRO||protocol==COAP_PRO)
 	{
 	  if(platform==0 || platform==5)
 		{}
@@ -510,28 +522,7 @@ ATEerror_t at_pro_set(const char *param)
   return AT_OK;
 }
 
-/************** 			AT+CFM		 **************/
-ATEerror_t at_cfm_get(const char *param)
-{
-	if(keep)
-		printf(AT CFM"=");
-	printf("%c\r\n",sys.cfm);
-  return AT_OK;
-}
 
-ATEerror_t at_cfm_set(const char *param)
-{
-	char* pos = strchr(param,'=');
-	uint8_t cfm = param[(pos-param)+1];
-	if(cfm != '0' && cfm != '1')
-	{
-		return AT_PARAM_ERROR;
-	}
-	
-	sys.cfm = cfm;
-	
-  return AT_OK;
-}
 /************** 			AT+RXDL		 **************/
 ATEerror_t at_rxdl_set(const char *param)
 {
@@ -802,11 +793,6 @@ ATEerror_t at_tlsmod_set(const char *param)
   }	
 	cert =  atoi(param+(strchr(pos,',')-param)+1);
 	
-	if(cert !=0) //cre=0
-	{
-		return AT_PARAM_ERROR;
-	}
-	
 	sys.tlsmod = tlsmod;
 	sys.cert =cert;
 	
@@ -905,6 +891,7 @@ ATEerror_t at_clocklog_set(const char *param)
 		sys.tr_time=cc;
 		sys.sht_noud=dd;
 		first_sample=0;
+		noud_flags = 1;
 		nb_cclk_run(NULL);
 	}
   else
@@ -920,6 +907,99 @@ ATEerror_t at_clocklog_get(const char *param)
 		printf("AT+CLOCKLOG=");
 	printf("%d,%d,%d,%d\r\n",sys.clock_switch,sys.strat_time,sys.tr_time,sys.sht_noud);
   return AT_OK;			
+}
+
+/************** 			AT+OPTION1		 **************/
+ATEerror_t at_uri1_get(const char *param)
+{
+	if(keep)
+		printf("AT+URI1=");
+	printf("%s\r\n",user.uri1);
+	
+  return AT_OK;
+}
+
+ATEerror_t at_uri1_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >128)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.uri1,0,sizeof(user.uri1));
+	memcpy(user.uri1,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
+	
+  return AT_OK;
+}
+/************** 			AT+OPTION2		 **************/
+ATEerror_t at_uri2_get(const char *param)
+{
+	if(keep)
+		printf("AT+URI2=");
+	printf("%s\r\n",user.uri2);
+	
+  return AT_OK;
+}
+
+ATEerror_t at_uri2_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >128)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.uri2,0,sizeof(user.uri2));
+	memcpy(user.uri2,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
+	
+  return AT_OK;
+}
+/************** 			AT+OPTION3		 **************/
+ATEerror_t at_uri3_get(const char *param)
+{
+	if(keep)
+		printf("AT+URI3=");
+	printf("%s\r\n",user.uri3);
+	
+  return AT_OK;
+}
+
+ATEerror_t at_uri3_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >128)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.uri3,0,sizeof(user.uri3));
+	memcpy(user.uri3,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
+	
+  return AT_OK;
+}
+/************** 			AT+OPTION4		 **************/
+ATEerror_t at_uri4_get(const char *param)
+{
+	if(keep)
+		printf("AT+URI4=");
+	printf("%s\r\n",user.uri4);
+	
+  return AT_OK;
+}
+
+ATEerror_t at_uri4_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >128)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.uri4,0,sizeof(user.uri4));
+	memcpy(user.uri4,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
+	
+  return AT_OK;
 }
 
 /************** 		Other		 **************/
@@ -950,7 +1030,7 @@ void config_Set(void)
 //	general_parameters[0]=sys.pwd[0]<<24 | sys.pwd[1]<<16 	| sys.pwd[2]<<8 | sys.pwd[3];
 //	general_parameters[1]=sys.pwd[4]<<24 | sys.pwd[5]<<16 	| sys.pwd[6]<<8 | sys.pwd[7];
 	general_parameters[2]=sys.mod<<24    | sys.tdc;
-	general_parameters[3]=sys.inmod<<24  | sys.protocol<<16 | sys.cfm<<8 	| sys.csq_time;
+	general_parameters[3]=sys.inmod<<24  | sys.protocol<<16 | sys.csq_time;
 	general_parameters[4]=sys.rxdl<<16   | sys.power_time;
 	general_parameters[5]=(int)(sensor.GapValue *10000);
 	general_parameters[6]=sensor.exit_count;
@@ -985,8 +1065,21 @@ void config_Set(void)
 	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.subtopic);i=i+4,j++)
 			mqtt_parameters_subtopic[j]=user.subtopic[i+0]<<24 | user.subtopic[i+1]<<16 | user.subtopic[i+2]<<8 | user.subtopic[i+3];
-	
+			
+	for(uint8_t i=0,j=0;i<strlen((char*)user.uri1);i=i+4,j++)
+			coap_parameters1[j]=user.uri1[i+0]<<24 | user.uri1[i+1]<<16 | user.uri1[i+2]<<8 | user.uri1[i+3];
+			
+	for(uint8_t i=0,j=0;i<strlen((char*)user.uri2);i=i+4,j++)
+			coap_parameters2[j]=user.uri2[i+0]<<24 | user.uri2[i+1]<<16 | user.uri2[i+2]<<8 | user.uri2[i+3];
+
+	for(uint8_t i=0,j=0;i<strlen((char*)user.uri3);i=i+4,j++)
+			coap_parameters3[j]=user.uri3[i+0]<<24 | user.uri3[i+1]<<16 | user.uri3[i+2]<<8 | user.uri3[i+3];
+
+	for(uint8_t i=0,j=0;i<strlen((char*)user.uri4);i=i+4,j++)
+			coap_parameters4[j]=user.uri4[i+0]<<24 | user.uri4[i+1]<<16 | user.uri4[i+2]<<8 | user.uri4[i+3];
+
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);
+	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);	
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);
 	FLASH_program(FLASH_USER_START_SERVADDR_ADD,servaddr_parameters, sizeof(servaddr_parameters)/4);
 //	FLASH_program(FLASH_USER_START_COAP,coap_parameters, sizeof(coap_parameters)/4);
@@ -995,6 +1088,10 @@ void config_Set(void)
 	FLASH_program(FLASH_USER_START_MQTT_PWD,mqtt_parameters_pwd, sizeof(mqtt_parameters_pwd)/4);
 	FLASH_program(FLASH_USER_START_MQTT_PUBTOPIC,mqtt_parameters_pubtopic, sizeof(mqtt_parameters_pubtopic)/4);
 	FLASH_program(FLASH_USER_START_MQTT_SUBTOPIC,mqtt_parameters_subtopic, sizeof(mqtt_parameters_subtopic)/4);
+	FLASH_program(FLASH_USER_COAP_URI1,coap_parameters1, sizeof(coap_parameters1)/4);
+	FLASH_program(FLASH_USER_COAP_URI2,coap_parameters2, sizeof(coap_parameters2)/4);
+	FLASH_program(FLASH_USER_COAP_URI3,coap_parameters3, sizeof(coap_parameters3)/4);		
+	FLASH_program(FLASH_USER_COAP_URI4,coap_parameters4, sizeof(coap_parameters4)/4);			
 }
 
 void config_Get(void)
@@ -1032,12 +1129,8 @@ void config_Get(void)
 	EX_GPIO_Init(sys.inmod-0x30);
 	
 	sys.protocol = FLASH_read(add+12)>>16  & 0x000000FF;
-	if(sys.protocol != UDP_PRO && sys.protocol != MQTT_PRO && sys.protocol != TCP_PRO)
+	if(sys.protocol != COAP_PRO &&sys.protocol != UDP_PRO && sys.protocol != MQTT_PRO && sys.protocol != TCP_PRO)
 		sys.protocol = UDP_PRO;
-	
-	sys.cfm = FLASH_read(add+12)>>8 & 0x000000FF;	
-	if(sys.cfm != '0' && sys.cfm != '1')
-		sys.cfm = '0';
 	
 	sys.power_time = FLASH_read(add+16)    & 0x0000FFFF;	
 	sys.rxdl       = FLASH_read(add+16)>>16& 0x0000FFFF;
@@ -1234,4 +1327,57 @@ void config_Get(void)
 	{
 		sprintf((char*)user.subtopic, "%s", "NULL");
 	}
+	//coap-option
+	add = FLASH_USER_COAP_URI1;
+	for(uint8_t i=0,j=0;i<32;i++,j=j+4)
+	{
+		uint32_t temp = FLASH_read(add+i*4);
+		user.uri1[j] 	= (temp>>24) & 0x000000FF;
+		user.uri1[j+1] = (temp>>16) & 0x000000FF;
+		user.uri1[j+2] = (temp>>8)  & 0x000000FF;
+		user.uri1[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.uri1) == 0)
+	{
+		sprintf((char*)user.uri1, "%s", "NULL");
+	}
+	add = FLASH_USER_COAP_URI2;
+	for(uint8_t i=0,j=0;i<32;i++,j=j+4)
+	{
+		uint32_t temp = FLASH_read(add+i*4);
+		user.uri2[j] 	= (temp>>24) & 0x000000FF;
+		user.uri2[j+1] = (temp>>16) & 0x000000FF;
+		user.uri2[j+2] = (temp>>8)  & 0x000000FF;
+		user.uri2[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.uri2) == 0)
+	{
+		sprintf((char*)user.uri2, "%s", "NULL");
+	}	
+	add = FLASH_USER_COAP_URI3;
+	for(uint8_t i=0,j=0;i<32;i++,j=j+4)
+	{
+		uint32_t temp = FLASH_read(add+i*4);
+		user.uri3[j] 	= (temp>>24) & 0x000000FF;
+		user.uri3[j+1] = (temp>>16) & 0x000000FF;
+		user.uri3[j+2] = (temp>>8)  & 0x000000FF;
+		user.uri3[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.uri3) == 0)
+	{
+		sprintf((char*)user.uri3, "%s", "NULL");
+	}	
+	add = FLASH_USER_COAP_URI4;
+	for(uint8_t i=0,j=0;i<32;i++,j=j+4)
+	{
+		uint32_t temp = FLASH_read(add+i*4);
+		user.uri4[j] 	= (temp>>24) & 0x000000FF;
+		user.uri4[j+1] = (temp>>16) & 0x000000FF;
+		user.uri4[j+2] = (temp>>8)  & 0x000000FF;
+		user.uri4[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.uri4) == 0)
+	{
+		sprintf((char*)user.uri4, "%s", "NULL");
+	}	
 }

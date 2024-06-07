@@ -54,7 +54,17 @@ nbsn95\nb_coap.o: ..\Drivers\BSP\inc\common.h
 nbsn95\nb_coap.o: ..\Drivers\BSP\inc\flash_eraseprogram.h
 nbsn95\nb_coap.o: ..\Drivers\BSP\inc\time_server.h
 nbsn95\nb_coap.o: ../Inc/rtc.h
+nbsn95\nb_coap.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\time.h
+nbsn95\nb_coap.o: ../Inc/utilities.h
+nbsn95\nb_coap.o: ../Inc/hw_conf.h
+nbsn95\nb_coap.o: ../Inc/stm32l0xx_nucleo.h
+nbsn95\nb_coap.o: ../Inc/stm32l0xx_hw_conf.h
 nbsn95\nb_coap.o: ..\Drivers\BSP\inc\battery_read.h
 nbsn95\nb_coap.o: ..\Drivers\BSP\inc\ds18b20.h
 nbsn95\nb_coap.o: ..\Drivers\BSP\inc\sht20.h
 nbsn95\nb_coap.o: ..\Drivers\BSP\inc\sht31.h
+nbsn95\nb_coap.o: ..\Drivers\BSP\inc\lidar.h
+nbsn95\nb_coap.o: ..\Drivers\BSP\inc\ultrasound.h
+nbsn95\nb_coap.o: ..\Drivers\BSP\inc\weight.h
+nbsn95\nb_coap.o: ..\Drivers\BSP\inc\ult.h
+nbsn95\nb_coap.o: ..\Drivers\BSP\inc\maxsonar.h

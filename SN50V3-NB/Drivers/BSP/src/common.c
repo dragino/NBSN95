@@ -7,6 +7,8 @@ uint8_t detect_flags=0;
 uint8_t mode2_flag=0;
 extern uint8_t rxbuf_u1;
 extern uint8_t mqtt_qos;
+extern bool first_sample;
+extern uint8_t  mqtt_qos_flags;
 SYSTEM sys    = {.pwd=sys_pwd};
 SENSOR sensor ={.data=sensor_data};
 USER user={0};
@@ -44,8 +46,10 @@ void product_information_print(void)
 										"NB-IoT Stack : "stack	 "\r\n"
 	                  "Protocol in Used: ");
 
-	if(sys.protocol == UDP_PRO)
-		printf("UDP\r\n");
+	if(sys.protocol == COAP_PRO)
+		printf("COAP\r\n");
+	else if(sys.protocol == UDP_PRO)
+		printf("UDP\r\n");	
 	else if(sys.protocol == MQTT_PRO)
 		printf("MQTT\r\n");
 	else if(sys.protocol == TCP_PRO)
@@ -288,6 +292,7 @@ void txPayLoadDeal(SENSOR* Sensor)
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_level);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temSHT>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x", (Sensor->temSHT>=0)?Sensor->temSHT:Sensor->temSHT*(-1));
@@ -329,6 +334,7 @@ void txPayLoadDeal(SENSOR* Sensor)
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_1>=0)?Sensor->temDs18b20_1:Sensor->temDs18b20_1*(-1));		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		  sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_level);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);		
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->distance);
 	}
@@ -349,6 +355,7 @@ void txPayLoadDeal(SENSOR* Sensor)
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_level);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc2);
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temSHT>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x", (Sensor->temSHT>=0)?Sensor->temSHT:Sensor->temSHT*(-1));
@@ -367,6 +374,7 @@ void txPayLoadDeal(SENSOR* Sensor)
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_level);
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_2>=0)?'0':'F');
 		sprintf(Sensor->data+strlen(Sensor->data), "%.3x",(Sensor->temDs18b20_2>=0)?Sensor->temDs18b20_2:Sensor->temDs18b20_2*(-1));		
 		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temDs18b20_3>=0)?'0':'F');
@@ -400,6 +408,7 @@ void txPayLoadDeal(SENSOR* Sensor)
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_level);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Weight);
 	}
 	else if(sys.mod == model6)
@@ -469,7 +478,6 @@ void txPayLoadDeal(SENSOR* Sensor)
 	
 	user_main_debug("Sensor->data:%s",Sensor->data);
 	user_main_debug("Sensor->data_len:%d",Sensor->data_len);
-	Sensor->exit_state = 0;
 	sys.exit_flag = 0;
 	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_SET);
 	HAL_IWDG_Refresh(&hiwdg);
@@ -552,6 +560,13 @@ void rxPayLoadDeal(char* payload)
 	  sys.tdc = tdc;
 
 		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+INTMOD\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-14));		
+		sys.inmod=at_downlink_data[0];
+		EX_GPIO_Init(sys.inmod-0x30);
+
+		memset(at_downlink_data,0,220);		
 	  pos_start  = strstr((char*)payload,"AT+APN\":\"");
 	  pos_end    = strchr(pos_start,'\n');	
 	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));		
@@ -559,12 +574,64 @@ void rxPayLoadDeal(char* payload)
 	  memcpy(user.apn,at_downlink_data,strlen(at_downlink_data));	
 
 		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+5VT\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));
+    uint16_t power_time = atoi(at_downlink_data);		
+		sys.power_time = power_time;	
+
+		memset(at_downlink_data,0,220);		
 	  pos_start  = strstr((char*)payload,"AT+PRO\":\"");
 	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-10));		
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));		
 		uint8_t protocol = at_downlink_data[0]-0x30;
 	  sys.protocol = protocol;
 		sys.platform =at_downlink_data[2]-0x30;
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+TR\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+8],(pos_end-pos_start-10));		
+    uint16_t tr = atoi(at_downlink_data);		
+   	sys.tr_time = tr;
+
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+NOUD\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+10],(pos_end-pos_start-12));		
+    uint8_t noud = atoi(at_downlink_data);	
+	  sys.sht_noud = noud;
+
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+CSQTIME\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+13],(pos_end-pos_start-15));		
+    uint8_t csqtdc = atoi(at_downlink_data);	
+		sys.csq_time = csqtdc;
+
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+DNSTIMER\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+14],(pos_end-pos_start-16));		
+	  uint16_t dnstdc = atoi(at_downlink_data);	
+		if(dnstdc==0)
+	  sys.dns_timer = 0;
+    else	
+	  sys.dns_timer = 1;	
+	 sys.dns_time = dnstdc;
+		
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+TLSMOD\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-14));	
+    sys.tlsmod = atoi(at_downlink_data);	
+		char* pos = strchr(at_downlink_data,',');
+		sys.cert = atoi(at_downlink_data+(strchr(pos,',')-at_downlink_data)+1);
+
+		memset(at_downlink_data,0,220);		
+	  pos_start  = strstr((char*)payload,"AT+MQOS\":\"");
+	  pos_end    = strchr(pos_start,'\n');	
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+10],(pos_end-pos_start-11));		
+    mqtt_qos = atoi(at_downlink_data);	
 		
 	  config_Set();	
 	  if(strstr((char*)at_downlink_data,"ATZ") != NULL)
@@ -605,6 +672,30 @@ void rxPayLoadDeal(char* payload)
 				EX_GPIO_Init(sys.inmod-0x30);
 				config_Set();
 			}			
+		case 0x07:
+			if(dataCom_len == 2)
+			{
+				mqtt_qos = dataCom[1];
+				mqtt_qos_flags=1;
+				config_Set();
+			}	
+		case 0x0A:
+			if(dataCom_len == 6)
+			{
+				bool aa=dataCom[1];
+        uint16_t bb=(dataCom[2]<<8 | dataCom[3] );
+       	uint8_t cc=dataCom[4];
+				uint8_t dd=dataCom[5];
+				if(((bb<3600)||(bb==65535))&&(cc<=255)&&(dd<=32))
+	     {
+		      sys.clock_switch=aa;
+		      sys.strat_time=bb;
+		      sys.tr_time=cc;
+		      sys.sht_noud=dd;
+		      first_sample=0;
+			 }
+				config_Set();
+			}				
 			break;
 		default:
 			printf("Downstream parameter error\n");
