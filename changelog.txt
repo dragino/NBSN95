@@ -1,4 +1,6 @@
 NBSN95
+V1.4.2_autorst
+1.Add 24-hour automatic reset function(AT+AUTORST=24)
 
 V1.3.7
 
