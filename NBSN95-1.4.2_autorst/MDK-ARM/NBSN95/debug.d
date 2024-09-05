@@ -1,0 +1,12 @@
+nbsn95\debug.o: ..\Src\debug.c
+nbsn95\debug.o: ../Inc/hw.h
+nbsn95\debug.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+nbsn95\debug.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
+nbsn95\debug.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+nbsn95\debug.o: ../Inc/hw_conf.h
+nbsn95\debug.o: ../Inc/hw_rtc.h
+nbsn95\debug.o: ../Inc/utilities.h
+nbsn95\debug.o: ../Inc/trace.h
+nbsn95\debug.o: ../Inc/utilities_conf.h
+nbsn95\debug.o: ../Inc/vcom.h
+nbsn95\debug.o: ../Inc/trace.h
