@@ -66,6 +66,18 @@ ATEerror_t ATInsPro(char* atdata)
 	}
 	return AT_OK;
 }
+void space_fun(char *str)
+{
+	char *str_c=str;
+	int i,j=0;
+	for(i=0;str[i]!='\0';i++)
+	{
+		if(str[i]!=' ')
+			str_c[j++]=str[i];
+	}
+	str_c[j]='\0';
+	str=str_c;	
+}
 
 /************** 			AT			 **************/
 ATEerror_t at_return_error(const char *param)
@@ -119,7 +131,7 @@ ATEerror_t at_model_get(const char *param)
 ATEerror_t at_mod_set(const char *param)
 {
 	char* pos = strchr(param,'=');
-	uint8_t mod = param[(pos-param)+1];
+	uint8_t mod = atoi((param+(pos-param)+1));
 
 	if(mod == model1)
 	{
@@ -145,6 +157,22 @@ ATEerror_t at_mod_set(const char *param)
 	{
 		printf("\r\nCounting mode\r\n");
 	}	
+	else if(mod == model7)
+	{
+		printf("\r\n3xADC + 3xDS18B20 mode\r\n");
+	}
+	else if(mod == model8)
+	{
+		printf("\r\nThree interrupt contact mode\r\n");
+	}
+	else if(mod == model9)
+	{
+		printf("\r\nCount+SHT31 mode\r\n");
+	}
+	else if(mod == model10)
+	{
+		printf("\r\nUse Sensor is TMP117\r\n");
+	}	
 	else
 	{
 		return AT_PARAM_ERROR;
@@ -158,7 +186,7 @@ ATEerror_t at_mod_get(const char *param)
 {
 	if(keep)
 		printf("AT+CFGMOD=");
-	printf("%c\r\n",sys.mod);
+	printf("%d\r\n",sys.mod);
 	
   return AT_OK;
 }
@@ -293,7 +321,12 @@ ATEerror_t at_servaddr_get(const char *param)
 
 ATEerror_t at_servaddr_set(const char *param)
 {
+	space_fun((char*)param);	
 	char* pos = strchr(param,'=');
+  if(strchr(param,',')==NULL)
+  {
+    return AT_PARAM_ERROR; 
+  }	
 	if(strlen(param) - (pos-param)-1 >69)
 	{
 		return AT_PARAM_ERROR;
@@ -317,6 +350,7 @@ ATEerror_t at_client_get(const char *param)
 
 ATEerror_t at_client_set(const char *param)
 {
+	space_fun((char*)param);
 	char* pos = strchr(param,'=');
 	if(strlen(param) - (pos-param)-1 >128)
 	{
@@ -341,6 +375,7 @@ ATEerror_t at_uname_get(const char *param)
 
 ATEerror_t at_uname_set(const char *param)
 {
+	space_fun((char*)param);
 	char* pos = strchr(param,'=');
 	if(strlen(param) - (pos-param)-1 >128)
 	{
@@ -364,6 +399,7 @@ ATEerror_t at_pwd_get(const char *param)
 
 ATEerror_t at_pwd_set(const char *param)
 {
+	space_fun((char*)param);
 	char* pos = strchr(param,'=');
 	if(strlen(param) - (pos-param)-1 >200)
 	{
@@ -386,6 +422,7 @@ ATEerror_t at_pubtopic_get(const char *param)
 
 ATEerror_t at_pubtopic_set(const char *param)
 {
+	space_fun((char*)param);
 	char* pos = strchr(param,'=');
 	if(strlen(param) - (pos-param)-1 >128)
 	{
@@ -408,6 +445,7 @@ ATEerror_t at_subtopic_get(const char *param)
 
 ATEerror_t at_subtopic_set(const char *param)
 {
+	space_fun((char*)param);
 	char* pos = strchr(param,'=');
 	if(strlen(param) - (pos-param)-1 >128)
 	{
@@ -444,7 +482,7 @@ ATEerror_t at_inmod_get(const char *param)
 {
 	if(keep)
 		printf("AT+INTMOD=");
-	printf("%c\r\n",sys.inmod);
+	printf("1:%d,2:%d,3:%d\r\n",sys.inmod,sys.inmod_pa4,sys.inmod_pa0);	
 	
   return AT_OK;
 }
@@ -452,13 +490,29 @@ ATEerror_t at_inmod_get(const char *param)
 ATEerror_t at_inmod_set(const char *param)
 {
 	char* pos = strchr(param,'=');
-	sys.inmod = param[(pos-param)+1];
-	if(sys.inmod != '0' && sys.inmod != '1' && sys.inmod != '2' && sys.inmod != '3')
+	uint8_t aa;
+  uint8_t bb,cc;	
+	char *param_temp;
+	uint8_t char_number=0;
+  for(uint8_t t=(pos-param)+1;t<strlen(param);t++)
+	{
+		param_temp[char_number++]=param[t];
+	}
+	param_temp[char_number]='\0';
+	
+	if((tiny_sscanf(param_temp, "%d,%d,%d", &aa,&bb,&cc) != 3))
 	{
 		return AT_PARAM_ERROR;
 	}
-	EX_GPIO_Init(sys.inmod-0x30);
-  return AT_OK;
+
+		sys.inmod=aa;
+		sys.inmod_pa4=bb;
+		sys.inmod_pa0=cc;			
+	  EX_GPIO_Init(sys.inmod);
+		EX_GPIO_Init_pa4(sys.inmod_pa4);
+		EX_GPIO_Init_pa0(sys.inmod_pa0);
+	
+	return AT_OK;	
 }
 
 /************** 			AT+5VT		 **************/
@@ -634,14 +688,33 @@ ATEerror_t at_ext_get(const char *param)
 {
 	if(keep)
 		printf(AT EXT"=");
-	printf("%d\r\n",sensor.exit_count);
+	printf("1:%d,2:%d,3:%d,%d\r\n",sensor.exit_count,sensor.exit_count_pa4,sensor.exit_count_pa0,sensor.count_mode);
   return AT_OK;
 }
 
 ATEerror_t at_ext_set(const char *param)
 {
 	char* pos = strchr(param,'=');
-	sensor.exit_count = atoi((param+(pos-param)+1));
+	uint32_t aa,bb,cc;
+	uint8_t dd;
+	char *param_temp;
+	uint8_t char_number=0;
+  for(uint8_t t=(pos-param)+1;t<strlen(param);t++)
+	{
+		param_temp[char_number++]=param[t];
+	}
+	param_temp[char_number]='\0';
+	
+	if((tiny_sscanf(param_temp, "%d,%d,%d,%d", &aa,&bb,&cc,&dd) != 4))
+	{
+		return AT_PARAM_ERROR;
+	}
+
+		sensor.exit_count=aa;
+		sensor.exit_count_pa4=bb;
+		sensor.exit_count_pa0=cc;			
+    sensor.count_mode=dd;	
+	
 	return AT_OK;
 }
 
@@ -664,6 +737,7 @@ ATEerror_t at_dnscfg_get(const char *param)
 
 ATEerror_t at_dnscfg_set(const char *param)
 {
+	space_fun((char*)param);
 	char* pos = strchr(param,'=');
 	if(strlen(param) - (pos-param)-1 >19)
 	{
@@ -680,6 +754,7 @@ ATEerror_t at_dnscfg_set(const char *param)
 /************** 			AT+APN		**************/
 ATEerror_t at_apn_set(const char *param)
 {
+	space_fun((char*)param);
 	char* pos = strchr(param,'=');
 	if(strlen(param) - (pos-param)-1 >40)
 	{
@@ -921,6 +996,7 @@ ATEerror_t at_uri1_get(const char *param)
 
 ATEerror_t at_uri1_set(const char *param)
 {
+	space_fun((char*)param);
 	char* pos = strchr(param,'=');
 	if(strlen(param) - (pos-param)-1 >128)
 	{
@@ -944,6 +1020,7 @@ ATEerror_t at_uri2_get(const char *param)
 
 ATEerror_t at_uri2_set(const char *param)
 {
+	space_fun((char*)param);
 	char* pos = strchr(param,'=');
 	if(strlen(param) - (pos-param)-1 >128)
 	{
@@ -967,6 +1044,7 @@ ATEerror_t at_uri3_get(const char *param)
 
 ATEerror_t at_uri3_set(const char *param)
 {
+	space_fun((char*)param);
 	char* pos = strchr(param,'=');
 	if(strlen(param) - (pos-param)-1 >128)
 	{
@@ -990,6 +1068,7 @@ ATEerror_t at_uri4_get(const char *param)
 
 ATEerror_t at_uri4_set(const char *param)
 {
+	space_fun((char*)param);
 	char* pos = strchr(param,'=');
 	if(strlen(param) - (pos-param)-1 >128)
 	{
@@ -1026,9 +1105,19 @@ uint8_t hexDetection(char* str)
 void config_Set(void)
 {
 	memset(general_parameters,0,sizeof(general_parameters));
+	memset(servaddr_parameters,0,sizeof(servaddr_parameters));
+	memset(mqtt_parameters_uname,0,sizeof(mqtt_parameters_uname));
+	memset(mqtt_parameters_pwd,0,sizeof(mqtt_parameters_pwd));
+	memset(mqtt_parameters_client,0,sizeof(mqtt_parameters_client));
+	memset(mqtt_parameters_pubtopic,0,sizeof(mqtt_parameters_pubtopic));
+	memset(mqtt_parameters_subtopic,0,sizeof(mqtt_parameters_subtopic));
+	memset(coap_parameters1,0,sizeof(coap_parameters1));	
+	memset(coap_parameters2,0,sizeof(coap_parameters2));
+	memset(coap_parameters3,0,sizeof(coap_parameters3));
+	memset(coap_parameters4,0,sizeof(coap_parameters4));	
 	
-//	general_parameters[0]=sys.pwd[0]<<24 | sys.pwd[1]<<16 	| sys.pwd[2]<<8 | sys.pwd[3];
-//	general_parameters[1]=sys.pwd[4]<<24 | sys.pwd[5]<<16 	| sys.pwd[6]<<8 | sys.pwd[7];
+	general_parameters[0]=sensor.exit_count_pa4;
+	general_parameters[1]=sensor.count_mode<<16 |sys.inmod_pa4<<8 | sys.inmod_pa0;
 	general_parameters[2]=sys.mod<<24    | sys.tdc;
 	general_parameters[3]=sys.inmod<<24  | sys.protocol<<16 | sys.csq_time;
 	general_parameters[4]=sys.rxdl<<16   | sys.power_time;
@@ -1038,6 +1127,7 @@ void config_Set(void)
 	general_parameters[12]=sys.platform<<24 |sys.dns_timer<<16 |sys.dns_time<<8;
 	general_parameters[28]=mqtt_qos_flags<<24 |mqtt_qos <<16 |sys.cert<<8 |sys.tlsmod;
 	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8 |sys.log_seq;	
+	general_parameters[30]=sensor.exit_count_pa0;
 	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.deui);i=i+4,j++)
 			general_parameters[7+j]=user.deui[i+0]<<24 | user.deui[i+1]<<16 | user.deui[i+2]<<8 | user.deui[i+3];
@@ -1115,8 +1205,24 @@ void config_Get(void)
 		sys.pwd_flag = 2;
 	}
   add = FLASH_USER_START_ADDR_CONFIG;	
+	
+	sensor.exit_count_pa4 = FLASH_read(add);
+	sensor.exit_count_pa0 = FLASH_read(add+120);
+	
+	sensor.count_mode= FLASH_read(add+4)>>16& 0x000000FF;
+	
+	sys.inmod_pa4= FLASH_read(add+4)>>8& 0x000000FF;
+	if(sys.inmod_pa4 != 0 && sys.inmod_pa4 != 1 && sys.inmod_pa4 != 2 && sys.inmod_pa4 != 3)
+		sys.inmod_pa4 = 0;
+	EX_GPIO_Init_pa4(sys.inmod_pa4);
+
+	sys.inmod_pa0= FLASH_read(add+4)& 0x000000FF;
+	if(sys.inmod_pa0 != 0 && sys.inmod_pa0 != 1 && sys.inmod_pa0 != 2 && sys.inmod_pa0 != 3)
+		sys.inmod_pa0 = 0;
+	EX_GPIO_Init_pa0(sys.inmod_pa0);
+	
 	sys.mod = FLASH_read(add+8) >>24;
-	if(sys.mod == 0 || sys.mod > model6)
+	if(sys.mod == 0 || sys.mod > model10)
 		sys.mod = model1;
 	
 	sys.tdc = FLASH_read(add+8)  & 0x00FFFFFF;
@@ -1124,9 +1230,9 @@ void config_Get(void)
 		sys.tdc = 7200;
 	
 	sys.inmod = FLASH_read(add+12)>>24;
-	if(sys.inmod != '0' && sys.inmod != '1' && sys.inmod != '2' && sys.inmod != '3')
-		sys.inmod = '0';
-	EX_GPIO_Init(sys.inmod-0x30);
+	if(sys.inmod != 0 && sys.inmod != 1 && sys.inmod != 2 && sys.inmod != 3)
+		sys.inmod = 0;
+	EX_GPIO_Init(sys.inmod);
 	
 	sys.protocol = FLASH_read(add+12)>>16  & 0x000000FF;
 	if(sys.protocol != COAP_PRO &&sys.protocol != UDP_PRO && sys.protocol != MQTT_PRO && sys.protocol != TCP_PRO)

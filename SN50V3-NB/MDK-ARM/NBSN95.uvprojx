@@ -338,7 +338,7 @@
             <v6Rtti>0</v6Rtti>
             <VariousControls>
               <MiscControls></MiscControls>
-              <Define>USE_HAL_DRIVER, USE_STM32L0XX_NUCLEO,STM32L072xx,SHT3x</Define>
+              <Define>USE_HAL_DRIVER, USE_STM32L0XX_NUCLEO,STM32L072xx,SHT3x,NB_NS</Define>
               <Undefine></Undefine>
               <IncludePath>../Inc;               ../Drivers/STM32L0xx_HAL_Driver/Inc;               ../Drivers/STM32L0xx_HAL_Driver/Inc/Legacy;               ../Drivers/CMSIS/Device/ST/STM32L0xx/Include;               ../Drivers/CMSIS/Include;               ..\Drivers\BSP\inc;               ..\Drivers\LWM2M</IncludePath>
             </VariousControls>
@@ -614,6 +614,11 @@
               <FileName>tiny_sscanf.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Src\tiny_sscanf.c</FilePath>
+            </File>
+            <File>
+              <FileName>ne117.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\BSP\src\ne117.c</FilePath>
             </File>
           </Files>
         </Group>

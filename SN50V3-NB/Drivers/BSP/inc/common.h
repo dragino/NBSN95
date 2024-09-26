@@ -23,7 +23,7 @@
 #include "weight.h"
 #include "ult.h"
 #include "maxsonar.h"
-
+#include "ne117.h"
 #ifdef __cplusplus
  extern "C" {
 #endif
@@ -41,17 +41,21 @@
  * @retval None
  */
 
-#define AT_VERSION_STRING 	"v1.2.3"
+#define AT_VERSION_STRING 	"v1.2.4"
 #define product_id 					 0x04
 
 typedef enum
 {
- model1 ='1',
+ model1 =1,
  model2 ,
  model3 ,
  model4 ,
  model5 ,
  model6 ,
+ model7 ,	
+ model8 ,
+ model9 ,
+ model10 ,
 }model;
 
 typedef struct
@@ -66,8 +70,12 @@ typedef struct
 	uint8_t			pwd_flag;		 		//Password correct flag
 	uint8_t			fdr_flag;		 		//FDR flag
 	uint8_t  		exit_flag;		 	//System external interrupt 
+	uint8_t  		exit_flag_pa4;		 	//System external interrupt 
+	uint8_t  		exit_flag_pa0;		 	//System external interrupt 
 	uint8_t  		mod;				   	//mode
 	uint8_t  		inmod;			   	//Interrupt mode
+	uint8_t  		inmod_pa4;			   	//Interrupt mode
+	uint8_t  		inmod_pa0;			   	//Interrupt mode
 	uint32_t 		tdc;				   	//Send cycle
 	uint16_t 		power_time;	 		//Power on time 
 	uint16_t 		uplink_count; 	//Number of postings
@@ -110,8 +118,15 @@ typedef struct
 {
 	uint8_t  	exit_state;
 	uint8_t  	exit_level;
+	uint8_t  	exit_state_pa4;
+	uint8_t  	exit_level_pa4;
+	uint8_t  	exit_state_pa0;
+	uint8_t  	exit_level_pa0;	
 	uint8_t  	singal;
 	uint32_t 	exit_count;
+	uint32_t 	exit_count_pa4;
+	uint32_t 	exit_count_pa0;
+	uint8_t 	count_mode;
 	uint32_t 	time_stamp;
 	int 			temDs18b20_1;
 	int 			temDs18b20_2;
@@ -139,6 +154,8 @@ extern USER user;
 void product_information_print(void);
 void reboot_information_print(void);
 void EX_GPIO_Init(uint8_t state);
+void EX_GPIO_Init_pa4(uint8_t state);
+void EX_GPIO_Init_pa0(uint8_t state);
 void led_on(uint16_t time);
 
 void txPayLoadDeal(SENSOR* Sensor);

@@ -678,7 +678,7 @@ static const struct NBTASK NBTask[] =
 		.ATRecStrError  = "ERROR",
 		.cmd_num        = _AT_QDNS,
 
-		.time_out 			= 500,
+		.time_out 			= 1000,
 
     .run 						= nb_qdns_run,
 		.set						= nb_qdns_set,

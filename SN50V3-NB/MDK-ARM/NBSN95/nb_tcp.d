@@ -68,3 +68,4 @@ nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\ultrasound.h
 nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\weight.h
 nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\ult.h
 nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\maxsonar.h
+nbsn95\nb_tcp.o: ..\Drivers\BSP\inc\ne117.h

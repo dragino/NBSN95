@@ -71,5 +71,6 @@ nbsn95\stm32l0xx_hal_msp.o: ..\Drivers\BSP\inc\ultrasound.h
 nbsn95\stm32l0xx_hal_msp.o: ..\Drivers\BSP\inc\weight.h
 nbsn95\stm32l0xx_hal_msp.o: ..\Drivers\BSP\inc\ult.h
 nbsn95\stm32l0xx_hal_msp.o: ..\Drivers\BSP\inc\maxsonar.h
+nbsn95\stm32l0xx_hal_msp.o: ..\Drivers\BSP\inc\ne117.h
 nbsn95\stm32l0xx_hal_msp.o: ../Inc/rtc.h
 nbsn95\stm32l0xx_hal_msp.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\time.h

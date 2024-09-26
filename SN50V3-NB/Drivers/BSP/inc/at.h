@@ -607,5 +607,5 @@ static const struct ATCommand_s ATCommand[] =
 };
 
 ATEerror_t ATInsPro( char* at);
-
+void space_fun(char *str);
 #endif

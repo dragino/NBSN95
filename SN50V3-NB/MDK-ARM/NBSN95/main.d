@@ -68,6 +68,7 @@ nbsn95\main.o: ..\Drivers\BSP\inc\ultrasound.h
 nbsn95\main.o: ..\Drivers\BSP\inc\weight.h
 nbsn95\main.o: ..\Drivers\BSP\inc\ult.h
 nbsn95\main.o: ..\Drivers\BSP\inc\maxsonar.h
+nbsn95\main.o: ..\Drivers\BSP\inc\ne117.h
 nbsn95\main.o: ..\Drivers\BSP\inc\flash_eraseprogram.h
 nbsn95\main.o: ..\Drivers\BSP\inc\lowpower.h
 nbsn95\main.o: ..\Drivers\BSP\inc\nbInit.h

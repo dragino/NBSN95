@@ -304,8 +304,12 @@ int main(void)
 	
      if(at_sleep_flag==1 && nb.uplink_flag == no_status)
 		 {
-			  sys.inmod= '0';
+			  sys.inmod= 0;
+				sys.inmod_pa4= 0;
+				sys.inmod_pa0= 0;
 			 	EX_GPIO_Init(0);
+				EX_GPIO_Init_pa4(0);
+				EX_GPIO_Init_pa0(0);;
 			 	at_sleep_flag=0;
 		   	sleep_status=1;
 			  TimerStop(&CheckBLETimesTimer);
@@ -474,8 +478,7 @@ static void USERTASK(void)
 		nb.recieve_flag = NB_IDIE;
 		nb.dns_flag = no_status;
 		while(dns_num--)
-		{
-		NBTask[_AT_QDNS].run(NULL);			
+		{		
 	  HAL_IWDG_Refresh(&hiwdg);				
 		HAL_Delay(3000);		
 		if(NBTask[_AT_QDNS].get(NULL) == NB_CMD_SUCC)
@@ -496,6 +499,8 @@ static void USERTASK(void)
 			if(dns_num==0)
 		  dns_reset_num++;
 		  }
+			if(dns_num!=0)
+			NBTask[_AT_QDNS].run(NULL);			
 		}
 	  }
 		nds_timer_flag2=0;
@@ -859,8 +864,12 @@ void user_key_event(void)
 			
 			case 2://sleep
 			{
-			  sys.inmod= '0';
+			  sys.inmod= 0;
+				sys.inmod_pa4= 0;
+				sys.inmod_pa0= 0;
 			 	EX_GPIO_Init(0);
+				EX_GPIO_Init_pa4(0);
+				EX_GPIO_Init_pa0(0);
 				sleep_status=1;
 			  TimerStop(&CheckBLETimesTimer);
 				TimerStop(&TxTimer);
@@ -904,9 +913,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {	
 	if(GPIO_Pin == GPIO_PIN_15)
 	{		
-		if(sys.mod == model6)
+		if(sys.mod == model6||(sys.mod == model8 && sensor.count_mode==1)||sys.mod == model9)
 			sensor.exit_count++;
-		else if(nb.net_flag == success && sys.mod != model6 && (task_num < _AT_COAP_CONFIG || task_num > _AT_TCP_CLOSE))
+		else if(nb.net_flag == success && sys.mod != model6&& sys.mod != model9 && (task_num < _AT_COAP_CONFIG || task_num > _AT_TCP_CLOSE))
 		{
 			if(nb.uplink_flag == no_status)
 			{
@@ -919,6 +928,40 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 			}
 		}
 	}
+	else if(GPIO_Pin == GPIO_PIN_4)
+	{		
+		if(sys.mod == model8 && sensor.count_mode==1)
+			sensor.exit_count_pa4++;
+		else if(nb.net_flag == success && (task_num < _AT_COAP_CONFIG || task_num > _AT_TCP_CLOSE) && sys.mod == model8 && sensor.count_mode==0)
+		{
+			if(nb.uplink_flag == no_status)
+			{
+			task_num = _AT_QSCLKOFF;
+		  nb.uplink_flag = send;
+			sys.exit_flag_pa4 = 1;
+			sensor.exit_level_pa4 = HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4);
+			sensor.exit_state_pa4 = 1;
+			LPM_DisableStopMode();	
+			}
+		}
+	}
+	else if(GPIO_Pin == GPIO_PIN_0)
+	{		
+		if((sys.mod == model8 && sensor.count_mode==1)||(sys.mod == model9))
+			sensor.exit_count_pa0++;
+		else if(nb.net_flag == success && (task_num < _AT_COAP_CONFIG || task_num > _AT_TCP_CLOSE)&& sys.mod == model8 && sensor.count_mode==0)
+		{
+			if(nb.uplink_flag == no_status)
+			{
+			task_num = _AT_QSCLKOFF;
+		  nb.uplink_flag = send;
+			sys.exit_flag_pa0 = 1;
+			sensor.exit_level_pa0 = HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_0);
+			sensor.exit_state_pa0 = 1;
+			LPM_DisableStopMode();	
+			}
+		}
+	}		
 	else if(GPIO_Pin == GPIO_PIN_8)
 	{		
 		nb.recieve_flag = NB_RECIEVE;

@@ -54,6 +54,8 @@
 #define EEPROM_AD1_AD4_START_ADD						(EEPROM_DISTANCE_START_ADD + 0x04*50)
 #define EEPROM_WEIGHT_START_ADD						(EEPROM_AD1_AD4_START_ADD + 0x04*50)
 #define EEPROM_COUNT_START_ADD						(EEPROM_WEIGHT_START_ADD + 0x04*50)
+#define EEPROM_COUNT2_START_ADD						(EEPROM_COUNT_START_ADD + 0x04*50)
+#define EEPROM_COUNT3_START_ADD						(EEPROM_COUNT2_START_ADD + 0x04*50)
 
 void  FLASH_erase(uint32_t page_address,uint8_t page);
 void  FLASH_program(uint32_t add, uint32_t *data, uint8_t count);

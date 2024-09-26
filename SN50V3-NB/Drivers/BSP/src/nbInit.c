@@ -762,7 +762,7 @@ NB_TaskStatus nb_cpsms_set(const char* param)
 {
 	memset(buff,0,sizeof(buff));
 	strcat(buff,AT CPSMS"=1,,,");
-	strcat(buff,(char*)"\"01000001\"");
+	strcat(buff,(char*)"\"01011111\"");
 	strcat(buff,(char*)",\"00000000\"\r\n");
 	
 	ATSendStr  = NULL;
@@ -1630,7 +1630,8 @@ case _AT_MQTT_CONN:
 case _AT_MQTT_SUB:
 			if(NBTask[_AT_MQTT_SUB].run(NULL) == NB_CMD_SUCC)
 			{
-				*task=_AT_IDLE;					
+				*task=_AT_IDLE;			
+			 HAL_Delay(sys.rxdl);				
 			}
 			else 
 			{
@@ -1720,7 +1721,6 @@ case _AT_MQTT_SEND:
 			}
 			break;
 case _AT_MQTT_READ:
-			HAL_Delay(sys.rxdl);
       mqtt_close_flag=1;
 	    succes_Status=true;
       reupload_time=0;
@@ -1994,11 +1994,14 @@ case _AT_UPLOAD_END:
 			}	
 		 if(succes_Status==true ||reupload_time==3)
 		{
-			if(sys.exit_flag == 0)	{TimerInit( &TxTimer, OnTxTimerEvent );
+			if(sys.exit_flag == 0&& sys.exit_flag_pa4 == 0&& sys.exit_flag_pa0 == 0)	
+				                      {TimerInit( &TxTimer, OnTxTimerEvent );
                                TimerSetValue(&TxTimer,sys.tdc*1000); 
                                TimerStart( &TxTimer);	}
 			reupload_time=0;	
-      sensor.exit_state = 0;															 
+      sensor.exit_state = 0;		
+      sensor.exit_state_pa4 = 0;	
+      sensor.exit_state_pa0 = 0;																 
 			*task = _AT_QSCLK;
 		}
 			succes_Status=false;	

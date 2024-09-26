@@ -67,5 +67,6 @@ nbsn95\nbinit.o: ..\Drivers\BSP\inc\ultrasound.h
 nbsn95\nbinit.o: ..\Drivers\BSP\inc\weight.h
 nbsn95\nbinit.o: ..\Drivers\BSP\inc\ult.h
 nbsn95\nbinit.o: ..\Drivers\BSP\inc\maxsonar.h
+nbsn95\nbinit.o: ..\Drivers\BSP\inc\ne117.h
 nbsn95\nbinit.o: ../Inc/gpio.h
 nbsn95\nbinit.o: ../Inc/hw_rtc.h
