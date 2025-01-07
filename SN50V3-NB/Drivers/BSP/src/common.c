@@ -38,9 +38,9 @@ void product_information_print(void)
 	#endif
 #else	
 	#if defined NB_NS
-	printf("\r\nDRAGINO SN50V3-NS-GE NB-IoT Sensor Node\r\n"
+	printf("\r\nDRAGINO SN50V3-NS NB-IoT Sensor Node\r\n"
 	#else	
-	printf("\r\nDRAGINO SN50V3-NB-GE NB-IoT Sensor Node\r\n"
+	printf("\r\nDRAGINO SN50V3-NB NB-IoT Sensor Node\r\n"
 	#endif
 	#endif
 										"Image Version: "AT_VERSION_STRING "\r\n"
@@ -363,6 +363,9 @@ void txPayLoadDeal(SENSOR* Sensor)
 	for(int i=0;i<strlen((char*)user.deui);i++)
 		sprintf(Sensor->data+strlen(Sensor->data), "%c",  user.deui[i]);
 
+	sprintf(Sensor->data+strlen(Sensor->data), "%c", 'f');
+	for(int i=0;i<strlen((char*)user.ccid);i++)
+		sprintf(Sensor->data+strlen(Sensor->data), "%c",  user.ccid[i]);	
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x",  0x04);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x",  string_touint());
 	
@@ -504,7 +507,7 @@ void txPayLoadDeal(SENSOR* Sensor)
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_level);
-		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Weight);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.8x", Weight);
 	}
 	else if(sys.mod == model6)
 	{
@@ -695,9 +698,24 @@ void txPayLoadDeal(SENSOR* Sensor)
 	
 void txPayLoadDeal2(SENSOR* Sensor)
 {	
-	user_main_printf("remaining battery =%d mv",Sensor->batteryLevel_mV);	
 	Sensor->batteryLevel_mV = getVoltage();
+	user_main_printf("remaining battery =%d mv",Sensor->batteryLevel_mV);		
   get_sensorvalue();
+		if(sys.mod == model9)
+	{
+	  if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0)==1)
+	    user_main_printf("PA8_status:Close\r\n");	
+    else
+		  user_main_printf("PA8_status:Open\r\n");	
+	}	
+	if(sys.mod != model9 && sys.mod != model6 && sys.mod != model8)
+	{
+	  if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_15)==1)
+	    user_main_printf("PB15_status:Close\r\n");	
+	  else
+		  user_main_printf("PB15_status:Open\r\n");	
+	}
+	
 	if(sys.mod == model6)
 	{
 	user_main_printf("count is %d ",sensor.exit_count);
@@ -828,15 +846,12 @@ void rxPayLoadDeal(char* payload)
 		sys.csq_time = csqtdc;
 
 		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+DNSTIMER\":\"");
+	  pos_start  = strstr((char*)payload,"AT+BKDNS\":\"");
 	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+14],(pos_end-pos_start-16));		
-	  uint16_t dnstdc = atoi(at_downlink_data);	
-		if(dnstdc==0)
-	  sys.dns_timer = 0;
-    else	
-	  sys.dns_timer = 1;	
-	 sys.dns_time = dnstdc;
+	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+11],(pos_end-pos_start-13));		
+	  sys.ddns_flag = atoi(at_downlink_data);	
+		char* pp = strchr(at_downlink_data,',');
+		sys.dns_time = atoi(at_downlink_data+(strchr(pp,',')-at_downlink_data)+1);	
 		
 		memset(at_downlink_data,0,220);		
 	  pos_start  = strstr((char*)payload,"AT+TLSMOD\":\"");
@@ -861,7 +876,7 @@ void rxPayLoadDeal(char* payload)
 	}
 	else
   {
-	uint8_t dataCom[10]={0};
+	uint8_t dataCom[20]={0};
 	rtrim((char*)payload);
 	StrToHex((char*)dataCom,payload,strlen(payload));
 	uint8_t dataCom_len = strlen(payload)/2;
@@ -966,12 +981,34 @@ void rxPayLoadDeal(char* payload)
 			if(dataCom_len == 2)
 			{
 				uint8_t temp;
+				temp= dataCom[1];
 				if(temp >= 1 && temp <= 30)
 				{
 				sys.csq_time = dataCom[1];
 				config_Set();
 				}
 			}	
+			break;	
+		case 0x0B:
+			if(dataCom_len == 5)
+			{
+				sensor.exit_count=( dataCom[1]<<24 |dataCom[2]<<16 |dataCom[3]<<8 | dataCom[4] );
+				config_Set();
+			}
+			break;	
+		case 0x0C:
+			if(dataCom_len == 5)
+			{
+				sensor.exit_count_pa4=( dataCom[1]<<24 |dataCom[2]<<16 |dataCom[3]<<8 | dataCom[4] );
+				config_Set();
+			}
+			break;	
+		case 0x0D:
+			if(dataCom_len == 5)
+			{
+				sensor.exit_count_pa0=( dataCom[1]<<24 |dataCom[2]<<16 |dataCom[3]<<8 | dataCom[4] );
+				config_Set();
+			}
 			break;			
 		default:
 			printf("Downstream parameter error\n");
@@ -1503,6 +1540,14 @@ void DatalogClear(void)
 	FLASH_erase(FLASH_USER_START_DATALOG,(FLASH_USER_END_DATALOG - FLASH_USER_START_DATALOG) / FLASH_PAGE_SIZE);	
 }
 
+void Entersleep_Write(uint32_t write_sleep)
+{	
+		HAL_FLASHEx_DATAEEPROM_Unlock();
+		HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_SLEEP_FLAG,write_sleep);
+		HAL_FLASHEx_DATAEEPROM_Lock();	
+}
+
+
 void get_sensorvalue(void)
 {
 		HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_RESET);	
@@ -1600,6 +1645,18 @@ void get_sensorvalue(void)
 	  adc1_datalog = ADCModel(ADC_CHANNEL_1);	
 		DS18B20_GetTemp_SkipRom(1);
 		DS18B20_IoDeInit(1);
+	  if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0)==1)
+	    user_main_printf("PA8_status:Close\r\n");	
+	  else
+		  user_main_printf("PA8_status:Open\r\n");	
+	  if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4)==1)
+	    user_main_printf("PA4_status:Close\r\n");	
+	  else
+		  user_main_printf("PA4_status:Open\r\n");	
+	  if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_15)==1)
+	    user_main_printf("PB15_status:Close\r\n");	
+	  else
+		  user_main_printf("PB15_status:Open\r\n");			
 		}
 	}		
 			if(sys.mod==model9)

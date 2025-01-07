@@ -48,7 +48,7 @@
 #define DNSCFG     "+DNSCFG"	//DNS Server
 
 #define CSQTIME     "+CSQTIME"
-#define DNSTIMER     "+DNSTIMER"
+#define BKDNS     "+BKDNS"
 #define TLSMOD     "+TLSMOD"
 #define SLEEP     "+SLEEP"
 #define MQOS      "+MQOS"
@@ -58,6 +58,7 @@
 #define URI2    "+URI2"
 #define URI3    "+URI3"
 #define URI4    "+URI4"
+#define DOWNTE     "+DOWNTE"
 /**********************************************/
 
 typedef enum
@@ -169,6 +170,8 @@ ATEerror_t at_uri3_set(const char *param);
 ATEerror_t at_uri3_get(const char *param);
 ATEerror_t at_uri4_set(const char *param);
 ATEerror_t at_uri4_get(const char *param);
+ATEerror_t at_down1t_set(const char *param);
+ATEerror_t at_down1t_get(const char *param);
 /*Other*/
 char *rtrim(char *str);
 uint8_t hexDetection(char* str);
@@ -497,12 +500,12 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_csqtime_set,
     .run = at_return_error,
   },
-				/** AT+DNSTIMER **/	
+				/** AT+BKDNS **/	
 	{
-    .string = AT DNSTIMER,
-		.size_string = sizeof(DNSTIMER) - 1,
+    .string = AT BKDNS,
+		.size_string = sizeof(BKDNS) - 1,
 #ifndef NO_HELP
-    .help_string = AT DNSTIMER "  : Get or Set the NDS timer ",
+    .help_string = AT BKDNS "  : Get or Set dynamic domain name resolution IP ",
 #endif
     .get = at_dnstimer_get,
     .set = at_dnstimer_set,
@@ -604,6 +607,16 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_uri4_set,
     .run = at_return_error,
 	},
+	{
+	  .string = AT DOWNTE,
+    .size_string = sizeof(AT DOWNTE) - 1,
+#ifndef NO_HELP
+    .help_string = AT DOWNTE ": Get or set the conversion between the standard version and 1T version downlinks",
+#endif
+    .get = at_down1t_get,
+    .set = at_down1t_set,
+    .run = at_return_error,
+	},	
 };
 
 ATEerror_t ATInsPro( char* at);

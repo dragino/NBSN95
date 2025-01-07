@@ -15,7 +15,7 @@ typedef enum
 
 #include "common.h"
 
-#define stack 							"D-BC660K-003"
+#define stack 							"D-BC660K-004"
 #define COAP_PRO  0x01
 #define UDP_PRO   0x02
 #define MQTT_PRO  0x03
@@ -47,6 +47,7 @@ typedef enum
 #define ATE  				"ATE"                     	/* Echo Mode */
 #define QCFGEV  	  "+QCFG"                     	/* Echo Mode */
 #define CSQ   			"+CSQ"               				/* singel */
+#define QENG   			"+QENG=0"               				/* singel */
 #define QRST			  "+QRST"											/* restart */
 #define QRST2			  "+QRST"											/* restart */
 #define CIMI				"+CIMI"											/* IMSI number */
@@ -114,6 +115,7 @@ typedef enum
 	_AT_CGDCONT,		//SET APN
 	_AT_CPSMS,     	//Power Saving ModeSetting
 	_AT_CSQ,       	//Singal
+	_AT_QENG, 	
 	_AT_QDNSCFG,    //DNSCFG
 	_AT_QDNS,       //DNS
 
@@ -171,6 +173,8 @@ typedef enum
 	_AT_UPLOAD_SUCC,
 	_AT_UPLOAD_FAIL,
 	_AT_UPLOAD_END,
+	_AT_QDETECT,
+	_AT_DNSDETECT,
 }ATCmdNum;
 
 typedef struct
@@ -286,6 +290,7 @@ NB_TaskStatus nb_qdns_set(const char* param);
 NB_TaskStatus nb_qdns_get(const char* param);
 
 NB_TaskStatus nb_csq_get(const char* param);
+NB_TaskStatus nb_qeng_get(const char* param);
 NB_TaskStatus nb_qrst_run(const char* param);
 NB_TaskStatus nb_qrst2_run(const char* param);
 
@@ -657,6 +662,20 @@ static const struct NBTASK NBTask[] =
 		.get						= nb_csq_get,
 
   },
+/**************** QENG	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_QENG,
+
+		.time_out 			= 500,
+
+    .run 						= nb_null_run,
+		.set						= nb_null_run,
+		.get						= nb_qeng_get,
+
+  },	
 /**************** QDNSCFG	****************/
 	{		
 

@@ -365,7 +365,11 @@ NB_TaskStatus nb_COAP_read_run(const char* param)
 
 NB_TaskStatus nb_COAP_read_get(const char* param)
 {
-	char *pch = strrchr((char*)nb.usart.data,','); 
+	char *pch = strrchr((char*)nb.usart.data,',');
+	if(sys.downlink_debug==1)
+	{
+	 user_main_printf("Debug downlink data:%s",nb.usart.data);
+	}	
 	if(pch == NULL)
 		nb_cmd_status = NB_READ_NODATA;
 	else

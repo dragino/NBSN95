@@ -82,11 +82,11 @@ uint16_t ADCModel(uint32_t channel)
 //	float adc_mV_average = (buff[1]+buff[2]+buff[3]+buff[4])/4;
  		if(tdc_clock_log_flag==0)
 	{
-	if(channel == ADC_CHANNEL_0)
+	if(channel == ADC_CHANNEL_4)
 		user_main_printf("adc_mV(1):%.2f",adc_mV);
 	else if(channel == ADC_CHANNEL_1)
 		user_main_printf("adc_mV(2):%.2f",adc_mV);
-	else if(channel == ADC_CHANNEL_4)
+	else if(channel == ADC_CHANNEL_0)
 		user_main_printf("adc_mV(3):%.2f",adc_mV);
   }
 	uint16_t adc_mV_= adc_mV;

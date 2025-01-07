@@ -15,6 +15,7 @@ static uint32_t coap_parameters1[32]={0};
 static uint32_t coap_parameters2[32]={0};
 static uint32_t coap_parameters3[32]={0};
 static uint32_t coap_parameters4[32]={0};
+static uint32_t dns_parameters[32]={0};
 static uint8_t  noud_flags = 0;
 uint8_t  mqtt_qos_flags = 0;
 uint8_t  qband_flag = 0;
@@ -102,6 +103,8 @@ ATEerror_t at_que(const char *param)
 /************** 			ATZ			 **************/
 ATEerror_t at_reset_run(const char *param)
 {
+  Entersleep_Write(( uint32_t )0x11);	
+	HAL_Delay(100);	 
 	NVIC_SystemReset();
   return AT_OK;
 }
@@ -119,9 +122,9 @@ ATEerror_t at_model_get(const char *param)
 	#endif
 #else	
 	#if defined NB_NS
-	printf("SN50V3-NS-GE,%s\r\n",AT_VERSION_STRING);
+	printf("SN50V3-NS,%s\r\n",AT_VERSION_STRING);
 	#else	
-	printf("SN50V3-NB-GE,%s\r\n",AT_VERSION_STRING);
+	printf("SN50V3-NB,%s\r\n",AT_VERSION_STRING);
 	#endif	
 	#endif
 	return AT_OK;
@@ -262,6 +265,7 @@ ATEerror_t at_fdr_run(const char *param)
 	FLASH_erase(FLASH_USER_START_PASSWORD,(FLASH_USER_END - FLASH_USER_START_PASSWORD) / FLASH_PAGE_SIZE);
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);	
 	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);	
+	FLASH_erase(FLASH_USER_DNSCFG,(FLASH_USER_DNSCFG_END - FLASH_USER_DNSCFG) / FLASH_PAGE_SIZE);	
 	DatalogClear();
 	memset(general_parameters,0,sizeof(general_parameters));	
 	sys.clock_switch=1;
@@ -270,6 +274,8 @@ ATEerror_t at_fdr_run(const char *param)
   general_parameters[11]=qband_flag<<24;
 	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8;		
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);		
+  Entersleep_Write(( uint32_t )0x12);	
+	HAL_Delay(100);	 	
 	NVIC_SystemReset();
   return AT_OK;
 }
@@ -282,6 +288,7 @@ ATEerror_t at_fdr1_run(const char *param)
 	HAL_FLASHEx_DATAEEPROM_Lock();
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);		
 	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);		
+	FLASH_erase(FLASH_USER_DNSCFG,(FLASH_USER_DNSCFG_END - FLASH_USER_DNSCFG) / FLASH_PAGE_SIZE);		
 	DatalogClear();
 	memset(general_parameters,0,sizeof(general_parameters));	
 	sys.clock_switch=1;
@@ -290,6 +297,8 @@ ATEerror_t at_fdr1_run(const char *param)
   general_parameters[11]=qband_flag<<24;
 	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8;		
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);			
+  Entersleep_Write(( uint32_t )0x12);	
+	HAL_Delay(100);	 	
 	NVIC_SystemReset();
   return AT_OK;
 }
@@ -325,6 +334,7 @@ ATEerror_t at_servaddr_set(const char *param)
 	char* pos = strchr(param,'=');
   if(strchr(param,',')==NULL)
   {
+		printf("NOTE:SERVADDR FORMAT ERROR\r\n");
     return AT_PARAM_ERROR; 
   }	
 	if(strlen(param) - (pos-param)-1 >69)
@@ -334,7 +344,10 @@ ATEerror_t at_servaddr_set(const char *param)
 	
 	memset(user.add,0,sizeof(user.add));
 	memcpy(user.add,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
-	
+  if((is_ipv4_addr((char*)user.add) == 1) ||(is_ipv4_addr((char*)user.add) == 2)|| (is_ipv6_addr((char*)user.add) == 1)|| (is_ipv6_addr((char*)user.add) == 2) )	
+  {
+  	memset(user.add_ip,0,sizeof(user.add_ip));
+  }
   return AT_OK;
 }
 
@@ -739,11 +752,7 @@ ATEerror_t at_dnscfg_set(const char *param)
 {
 	space_fun((char*)param);
 	char* pos = strchr(param,'=');
-	if(strlen(param) - (pos-param)-1 >19)
-	{
-		return AT_PARAM_ERROR;
-	}
-	if(countchar(pos,',')!=1 || countchar(pos,'.')!=6)
+	if(strlen(param) - (pos-param)-1 >40)
 	{
 		return AT_PARAM_ERROR;
 	}
@@ -814,30 +823,53 @@ ATEerror_t at_csqtime_set(const char *param)
 	sys.csq_time = tdc;
   return AT_OK;
 }
-/************** 			AT+DNSTIMER		 **************/
+/************** 			AT+BKDNS		 **************/
 ATEerror_t at_dnstimer_get(const char *param)
 {
 	if(keep)
-		printf("AT+DNSTIMER=");
-	printf("%d\r\n",sys.dns_time);
+		printf("AT+BKDNS=");
+	printf("%d,%d,",sys.ddns_flag,sys.dns_time);
+	if(sys.ddns_flag==0||strlen((char*)user.add_ip)==0)
+		printf("NULL\r\n");		
+	else
+		printf("%s\r\n",user.add_ip);
   return AT_OK;
 }
 
 ATEerror_t at_dnstimer_set(const char *param)
 {
 	char* pos = strchr(param,'=');
-	uint32_t tdc = atoi((param+(pos-param)+1));
-	if(tdc > 48)
+	char* ipadd = strchr(param,',');	
+	char* ipadd2= strchr(ipadd+1,',');
+	uint8_t tem =  param[(pos-param)+1];
+	uint8_t tem2;
+	tem = tem - 0x30;
+	tem2 =  atoi(param+(strchr(pos,',')-param)+1);	
+	if(tem > 0x02||countchar(pos,',')==0 ||tem2 > 56)
 	{
 		return AT_PARAM_ERROR;
 	}
+	if(countchar(pos,',')==2)
+	{
+		printf("NOTE:IP format error\r\n");
+		return AT_PARAM_ERROR;
+	}	
 	
-	if(tdc==0)
-	sys.dns_timer = 0;
-  else	
-	sys.dns_timer = 1;	
- 
-	sys.dns_time = tdc;
+	if(tem!=0 && countchar(pos,',')==3)	
+	{
+	  if(strlen(param) - (ipadd-param)-1 >49)
+	 {
+		 printf("NOTE:IP format error\r\n");
+		 return AT_PARAM_ERROR;
+	 }
+	  memset(user.add_ip,0,sizeof(user.add_ip));
+	  memcpy(user.add_ip,(param+(ipadd2-param)+1),strlen((param+(ipadd2-param)+1)));	
+	}
+  sys.ddns_flag=tem;
+	sys.dns_time = tem2;
+	
+  printf("Attention:Take effect after ATZ\r\n");
+	
   return AT_OK;
 }
 
@@ -893,9 +925,16 @@ ATEerror_t at_sleep_set(const char *param)
 		return AT_PARAM_ERROR;
 	}
 	if(sleep_tem==1)
+	{
+   Entersleep_Write(( uint32_t )0xA8);			
 	 at_sleep_flag= sleep_tem;
+	}
   else	
-	 NVIC_SystemReset();	
+	{
+   Entersleep_Write(( uint32_t )0x11);	
+   HAL_Delay(100);		
+	 NVIC_SystemReset();
+	}		
 	
   return AT_OK;
 }
@@ -1081,6 +1120,40 @@ ATEerror_t at_uri4_set(const char *param)
   return AT_OK;
 }
 
+/************** 			AT+DOWNTE		 **************/
+ATEerror_t at_down1t_get(const char *param)
+{
+	if(keep)
+		printf(AT DOWNTE"=");
+	printf("%d,%d\r\n",sys.downlink_1t,sys.downlink_debug);	
+
+  return AT_OK;
+}
+
+ATEerror_t at_down1t_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	uint8_t tem = param[(pos-param)+1];
+	uint8_t tem2;
+	tem = tem - 0x30;
+	if(tem > 0x01)
+	{
+		return AT_PARAM_ERROR;
+	}
+  if(strchr(param,',')==NULL)
+  {
+    return AT_PARAM_ERROR; 
+  }	
+  tem2 =  atoi(param+(strchr(pos,',')-param)+1);
+  
+	if(tem2 > 1)
+	{
+		return AT_PARAM_ERROR;
+	}
+	sys.downlink_1t = tem;
+	sys.downlink_debug =tem2;	
+  return AT_OK;
+}
 /************** 		Other		 **************/
 char *rtrim(char* str)
 {
@@ -1115,7 +1188,7 @@ void config_Set(void)
 	memset(coap_parameters2,0,sizeof(coap_parameters2));
 	memset(coap_parameters3,0,sizeof(coap_parameters3));
 	memset(coap_parameters4,0,sizeof(coap_parameters4));	
-	
+	memset(dns_parameters,0,sizeof(dns_parameters));	
 	general_parameters[0]=sensor.exit_count_pa4;
 	general_parameters[1]=sensor.count_mode<<16 |sys.inmod_pa4<<8 | sys.inmod_pa0;
 	general_parameters[2]=sys.mod<<24    | sys.tdc;
@@ -1124,19 +1197,16 @@ void config_Set(void)
 	general_parameters[5]=(int)(sensor.GapValue *10000);
 	general_parameters[6]=sensor.exit_count;
 	general_parameters[11]=qband_flag<<24  |sys.tr_time<<16 | noud_flags<<8 | sys.sht_noud;
-	general_parameters[12]=sys.platform<<24 |sys.dns_timer<<16 |sys.dns_time<<8;
+	general_parameters[12]=sys.platform<<24 |sys.ddns_flag<<16 |sys.dns_time<<8|sys.downlink_1t;
 	general_parameters[28]=mqtt_qos_flags<<24 |mqtt_qos <<16 |sys.cert<<8 |sys.tlsmod;
 	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8 |sys.log_seq;	
 	general_parameters[30]=sensor.exit_count_pa0;
-	
+	general_parameters[31]=sys.downlink_debug;		
 	for(uint8_t i=0,j=0;i<strlen((char*)user.deui);i=i+4,j++)
 			general_parameters[7+j]=user.deui[i+0]<<24 | user.deui[i+1]<<16 | user.deui[i+2]<<8 | user.deui[i+3];
 	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.apn);i=i+4,j++)
 			general_parameters[18+j]=user.apn[i+0]<<24 | user.apn[i+1]<<16 | user.apn[i+2]<<8 | user.apn[i+3];
-	
-	for(uint8_t i=0,j=0;i<strlen((char*)user.dns_add);i=i+4,j++)
-			general_parameters[13+j]=user.dns_add[i+0]<<24 | user.dns_add[i+1]<<16 | user.dns_add[i+2]<<8 | user.dns_add[i+3];
 	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.add);i=i+4,j++)
 			servaddr_parameters[0+j]=user.add[i+0]<<24 | user.add[i+1]<<16 | user.add[i+2]<<8 | user.add[i+3];
@@ -1168,8 +1238,16 @@ void config_Set(void)
 	for(uint8_t i=0,j=0;i<strlen((char*)user.uri4);i=i+4,j++)
 			coap_parameters4[j]=user.uri4[i+0]<<24 | user.uri4[i+1]<<16 | user.uri4[i+2]<<8 | user.uri4[i+3];
 
+	for(uint8_t i=0,j=0;i<strlen((char*)user.dns_add);i=i+4,j++)
+			dns_parameters[j]=user.dns_add[i+0]<<24 | user.dns_add[i+1]<<16 | user.dns_add[i+2]<<8 | user.dns_add[i+3];
+			
+	for(uint8_t i=0,j=0;i<strlen((char*)user.add_ip);i=i+4,j++)
+			dns_parameters[10+j]=user.add_ip[i+0]<<24 | user.add_ip[i+1]<<16 | user.add_ip[i+2]<<8 | user.add_ip[i+3];
+
+			
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);
 	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);	
+	FLASH_erase(FLASH_USER_DNSCFG,(FLASH_USER_DNSCFG_END - FLASH_USER_DNSCFG) / FLASH_PAGE_SIZE);		
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);
 	FLASH_program(FLASH_USER_START_SERVADDR_ADD,servaddr_parameters, sizeof(servaddr_parameters)/4);
 //	FLASH_program(FLASH_USER_START_COAP,coap_parameters, sizeof(coap_parameters)/4);
@@ -1182,6 +1260,7 @@ void config_Set(void)
 	FLASH_program(FLASH_USER_COAP_URI2,coap_parameters2, sizeof(coap_parameters2)/4);
 	FLASH_program(FLASH_USER_COAP_URI3,coap_parameters3, sizeof(coap_parameters3)/4);		
 	FLASH_program(FLASH_USER_COAP_URI4,coap_parameters4, sizeof(coap_parameters4)/4);			
+	FLASH_program(FLASH_USER_DNSCFG,dns_parameters, sizeof(dns_parameters)/4);	
 }
 
 void config_Get(void)
@@ -1198,6 +1277,11 @@ void config_Get(void)
 	if(strlen((char*)sys.pwd) == 0)
 	{
 		memcpy(sys.pwd,MCU_pwd,6);
+	  password_parameters[0]=sys.pwd[0]<<24 | sys.pwd[1]<<16 	| sys.pwd[2]<<8 | sys.pwd[3];
+	  password_parameters[1]=sys.pwd[4]<<24 | sys.pwd[5]<<16 	| sys.pwd[6]<<8 | sys.pwd[7];	
+	
+	  FLASH_erase(FLASH_USER_START_PASSWORD,(FLASH_USER_END - FLASH_USER_START_PASSWORD) / FLASH_PAGE_SIZE);
+	  FLASH_program(FLASH_USER_START_PASSWORD,password_parameters, sizeof(password_parameters)/4);
 		sys.pwd_flag = 0;
 	}
 	else if(strlen((char*)sys.pwd)==1 && strchr((char*)sys.pwd,'0'))
@@ -1264,7 +1348,9 @@ void config_Get(void)
 
   sys.dns_time = FLASH_read(add+48)>>8 &0xFF;	
 	
-  sys.dns_timer	= FLASH_read(add+48)>>16 &0xFF;	
+  sys.ddns_flag	= FLASH_read(add+48)>>16 &0xFF;	
+	
+	sys.downlink_1t= FLASH_read(add+48) &0xFF;	
 	
   sys.tlsmod = FLASH_read(add+112) &0xFF;	
 	
@@ -1281,7 +1367,7 @@ void config_Get(void)
 	sys.clock_switch = FLASH_read(add+116)>>24 &0xFF;
 	
 	sys.strat_time = FLASH_read(add+116)>>8 &0xFFFF;
-	
+	sys.downlink_debug= FLASH_read(add+124) &0xFF;	
   sys.platform	= FLASH_read(add+48)>>24 &0xFF;	
 	
 	add = add+28;
@@ -1316,20 +1402,6 @@ void config_Get(void)
 		#endif
 	}
 	
-		add = FLASH_USER_START_ADDR_CONFIG + 0x04*13;
-	for(uint8_t i=0,j=0;i<5;i++,j=j+4)
-	{
-		uint32_t temp  = FLASH_read(add+i*4);
-		user.dns_add[j] 	 = (temp>>24) & 0x000000FF;
-		user.dns_add[j+1] = (temp>>16) & 0x000000FF;
-		user.dns_add[j+2] = (temp>>8)  & 0x000000FF;
-		user.dns_add[j+3] = (temp)     & 0x000000FF;
-	}
-	if(strlen((char*)user.dns_add) == 0)
-	{
-		sprintf((char*)user.dns_add, "%s", "\"8.8.8.8\",\"8.8.4.4\"");
-	}
-	
 	add = FLASH_USER_START_SERVADDR_ADD;
 	for(uint8_t i=0,j=0;i<18;i++,j=j+4)
 	{
@@ -1361,6 +1433,28 @@ void config_Get(void)
 		else if(sys.platform==3)
 		sprintf((char*)user.add, "%s", "broker.hivemq.com,1883");			
 	}
+		add = FLASH_USER_DNSCFG;
+	for(uint8_t i=0,j=0;i<10;i++,j=j+4)
+	{
+		uint32_t temp  = FLASH_read(add+i*4);
+		user.dns_add[j] 	 = (temp>>24) & 0x000000FF;
+		user.dns_add[j+1] = (temp>>16) & 0x000000FF;
+		user.dns_add[j+2] = (temp>>8)  & 0x000000FF;
+		user.dns_add[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.dns_add) == 0)
+	{
+		sprintf((char*)user.dns_add, "%s", "\"8.8.8.8\",\"8.8.4.4\"");
+	}
+	
+	for(uint8_t i=0,j=0;i<12;i++,j=j+4)
+	{
+		uint32_t temp  = FLASH_read(add+(i+10)*4);
+		user.add_ip[j] 	 = (temp>>24) & 0x000000FF;
+		user.add_ip[j+1] = (temp>>16) & 0x000000FF;
+		user.add_ip[j+2] = (temp>>8)  & 0x000000FF;
+		user.add_ip[j+3] = (temp)     & 0x000000FF;
+	}	
 	//mqtt-uname
 	add = FLASH_USER_START_MQTT_UNAME;
 	for(uint8_t i=0,j=0;i<32;i++,j=j+4)

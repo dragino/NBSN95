@@ -41,7 +41,7 @@
  * @retval None
  */
 
-#define AT_VERSION_STRING 	"v1.2.4"
+#define AT_VERSION_STRING 	"v1.3.0"
 #define product_id 					 0x04
 
 typedef enum
@@ -84,7 +84,7 @@ typedef struct
 	uint8_t 		tr_time;				//Time interval of sensor recording data 
 	uint8_t     csq_time;
   uint8_t     dns_time;	
-  uint8_t     dns_timer;	
+  uint8_t     ddns_flag;	
 	uint8_t			sht_seq;
 	uint8_t			sht_noud;
 	USART				usart;
@@ -94,14 +94,17 @@ typedef struct
 	uint8_t			log_seq;
 	bool        clock_switch;
 	uint16_t    strat_time;
+	uint8_t			downlink_1t;
+	uint8_t			downlink_debug;
 }SYSTEM;
 
 typedef struct
 {
 	uint8_t  deui[16];
+	uint8_t  ccid[16];
 	uint8_t  add[70];
 	uint8_t  add_ip[50];
-	uint8_t  dns_add[26];
+	uint8_t  dns_add[41];
 	uint8_t  apn[41];
 	uint8_t  client[129];
 	uint8_t  uname[129];
@@ -177,5 +180,6 @@ void shtDataClear(void);
 void DatalogPrint(void);
 void DatalogClear(void);
 void get_sensorvalue(void);
+void Entersleep_Write(uint32_t write_sleep);
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -496,6 +496,10 @@ NB_TaskStatus nb_MQTT_data_read_set(const char* param)
 {
 	memset(downlink_data,0,1000);		
 	char* pos_start  = strstr((char*)nb.usart.data,"\",\"");	user_main_debug("pos_start:%p",&pos_start);
+	if(sys.downlink_debug==1)
+	{
+	 user_main_printf("Debug downlink data:%s",nb.usart.data);
+	}
 	if(pos_start[3]=='{')
 	{
 	  char* pos_end    = strchr(pos_start,'}');			user_main_debug("pos_end:%p",&pos_end);		

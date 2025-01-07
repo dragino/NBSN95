@@ -1,3 +1,16 @@
+v1.3.0
+1. Network Information is displayed when accessing the network
+2. Fix bugs where commands such as AT+UNAME display errors
+3. The software automatically removes spaces to prevent customers from filling in the wrong address
+4. Support TE version UDP distribution, add command AT+DOWNTE.
+5. Updated domain name resolution mechanism, removed AT+DNSTIME command, and added AT+BKDNS command
+6. Added a feature to prevent devices from crashing during sleep, accidentally resetting, or being unable to enter sleep mode due to power failure
+7. Add NB module detection crash mechanism
+8. The AT+SERVADDR command adds formatting restrictions to prevent customers from filling in errors.
+9. The AT+DNSCFG command has been increased from 19 characters to 40 characters, removing formatting restrictions.
+10. Remove GE and 1D versions from the device name and unify them into one version, for example, S31-NB-GE becomes S31-NB
+11. Add IMSI number in payload format
+
 v1.2.4
 1.Add four modes
  MOD7 3xADC + 3xDS18B20 mode

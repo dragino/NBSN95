@@ -17,9 +17,10 @@ extern uint8_t join_network_time;
 extern uint8_t join_network_timer;
 extern uint8_t error_num;
 extern uint8_t  rxbuf;
+extern bool at_sleep_flag;
 uint8_t reupload_time = 0;
 bool  succes_Status=false;
-extern uint8_t nds_timer_flag2;
+extern uint8_t dns_timer_flag;
 extern uint8_t is_time_to_send;
 extern uint8_t sleep_status;
 extern uint8_t nbmodel_int;
@@ -28,6 +29,7 @@ static uint8_t mqtt_close_flag = 0;
 static uint8_t resend_flag = 0;
 static uint8_t no_response_flag = 0;
 static uint8_t no_response_time = 0;
+extern uint8_t nb_no_rev;
 uint8_t read_flag = 0;
 bool no_singal_flag = 0;
 char record_log[512]={0};
@@ -46,6 +48,7 @@ extern TimerEvent_t timesampleTimer;
 extern void OntimesampleEvent(void);
 extern bool Calibrat_flag;
 
+extern bool nb_start;
 NB nb = {.net_flag=no_status,.recieve_flag=0,.usart.len=0,.usart.data=recieve_data,
 				 .imei={0},.imsi={0},.singal=0};
 
@@ -804,6 +807,44 @@ NB_TaskStatus nb_csq_get(const char* param)
 
 	return nb_cmd_status;
 }
+
+/**
+	* @brief  AT+QENG : Get Network information
+  * @param  Instruction parameter
+  * @retval None
+  */
+
+NB_TaskStatus nb_qeng_get(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = AT QENG NEWLINE;
+	len_string = sizeof(AT QENG NEWLINE) - 1;
+  int rssi,sinr,band;	
+	if(nb_at_send(&NBTask[_AT_QENG])== NB_CMD_SUCC)
+	{
+	  char *p = strstr((char*)nb.usart.data,"+QENG");
+	  if( p==NULL)
+		  nb_cmd_status = NB_CMD_FAIL;
+	  else
+	 {
+		 	char *pch1 = strchr((char*)nb.usart.data,':');
+		 for(uint8_t i=0;i<7;i++)
+		 {
+		  pch1 = strchr((char*)pch1,',');
+			pch1=pch1+1;   
+		 }
+		 rssi = atoi(pch1);
+		 pch1 = strchr((char*)pch1,',');
+		 pch1=pch1+1; 
+     sinr = atoi(pch1);
+		 pch1 = strchr((char*)pch1,',');
+		 pch1=pch1+1; 
+		 band = atoi(pch1);
+		 user_main_printf("Network Information:\"RSSI:%d\",\"SINR:%d\",\"BAND:%d\"",rssi,sinr,band);
+	 }	
+	}
+	return nb_cmd_status;
+}
 /**
 	* @brief  AT+QDNSCFG : DNS Server 
   * @param  Instruction parameter
@@ -885,7 +926,17 @@ NB_TaskStatus nb_qdns_get(const char* param)
 {
 	char *p1=strrchr((char*)nb.usart.data,'P');	
 	char *q1=strrchr((char*)user.add,',');
-	if(p1==NULL || q1==NULL)
+	uint8_t q2,q3;
+	
+     if(countchar((char*)nb.usart.data,'.')>=3)
+			  q2=1;
+     else
+				q2=0;  
+     if(countchar((char*)nb.usart.data,':')>3)
+        q3=1;
+     else
+				q3=0; 	
+    if(p1==NULL || q1==NULL || (q2==0&&q3==0))
 	{
 		user_main_printf("Domain name resolution failed");
 	  sprintf(record_log+strlen(record_log), "Domain name resolution failed\r\n");		
@@ -1050,6 +1101,9 @@ case _AT_IMSI:{
 				{
 					*task=_AT_QICFG;
 					user_main_printf("The IMSI number is:%s.",nb.imsi);
+					memset(user.ccid,0,sizeof(user.ccid));
+					memcpy(user.ccid,nb.imsi,15);						
+
 				}
 				else 
 				{
@@ -1198,7 +1252,7 @@ case _AT_CSQ:{
 					if(csq_fail_log>0)
 				 sprintf(record_log+strlen(record_log), "Signal Strength:99 *%d\r\n",csq_fail_log);
 				 sprintf(record_log+strlen(record_log), "Signal Strength:%d\r\n",nb.singal);
-					*task=(net_acc_status_led == 0)?_AT_CPSMS:_AT_CCLK;				
+					*task=(net_acc_status_led == 0)?_AT_QENG:_AT_CCLK;				
 					nb.net_flag = success;
 					if(net_acc_status_led == 0)
 					{
@@ -1217,6 +1271,13 @@ case _AT_CSQ:{
 					*task = _AT_IDLE;	
 				  join_network_flag=1;
 					nb.net_flag = fail;
+				}
+			}
+			break;	
+case _AT_QENG:{
+				if(NBTask[_AT_QENG].get(NULL) == NB_CMD_SUCC)
+				{
+				     *task = _AT_CPSMS;				
 				}
 			}
 			break;			
@@ -1298,7 +1359,7 @@ case _AT_QMTCFG_SSL:
 			break;
 			
 case _AT_QDNS:{
-				if((is_ipv4_addr((char*)user.add) == 1) ||(is_ipv4_addr((char*)user.add) == 2) || (nds_timer_flag2==1) || (is_ipv6_addr((char*)user.add) == 1)|| (is_ipv6_addr((char*)user.add) == 2) )
+				if(((is_ipv4_addr((char*)user.add) == 1) ||(is_ipv4_addr((char*)user.add) == 2) || (is_ipv6_addr((char*)user.add) == 1)|| (is_ipv6_addr((char*)user.add) == 2))&&(dns_timer_flag!=1) )
 				{
           *task = _AT_UPLOAD_START;
 					user_main_printf("No DNS resolution required");		
@@ -1340,7 +1401,12 @@ case _AT_UPLOAD_START:{
 				memset(record_log,0,sizeof(record_log));
 				nb.uplink_flag = send;
 				nb.recieve_flag = NB_IDIE;
-
+	    if(nb_start==1)
+			{
+				nb_start=0;
+				TimerSetValue(&TxTimer,sys.tdc*1000); 
+        TimerStart( &TxTimer);
+			}
       if(sys.protocol == COAP_PRO)	{*task=_AT_COAP_CONFIG;}
       else if(sys.protocol == UDP_PRO)	{*task=_AT_UDP_OPEN;}			
 			else if(sys.protocol == MQTT_PRO)	{*task=_AT_MQTT_Config;}
@@ -1994,10 +2060,6 @@ case _AT_UPLOAD_END:
 			}	
 		 if(succes_Status==true ||reupload_time==3)
 		{
-			if(sys.exit_flag == 0&& sys.exit_flag_pa4 == 0&& sys.exit_flag_pa0 == 0)	
-				                      {TimerInit( &TxTimer, OnTxTimerEvent );
-                               TimerSetValue(&TxTimer,sys.tdc*1000); 
-                               TimerStart( &TxTimer);	}
 			reupload_time=0;	
       sensor.exit_state = 0;		
       sensor.exit_state_pa4 = 0;	
@@ -2018,7 +2080,38 @@ case _AT_UPLOAD_FAIL:
 				sprintf(record_log+strlen(record_log), "Failed to send\r\n");
 			*task = _AT_UPLOAD_END;
 			break;
-
+case _AT_QDETECT:{
+      if(NBTask[_AT].run(NULL) == NB_CMD_SUCC)
+	   {
+			 nb_no_rev=0;
+	     NBTask[_AT_QSCLK].run(NULL); 
+	   }else
+      {
+				  nb_no_rev++;
+	 				RESET_GPIO_Init();
+				  HAL_Delay(100);
+				  RESET_GPIO_DeInit();
+					HAL_Delay(2000);
+		    if(NBTask[_AT_QSCLK].run(NULL) == NB_CMD_SUCC)
+				{
+				  if(NBTask[_AT_CFUNEND].run(NULL) == NB_CMD_SUCC)
+				  { 
+						printf("Enter sleep mode");
+				  }
+			  }
+	    }
+      nb.uplink_flag = no_status;				
+			*task=_AT_IDLE;		
+		}
+					break;
+case _AT_DNSDETECT:{
+			NBTask[_AT].run(NULL); 
+		  NBTask[_AT_CFUNSTA].run(NULL); 
+		  NBTask[_AT_QDNSCFG].run(NULL);	
+			HAL_Delay(5000);
+			*task=_AT_QDNS;		
+		}
+					break;
 case _AT_QRST:{
 				if(NBTask[_AT_QRST].run(NULL) != NB_CMD_SUCC)
 				{
@@ -2065,6 +2158,12 @@ case _AT_FLAG_INIT:{
 				net_acc_status_led = 0;
 	      nbmodel_int=1;
 	      tls_flag=0;
+		    uint32_t r_sleep=*(__IO uint32_t *)(EEPROM_USER_SLEEP_FLAG);	
+		    //printf("r_sleep:%x",r_sleep);
+		      if(r_sleep==0xA8)
+				{
+				 at_sleep_flag=1;
+				}	
 	      TimerInit( &nb_intTimeoutTimer, nb_intTimeoutEvent );
 			  TimerSetValue( &nb_intTimeoutTimer, 8000);
 			  TimerStart( &nb_intTimeoutTimer );

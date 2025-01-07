@@ -7,7 +7,7 @@ extern float tem_value;
 extern float ds1820_value;
 extern float ds1820_value2;
 extern float ds1820_value3;
-
+extern int32_t Weight_Shiwu;
 void pro_data_thingspeak(void)
 {
 	uint16_t batteryLevel_mV=getVoltage();
@@ -53,13 +53,8 @@ void pro_data_thingspeak(void)
    sprintf(buff1+strlen(buff1), "field4=%.1f&",ds1820_value);	
 	 sprintf(buff1+strlen(buff1), "field5=%d&",sensor.adc1);
    sprintf(buff1+strlen(buff1), "field6=%d&",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
-	  sprintf(buff1+strlen(buff1), "field7=%d&",sensor.exit_state);
-	  WEIGHT_SCK_Init();
-	  WEIGHT_DOUT_Init();
-		int32_t Weight = Get_Weight();	
-	  WEIGHT_SCK_DeInit();
-	  WEIGHT_DOUT_DeInit();					
-	 sprintf(buff1+strlen(buff1), "field8=%d",Weight);	
+	  sprintf(buff1+strlen(buff1), "field7=%d&",sensor.exit_state);			
+	 sprintf(buff1+strlen(buff1), "field8=%d",Weight_Shiwu);	
 	}		
 	else if(sys.mod == model6)
 	{
@@ -105,6 +100,13 @@ void pro_data(void)
 {
 		uint16_t str_end,str_beg=0;
 		uint16_t batteryLevel_mV=getVoltage();
+	  time_t curtime;
+	  struct tm *info;	
+		curtime = sensor.time_stamp;	
+	  info = localtime( &curtime );
+    char nowtime[80];	
+	  memset(nowtime,0,sizeof(nowtime));
+		strftime(nowtime, 80, "%Y/%m/%d %H:%M:%S", info);
 		for(uint8_t j=0;j<2;j++)
 		{
      if(j==1)
@@ -114,15 +116,14 @@ void pro_data(void)
 		      strcat(buff,(char*)"\"");
 		 }
 		 str_beg=strlen(buff);
-	sprintf(buff+strlen(buff),  "{\"IMEI\":\"%s\",\"Model\":\"SN50V3-NB\",\"mod\":%d,\"battery\":%.2f,\"signal\":%d,",user.deui,sys.mod,batteryLevel_mV/1000.0,nb.singal);	
+	sprintf(buff+strlen(buff),  "{\"IMEI\":\"%s\",\"IMSI\":\"%s\",\"Model\":\"SN50V3-NB\",\"mod\":%d,\"battery\":%.2f,\"signal\":%d,\"time\":\"%s\",",user.deui,user.ccid,sys.mod,batteryLevel_mV/1000.0,nb.singal,nowtime);	
    mode_data(buff);
 		int num = sys.sht_seq;
 		int16_t tem,hum,d1,d2,d3;
 		uint16_t ad0,ad1,ad4,distance;
 		uint32_t count,count2,count3;
 	  int32_t weight;
-		time_t curtime;
-	  struct tm *info;	
+
 			int num2 = sys.sht_noud;
 		if(sys.protocol == MQTT_PRO)	
 		{
@@ -262,7 +263,7 @@ void pro_data(void)
 		   }
 			 	else if(sys.mod==model9)
        {
-			  sprintf(buff+strlen(buff),"[%.1f,%.1f,%d,\"%s\"]",(float)tem/10.0,(float)hum/10.0,count,mini);	
+			  sprintf(buff+strlen(buff),"[%.1f,%.1f,%d,\"%s\"]",(float)tem/10.0,(float)hum/10.0,count3,mini);	
 		   }	
 			 	else if(sys.mod==model10)
        {
@@ -322,13 +323,8 @@ sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);
 	 sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
         sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
 	      sprintf(buff+strlen(buff), "\"interrupt\":%d,",sensor.exit_state);
-		sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);	
-	  WEIGHT_SCK_Init();
-	  WEIGHT_DOUT_Init();
-		int32_t Weight = Get_Weight();	
-	  WEIGHT_SCK_DeInit();
-	  WEIGHT_DOUT_DeInit();					
-	 sprintf(buff+strlen(buff), "\"weight\":%d",Weight);	
+		sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);					
+	 sprintf(buff+strlen(buff), "\"weight\":%d",Weight_Shiwu);	
 	}		
 	else if(sys.mod == model6)
 	{

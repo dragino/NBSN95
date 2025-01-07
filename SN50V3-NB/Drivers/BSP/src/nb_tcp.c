@@ -131,6 +131,12 @@ NB_TaskStatus nb_TCP_read_run(const char* param)
 
 NB_TaskStatus nb_TCP_read_get(const char* param)
 {
+	if(sys.downlink_debug==1)
+	{
+	 user_main_printf("Debug downlink data:%s",nb.usart.data);
+	}
+if(sys.downlink_1t==0)
+{
 	char *pch = strrchr((char*)nb.usart.data,','); 
 	if(pch == NULL)
 		nb_cmd_status = NB_READ_NODATA;
@@ -145,6 +151,28 @@ NB_TaskStatus nb_TCP_read_get(const char* param)
 		
 		nb_cmd_status = NB_READ_DATA;
 	}
+	}
+	else
+	{
+  char tem[100]={0};	
+	char *pch2 = strstr((char*)nb.usart.data,"recv\""); 
+	char* start2  = strchr(pch2,'\n'); 	
+	memcpy(tem,&nb.usart.data[pch2-((char*)nb.usart.data)+2],(start2-pch2-2));		
+	char* pch  = strrchr((char*)tem,','); 		
+	if(pch == NULL)
+		nb_cmd_status = NB_READ_NODATA;
+	else
+	{
+		memset(downlink_data,0,sizeof(downlink_data));
+		char*	end    = pch;
+		char* start  = strrchr((char*)tem,'\"'); 
+
+		memcpy(downlink_data,&tem[end-((char*)tem)+2],(start-end-2));	
+		user_main_printf("Received downlink data:%s",downlink_data);
+		
+		nb_cmd_status = NB_READ_DATA;
+	}	
+	}	
 	return nb_cmd_status;	
 }
 

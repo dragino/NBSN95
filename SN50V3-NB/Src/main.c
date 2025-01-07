@@ -87,7 +87,7 @@ static uint8_t pwd_time_count = 0;			//Password time count times
 
 static uint16_t dns_time_count = 0;			//DNS time count times
 
-static uint8_t task_num = _AT_IDLE;			//NB task directory
+uint8_t task_num = _AT_IDLE;			//NB task directory
 extern bool no_singal_flag ;
 uint8_t error_num = 0;				    //Error count
 uint8_t press_button_times=0;//Press the button times in a row fast
@@ -103,9 +103,10 @@ uint8_t user_key_duration=0;
 uint8_t join_network_flag = 0;	
 uint8_t join_network_time = 0;
 uint8_t join_network_timer = 0;
-uint8_t nds_network_time = 0;
-uint8_t nds_timer_flag = 0;
-uint8_t nds_timer_flag2= 0;
+
+
+uint8_t dns_timer_flag= 0;
+uint8_t nb_no_rev= 0;
 uint8_t user_key_exti_flag=0;
 extern int32_t cal_time_difference;
 extern bool clock_cal_time_flag;
@@ -120,6 +121,7 @@ __IO bool ble_sleep_command=0;
 bool sleep_status=0;//AT+SLEEP
 bool tdc_clock_log_flag=0;
 bool Calibrat_flag=0;
+bool nb_start=0;
 /* USER CODE END PV */
 TimerEvent_t TxTimer;
 TimerEvent_t CheckBLETimesTimer;
@@ -128,14 +130,18 @@ TimerEvent_t PressButtonTimeoutTimer;
 TimerEvent_t nb_intTimeoutTimer;
 TimerEvent_t timesampleTimer;
 TimerEvent_t CalibrationtimeTimer;
-void LoraStartTx(void);
+
+TimerEvent_t DDNSTimer;
+TimerEvent_t DectectMODELTimer;
 void OnTxTimerEvent( void );
 void OnCheckBLETimesEvent(void);
 void GPIO_BLE_STATUS_Ioinit(void);
 void nb_intTimeoutEvent(void);
 void OnPressButtonTimesLedEvent(void);
+void OnDDNSEvent( void );
 void rename_ble(void);
 void LoraStartCheckBLE(void);
+void DectectMODEL(void);
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 void user_key_event(void);
@@ -209,6 +215,12 @@ int main(void)
 	My_UARTEx_StopModeWakeUp(&hlpuart1);			//Enable serial port wake up
   TimerInit( &CalibrationtimeTimer, onCalibrationtimeEvent );
 	onCalibrationtimeEvent();	
+	TimerInit( &DDNSTimer, OnDDNSEvent );	
+	TimerInit( &DectectMODELTimer, DectectMODEL );
+  TimerSetValue( &DectectMODELTimer,  60000*60); 
+  TimerStart( &DectectMODELTimer);	
+	TimerInit( &TxTimer, OnTxTimerEvent );
+	nb_start=1;
   /* USER CODE END 2 */
 	
   /* Infinite loop */
@@ -256,6 +268,10 @@ int main(void)
 		{
 		NVIC_SystemReset();	
 		dns_reset_num=0;
+		}
+		if(nb_no_rev>=3)
+		{
+		 NVIC_SystemReset();			
 		}
 		if(/*nb.recieve_flag == NB_RECIEVE &&*/ nb.uplink_flag == send && task_num == _AT_IDLE && sleep_status==0)
 		{
@@ -316,6 +332,7 @@ int main(void)
 				TimerStop(&TxTimer);
 			  TimerStop(&timesampleTimer);
 			  TimerStop( &CalibrationtimeTimer);
+			  TimerStop( &DDNSTimer);
 			  task_num = _AT_CFUNOFF;	
 			  NBTASK(&task_num);	
 				
@@ -483,7 +500,7 @@ static void USERTASK(void)
 		HAL_Delay(3000);		
 		if(NBTask[_AT_QDNS].get(NULL) == NB_CMD_SUCC)
 		{
-			if( nds_timer_flag2==0)
+			if( dns_timer_flag==0)
 			{
 			task_num = _AT_UPLOAD_START;
 			}
@@ -492,10 +509,16 @@ static void USERTASK(void)
 		}
 		else
 		{
-			if( nds_timer_flag2==0)
+			if( dns_timer_flag==0)
 			{
-			task_num = _AT_QRST;
-
+			  if(strlen((char*)user.add_ip) == 0 ||sys.ddns_flag==0)
+			    task_num = _AT_QRST;
+        else
+				{
+				 if(dns_num==0)	
+				   user_main_printf("Domain IP:%s",user.add_ip);
+				 task_num = _AT_UPLOAD_START;
+				}
 			if(dns_num==0)
 		  dns_reset_num++;
 		  }
@@ -503,7 +526,11 @@ static void USERTASK(void)
 			NBTask[_AT_QDNS].run(NULL);			
 		}
 	  }
-		nds_timer_flag2=0;
+		if(dns_timer_flag==1)
+		{
+		 nb.uplink_flag = no_status;
+		 dns_timer_flag=0;
+		}
 	}	
 }
 
@@ -558,18 +585,6 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 		}
 	}	
 #endif	
-
-	if(sys.dns_timer==1&& sleep_status==0)
-	{
-		nds_network_time++;
-		if(nds_network_time==(sys.dns_time*360))
-		{
-		 nds_network_time=0;
-     nds_timer_flag=1;	
-     nds_timer_flag2=1;			
-		 task_num = _AT_QDNS;
-		}
-	}	
 	
 	if(nb.net_flag == fail && join_network_flag==1 && sleep_status==0)
 	{
@@ -638,6 +653,17 @@ void OnPressButtonTimesLedEvent(void)
 	HAL_GPIO_WritePin(LED_RGB_PORT,LED_BLUE_PIN,GPIO_PIN_RESET);
 }
 
+void DectectMODEL(void)
+{
+  TimerSetValue( &DectectMODELTimer,  60000*60); 
+  TimerStart( &DectectMODELTimer);		
+  if(nb.uplink_flag == no_status)
+  {
+	  nb.uplink_flag = effective;	
+    task_num	=	_AT_QDETECT;
+  }
+}
+
 void OnPressButtonTimeoutEvent(void)
 {
 	TimerStop(&PressButtonTimeoutTimer);
@@ -649,7 +675,25 @@ void nb_intTimeoutEvent(void)
 {
 	TimerStop(&nb_intTimeoutTimer);
 	if(sleep_status==0)
+	{
 	  task_num = _AT;
+	  OnDDNSEvent();
+	}
+}
+
+void OnDDNSEvent(void)
+{
+	if(sys.ddns_flag==2&& sleep_status==0&&sys.dns_time!=0)
+	{
+	 TimerSetValue( &DDNSTimer,  sys.dns_time*3600000); 
+	 TimerStart( &DDNSTimer);	
+	 if(nb.uplink_flag == no_status && nb.net_flag == success)
+	 {
+		dns_timer_flag=1;
+		nb.uplink_flag = effective;
+	  task_num = _AT_DNSDETECT;
+	 }
+  }
 }
 
 void OntimesampleEvent(void)
@@ -756,15 +800,12 @@ void rename_ble(void)
 
 void OnTxTimerEvent( void )
 {
+  TimerSetValue(&TxTimer,sys.tdc*1000); 
+  TimerStart( &TxTimer);		
 	is_time_to_send=1;
 }
 
-void LoraStartTx(void)
-{
-    TimerInit( &TxTimer, OnTxTimerEvent );
-    TimerSetValue( &TxTimer,  sys.tdc*1000); 
-    OnTxTimerEvent();
-}
+
 
 void HW_GetUniqueId( uint8_t *id )
 {
@@ -814,6 +855,7 @@ void user_key_event(void)
 			}			
 			else if(TimerGetElapsedTime(currentTime) >= 3000)//system reset,Activation Mode
 			{ 
+        Entersleep_Write(( uint32_t )0x11);
         press_button_times=0;					
 				for(int i=0;i<10;i++)
 				{
@@ -871,10 +913,12 @@ void user_key_event(void)
 				EX_GPIO_Init_pa4(0);
 				EX_GPIO_Init_pa0(0);
 				sleep_status=1;
+				Entersleep_Write(( uint32_t )0xA8);
 			  TimerStop(&CheckBLETimesTimer);
 				TimerStop(&TxTimer);
 				TimerStop(&timesampleTimer);
 				TimerStop( &CalibrationtimeTimer);
+        TimerStop( &DDNSTimer);
 			  task_num = _AT_CFUNOFF;	
 			  NBTASK(&task_num);	
 				
