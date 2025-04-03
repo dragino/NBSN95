@@ -1,3 +1,10 @@
+v1.1.2
+1. Fix mode 8, the issue of packet sending failure interrupted by pb15 and pa4
+
+v1.1.1
+1. The use of AT+FDR1 command will not erase DEUI
+2. Add AT+BKDNS command
+
 v1.1
 1. Network Information is displayed when accessing the network
 2. Fix bugs where commands such as AT+UNAME display errors
