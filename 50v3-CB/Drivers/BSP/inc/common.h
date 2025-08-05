@@ -41,7 +41,7 @@
  * @retval None
  */
 
-#define AT_VERSION_STRING 	"v1.1.2"
+#define AT_VERSION_STRING 	"v1.1.4"
 #define product_id 					 0x04
 
 typedef enum
