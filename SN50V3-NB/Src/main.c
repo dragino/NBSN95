@@ -89,6 +89,7 @@ static uint16_t dns_time_count = 0;			//DNS time count times
 
 uint8_t task_num = _AT_IDLE;			//NB task directory
 extern bool no_singal_flag ;
+uint8_t no_singal_num= 0;
 uint8_t error_num = 0;				    //Error count
 uint8_t press_button_times=0;//Press the button times in a row fast
 uint8_t is_time_to_send=0;
@@ -264,15 +265,11 @@ int main(void)
 			HAL_UART_Receive_IT(&hlpuart1,rxbuf_lp,RXSIZE);	
 			My_UARTEx_StopModeWakeUp(&hlpuart1);	
 		}
-		if(dns_reset_num > 2 )
+		if(dns_reset_num > 2 ||nb_no_rev>=3 ||no_singal_num>=12)
 		{
-		NVIC_SystemReset();	
-		dns_reset_num=0;
+		 NVIC_SystemReset();	
 		}
-		if(nb_no_rev>=3)
-		{
-		 NVIC_SystemReset();			
-		}
+
 		if(/*nb.recieve_flag == NB_RECIEVE &&*/ nb.uplink_flag == send && task_num == _AT_IDLE && sleep_status==0)
 		{
 			task_num = _AT_URI;
@@ -320,9 +317,6 @@ int main(void)
 	
      if(at_sleep_flag==1 && nb.uplink_flag == no_status)
 		 {
-			  sys.inmod= 0;
-				sys.inmod_pa4= 0;
-				sys.inmod_pa0= 0;
 			 	EX_GPIO_Init(0);
 				EX_GPIO_Init_pa4(0);
 				EX_GPIO_Init_pa0(0);;
@@ -906,9 +900,6 @@ void user_key_event(void)
 			
 			case 2://sleep
 			{
-			  sys.inmod= 0;
-				sys.inmod_pa4= 0;
-				sys.inmod_pa0= 0;
 			 	EX_GPIO_Init(0);
 				EX_GPIO_Init_pa4(0);
 				EX_GPIO_Init_pa0(0);

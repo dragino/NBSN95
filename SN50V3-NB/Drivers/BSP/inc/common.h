@@ -41,7 +41,7 @@
  * @retval None
  */
 
-#define AT_VERSION_STRING 	"v1.3.0"
+#define AT_VERSION_STRING 	"v1.4.5"
 #define product_id 					 0x04
 
 typedef enum
@@ -56,6 +56,7 @@ typedef enum
  model8 ,
  model9 ,
  model10 ,
+ model11 ,
 }model;
 
 typedef struct
@@ -78,7 +79,7 @@ typedef struct
 	uint8_t  		inmod_pa0;			   	//Interrupt mode
 	uint32_t 		tdc;				   	//Send cycle
 	uint16_t 		power_time;	 		//Power on time 
-	uint16_t 		uplink_count; 	//Number of postings
+	uint32_t 		uplink_count; 	//Number of postings
 	uint8_t  		protocol;		 		//protocol
 	uint16_t 		rxdl;				 		//Receiving time
 	uint8_t 		tr_time;				//Time interval of sensor recording data 
@@ -115,6 +116,8 @@ typedef struct
 	uint8_t  uri2[129];
 	uint8_t  uri3[129];
 	uint8_t  uri4[129];	
+	uint8_t  ntp_add[64];	
+	uint8_t  operator_code[64];	
 }USER;
 
 typedef struct

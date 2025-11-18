@@ -2,6 +2,7 @@
 float hum_value;
 float tem_value;
 extern uint16_t tem_store,hum_store;
+float gxht30_temp_record=10,gxht30_hum_record=40;
 extern bool tdc_clock_log_flag;
 void sht31Init(void)
 {
@@ -29,38 +30,94 @@ void sht31LowPower(void)
 
 void sht31Data(void)
 {
+  HAL_StatusTypeDef   error;
+  uint8_t times = 0;	
 	float hum=0.0;
 	float tem=0.0;
 	uint8_t rxdata[6]={0};
 	uint8_t SHT3X_Start_Buffer[2]={0xE0,0x00};
 	uint16_t AD_code = 0;
-	sht31Init();
-	HAL_Delay(100);
-	HAL_I2C_Master_Transmit(&hi2c1,0x88,SHT3X_Start_Buffer,2,1000);
-	HAL_I2C_Master_Receive(&hi2c1,0x89,rxdata,6,1000);
-		
+  do
+  {
+     times++;
+	  sht31Init();
+	  HAL_Delay(100);		
+    HAL_I2C_Master_Transmit(&hi2c1,0x88,SHT3X_Start_Buffer,2,1000);
+		error = HAL_I2C_Master_Receive(&hi2c1,0x89,rxdata,6,1000);
+  }while(times < 4 && error != HAL_OK);	
 	AD_code=(rxdata[3]<<8)+rxdata[4];
 	AD_code &=~0x0003;   //14bit
 	hum=AD_code*100.0/(65536-1);
-	if(hum>100.0 || hum<0.0)
-	{
-		hum=0.0;
-	}
-
 	AD_code=(rxdata[0]<<8)+rxdata[1];
 //	AD_code &=~0x0003;   //14bit
 	tem=AD_code*175.0/(65536-1)-45.0;
-	if((tem<-40.0)||(tem>125.0))
-	{
-		tem = 130.0;
-	}
-  hum_value=hum;
-  tem_value=tem;
+
+
+   if(error != HAL_OK ||tem-gxht30_temp_record>30 || tem-gxht30_temp_record<-30
+            || hum<20 || hum>=100 || hum-gxht30_hum_record>20 || hum-gxht30_hum_record<-20)
+   {
+       times = 0;       
+       do
+       {
+          times++;
+				 	sht31Init();
+	        HAL_Delay(100);
+          HAL_I2C_Master_Transmit(&hi2c1,0x88,SHT3X_Start_Buffer,2,1000);
+		      error = HAL_I2C_Master_Receive(&hi2c1,0x89,rxdata,6,1000);
+       }while(times < 4 && error != HAL_OK);
+			 
+	AD_code=(rxdata[3]<<8)+rxdata[4];
+	AD_code &=~0x0003;   //14bit
+	hum=AD_code*100.0/(65536-1);
+	AD_code=(rxdata[0]<<8)+rxdata[1];
+//	AD_code &=~0x0003;   //14bit
+	tem=AD_code*175.0/(65536-1)-45.0;
+   }
+	
+	  if(error == HAL_OK)
+    {
+        if(tem>125)
+        {
+            tem=125;
+            tem=gxht30_temp_record;
+        }
+        else if(tem<-40)
+        {
+            tem=-40;
+            tem=gxht30_temp_record;
+        }
+        
+        if(hum>100)
+        {
+            hum=100;
+            hum=gxht30_hum_record;
+        }
+        else if(hum<0)
+        {
+            hum=0;
+            hum=gxht30_hum_record;
+        }
+        else if(hum==100)
+        {
+            hum=gxht30_hum_record;
+        }
+        
+        gxht30_temp_record=tem;
+        gxht30_hum_record=hum;
+    }
+    else
+    {
+        tem=130.0;
+        hum=0.0;
+    }
+	
  		if(tdc_clock_log_flag==0)
 	{
   user_main_printf("Humidity =%.2f %%rh",hum);
 	user_main_printf("tem =%.2f C",tem);	
 	}
+  hum_value=hum;
+  tem_value=tem;
 	sensor.temSHT = (int)(tem*10);
 	sensor.humSHT = (int)(hum*10);
  		if(tdc_clock_log_flag==1)

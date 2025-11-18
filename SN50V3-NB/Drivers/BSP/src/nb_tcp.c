@@ -5,14 +5,17 @@ extern char buff[2000];
 extern char downlink_data[1000];
 extern float hum_value;
 extern float tem_value;
-extern float ds1820_value;
-extern float ds1820_value2;
-extern float ds1820_value3;
 extern char 	*ATSendStr;
 extern int 	len_string;
 extern uint8_t  try_num;
 extern NB_TaskStatus  nb_cmd_status;
+extern uint8_t at_downlink_flag;
+
+extern uint8_t downlink_check_event;
+extern uint8_t received_dwonlink_flags;
 extern void pro_data(void);
+extern void downilnk_check_data(void);
+extern void downilnk_ack_data(void);
 /**
 	* @brief  Open TCP port operation
   * @param  Instruction parameter
@@ -92,7 +95,12 @@ NB_TaskStatus nb_TCP_send_set(const char* param)
 	strcat(buff,"0,");
 	if(sys.platform==5)	
 	{
-   pro_data();
+		if(downlink_check_event==1)
+			downilnk_check_data();
+		else if(received_dwonlink_flags==1)
+			downilnk_ack_data();		
+		else	
+      pro_data();
 	}
 	if(sys.platform==0)		
 	{
@@ -117,63 +125,95 @@ NB_TaskStatus nb_TCP_send_set(const char* param)
   */
 NB_TaskStatus nb_TCP_read_run(const char* param)
 {
-	NBTask[_AT_TCP_READ].set(param);
-	if(nb_at_send(&NBTask[_AT_TCP_READ]) == NB_CMD_SUCC)
-	{
 		if(NBTask[_AT_TCP_READ].get(param) == NB_READ_DATA)
 		{			
-			rxPayLoadDeal(downlink_data);
+			if(downlink_check_event==0)
+			  rxPayLoadDeal(downlink_data);
 		}
-	}
 	
 	return nb_cmd_status;
 }
 
 NB_TaskStatus nb_TCP_read_get(const char* param)
 {
+	uint8_t downlink_code=0;
+	char*	end;
+	char* start;
+	char *pch;	
+	memset(downlink_data,0,sizeof(downlink_data));	
 	if(sys.downlink_debug==1)
 	{
 	 user_main_printf("Debug downlink data:%s",nb.usart.data);
-	}
-if(sys.downlink_1t==0)
-{
-	char *pch = strrchr((char*)nb.usart.data,','); 
-	if(pch == NULL)
-		nb_cmd_status = NB_READ_NODATA;
-	else
-	{
-		memset(downlink_data,0,sizeof(downlink_data));
-		char*	end    = pch;
-		char* start  = strrchr((char*)nb.usart.data,'\"'); 
-
-		memcpy(downlink_data,&nb.usart.data[end-((char*)nb.usart.data)+2],(start-end-2));	
-		user_main_printf("Received downlink data:%s",downlink_data);
-		
-		nb_cmd_status = NB_READ_DATA;
-	}
-	}
-	else
-	{
-  char tem[100]={0};	
-	char *pch2 = strstr((char*)nb.usart.data,"recv\""); 
-	char* start2  = strchr(pch2,'\n'); 	
-	memcpy(tem,&nb.usart.data[pch2-((char*)nb.usart.data)+2],(start2-pch2-2));		
-	char* pch  = strrchr((char*)tem,','); 		
-	if(pch == NULL)
-		nb_cmd_status = NB_READ_NODATA;
-	else
-	{
-		memset(downlink_data,0,sizeof(downlink_data));
-		char*	end    = pch;
-		char* start  = strrchr((char*)tem,'\"'); 
-
-		memcpy(downlink_data,&tem[end-((char*)tem)+2],(start-end-2));	
-		user_main_printf("Received downlink data:%s",downlink_data);
-		
-		nb_cmd_status = NB_READ_DATA;
 	}	
+	if(strstr((char*)nb.usart.data,"{\"Config\":\"[") != NULL)
+	{
+	  downlink_code=1;
+	}		
+	
+	if(sys.platform==5 && strstr((char*)nb.usart.data,"Event:Status") != NULL)
+	{
+	  downlink_check_event=1;
 	}	
-	return nb_cmd_status;	
+	
+  if(sys.downlink_1t==0)
+  {
+		if(downlink_code==1)
+		{
+	      pch = strchr((char*)nb.usart.data,'{'); 	
+		    end    = pch;
+		    start  = strrchr((char*)nb.usart.data,'\"'); 
+		    memcpy(downlink_data,&nb.usart.data[end-((char*)nb.usart.data)+11],(start-end)-13);	
+			  at_downlink_flag=1;	
+		    user_main_printf("Received downlink data:%s",downlink_data);
+		    nb_cmd_status = NB_READ_DATA;		
+		}
+		else
+		{
+	     pch = strrchr((char*)nb.usart.data,','); 	
+	     if(pch == NULL)
+		     nb_cmd_status = NB_READ_NODATA;
+	     else
+	    {
+		    end    = pch;
+		    start  = strrchr((char*)nb.usart.data,'\"'); 
+		    memcpy(downlink_data,&nb.usart.data[end-((char*)nb.usart.data)+2],(start-end-2));	
+		    user_main_printf("Received downlink data:%s",downlink_data);
+		    nb_cmd_status = NB_READ_DATA;
+	    }
+    }
+	}
+	else
+	{
+    char tem[100]={0};	
+	  char *pch2 = strstr((char*)nb.usart.data,"recv\""); 
+   	char* start2  = strchr(pch2,'\n'); 	
+	  memcpy(tem,&nb.usart.data[pch2-((char*)nb.usart.data)+2],(start2-pch2-2));		
+		if(downlink_code==1)
+		{		
+	    pch  = strchr((char*)tem,'{'); 		
+		  end    = pch;
+		  start  = strrchr((char*)tem,'\"'); 
+		  memcpy(downlink_data,&tem[end-((char*)nb.usart.data)+11],(start-end)-13);		
+			at_downlink_flag=1;	
+		  user_main_printf("Received downlink data:%s",downlink_data);
+		  nb_cmd_status = NB_READ_DATA;	
+	 }
+		else
+   {
+		    pch  = strrchr((char*)tem,','); 		
+	    if(pch == NULL)
+		    nb_cmd_status = NB_READ_NODATA;
+	    else
+	   {
+		    end    = pch;
+		    start  = strrchr((char*)tem,'\"'); 
+		    memcpy(downlink_data,&tem[end-((char*)tem)+2],(start-end-2));	
+		    user_main_printf("Received downlink data:%s",downlink_data);
+		    nb_cmd_status = NB_READ_DATA;
+	   } 
+	 }
+	}
+	return nb_cmd_status;
 }
 
 /**

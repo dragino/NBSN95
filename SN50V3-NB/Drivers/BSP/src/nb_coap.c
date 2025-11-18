@@ -9,7 +9,11 @@ extern char 	*ATSendStr;
 extern int 	len_string;
 extern uint8_t  try_num;
 extern NB_TaskStatus  nb_cmd_status;
+extern uint8_t downlink_check_event;
+extern uint8_t received_dwonlink_flags;
 extern void pro_data(void);
+extern void downilnk_check_data(void);
+extern void downilnk_ack_data(void);
 /**
 	* @brief  Configure to show the CoAP option of sender
   * @param  Instruction parameter
@@ -313,7 +317,12 @@ NB_TaskStatus nb_COAP_send_run(const char* param)
 NB_TaskStatus nb_COAP_send_set(const char* param)
 {
 	memset(buff,0,sizeof(buff));
-	pro_data();			
+  if(downlink_check_event==1)
+		downilnk_check_data();
+	else if(received_dwonlink_flags==1)
+			downilnk_ack_data();			
+	else	
+    pro_data();	
 	buff[strlen(buff)]=0x1A;	
 	ATSendStr  = NULL;	
 	ATSendStr = buff;
@@ -358,7 +367,8 @@ NB_TaskStatus nb_COAP_read_run(const char* param)
 {
 		if(NBTask[_AT_COAP_READ].get(param) == NB_READ_DATA)
 		{			
-			rxPayLoadDeal(downlink_data);
+			if(downlink_check_event==0)
+			  rxPayLoadDeal(downlink_data);
 		}
 	return nb_cmd_status;
 }
@@ -370,6 +380,12 @@ NB_TaskStatus nb_COAP_read_get(const char* param)
 	{
 	 user_main_printf("Debug downlink data:%s",nb.usart.data);
 	}	
+	
+	if(sys.platform==5 && strstr((char*)nb.usart.data,"Event:Status") != NULL)
+	{
+	  downlink_check_event=1;
+	}	
+	
 	if(pch == NULL)
 		nb_cmd_status = NB_READ_NODATA;
 	else

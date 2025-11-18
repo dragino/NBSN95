@@ -16,10 +16,10 @@ static uint32_t coap_parameters2[32]={0};
 static uint32_t coap_parameters3[32]={0};
 static uint32_t coap_parameters4[32]={0};
 static uint32_t dns_parameters[32]={0};
-static uint8_t  noud_flags = 0;
-uint8_t  mqtt_qos_flags = 0;
+static uint32_t ntp_parameters[32]={0};
 uint8_t  qband_flag = 0;
 uint8_t mqtt_qos=0;
+extern uint8_t fdr_qsw;
 extern char MCU_pwd[20];
 uint8_t getsensorvalue_flag=0;
 extern bool at_sleep_flag;
@@ -176,6 +176,10 @@ ATEerror_t at_mod_set(const char *param)
 	{
 		printf("\r\nUse Sensor is TMP117\r\n");
 	}	
+	else if(mod == model11)
+	{
+		printf("\r\n3 ADC ratiometric + I2C\r\n");
+	}	
 	else
 	{
 		return AT_PARAM_ERROR;
@@ -266,12 +270,18 @@ ATEerror_t at_fdr_run(const char *param)
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);	
 	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);	
 	FLASH_erase(FLASH_USER_DNSCFG,(FLASH_USER_DNSCFG_END - FLASH_USER_DNSCFG) / FLASH_PAGE_SIZE);	
+	FLASH_erase(FLASH_USER_NTP,(FLASH_USER_NTP_END - FLASH_USER_NTP) / FLASH_PAGE_SIZE);
 	DatalogClear();
 	memset(general_parameters,0,sizeof(general_parameters));	
 	sys.clock_switch=1;
 	sys.strat_time=65535;
 	qband_flag=1;	
-  general_parameters[11]=qband_flag<<24;
+	sys.ddns_flag=1;
+	mqtt_qos = 2; 
+	sys.sht_noud = 8;
+	general_parameters[12]=sys.ddns_flag<<16;
+  general_parameters[11]=qband_flag<<24  |sys.sht_noud;
+	general_parameters[28]=mqtt_qos <<16;	
 	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8;		
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);		
   Entersleep_Write(( uint32_t )0x12);	
@@ -283,23 +293,47 @@ ATEerror_t at_fdr_run(const char *param)
 /************** 			AT+FDR1		 **************/
 ATEerror_t at_fdr1_run(const char *param)
 {
+	uint32_t add = FLASH_USER_START_ADDR_CONFIG;
+	add = add+28;
+	for(uint8_t i=0,j=0;i<4;i++,j=j+4)
+	{
+		uint32_t temp  = FLASH_read(add+i*4);
+		user.deui[j] 	 = (temp>>24) & 0x000000FF;
+		user.deui[j+1] = (temp>>16) & 0x000000FF;
+		user.deui[j+2] = (temp>>8)  & 0x000000FF;
+		user.deui[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.deui) == 0)
+	{
+		sprintf((char*)user.deui, "%s", "NULL");
+	}
 	HAL_FLASHEx_DATAEEPROM_Unlock();
 	HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_FDR_FLAG,0x01);//store fdr_flag
 	HAL_FLASHEx_DATAEEPROM_Lock();
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);		
 	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);		
-	FLASH_erase(FLASH_USER_DNSCFG,(FLASH_USER_DNSCFG_END - FLASH_USER_DNSCFG) / FLASH_PAGE_SIZE);		
+	FLASH_erase(FLASH_USER_DNSCFG,(FLASH_USER_DNSCFG_END - FLASH_USER_DNSCFG) / FLASH_PAGE_SIZE);
+	FLASH_erase(FLASH_USER_NTP,(FLASH_USER_NTP_END - FLASH_USER_NTP) / FLASH_PAGE_SIZE);		
 	DatalogClear();
 	memset(general_parameters,0,sizeof(general_parameters));	
 	sys.clock_switch=1;
 	sys.strat_time=65535;
 	qband_flag=1;	
-  general_parameters[11]=qband_flag<<24;
+	sys.ddns_flag=1;
+	mqtt_qos = 2; 
+	sys.sht_noud = 8;
+	for(uint8_t i=0,j=0;i<strlen((char*)user.deui);i=i+4,j++)
+			general_parameters[7+j]=user.deui[i+0]<<24 | user.deui[i+1]<<16 | user.deui[i+2]<<8 | user.deui[i+3];
+	general_parameters[12]=sys.ddns_flag<<16;
+  general_parameters[11]=qband_flag<<24  |sys.sht_noud;
+	general_parameters[28]=mqtt_qos <<16;		
 	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8;		
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);			
   Entersleep_Write(( uint32_t )0x12);	
 	HAL_Delay(100);	 	
-	NVIC_SystemReset();
+  if(fdr_qsw==0)	
+	  NVIC_SystemReset();
+  fdr_qsw=0;	  
   return AT_OK;
 }
 /************** 			AT+CFG		 **************/
@@ -956,7 +990,6 @@ ATEerror_t at_mqos_set(const char *param)
 		return AT_PARAM_ERROR;
 	}
 	mqtt_qos = noud;
-	mqtt_qos_flags=1;
 	return AT_OK;
 }
 /************** 			AT+GETLOG		**************/
@@ -1004,9 +1037,6 @@ ATEerror_t at_clocklog_set(const char *param)
 		sys.strat_time=bb;
 		sys.tr_time=cc;
 		sys.sht_noud=dd;
-		first_sample=0;
-		noud_flags = 1;
-		nb_cclk_run(NULL);
 	}
   else
 	{
@@ -1154,6 +1184,57 @@ ATEerror_t at_down1t_set(const char *param)
 	sys.downlink_debug =tem2;	
   return AT_OK;
 }
+
+/************** 			AT+NTP		 **************/
+ATEerror_t at_ntp_get(const char *param)
+{
+	if(keep)
+		printf("AT+NTP=");
+	printf("%s\r\n",user.ntp_add);
+	
+  return AT_OK;
+}
+
+ATEerror_t at_ntp_set(const char *param)
+{
+	space_fun((char*)param);	
+	char* pos = strchr(param,'=');
+	
+	if(strlen(param) - (pos-param)-1 >63)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.ntp_add,0,sizeof(user.ntp_add));
+	memcpy(user.ntp_add,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
+	
+  return AT_OK;
+}
+/************** 			AT+QCOPS		 **************/
+ATEerror_t at_cops_get(const char *param)
+{
+	if(keep)
+		printf("AT+QCOPS=");
+	printf("%s\r\n",user.operator_code);
+	
+  return AT_OK;
+}
+
+ATEerror_t at_cops_set(const char *param)
+{
+	space_fun((char*)param);	
+	char* pos = strchr(param,'=');
+	
+	if(strlen(param) - (pos-param)-1 >63)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.operator_code,0,sizeof(user.operator_code));
+	memcpy(user.operator_code,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
+	
+  return AT_OK;
+}
 /************** 		Other		 **************/
 char *rtrim(char* str)
 {
@@ -1188,7 +1269,8 @@ void config_Set(void)
 	memset(coap_parameters2,0,sizeof(coap_parameters2));
 	memset(coap_parameters3,0,sizeof(coap_parameters3));
 	memset(coap_parameters4,0,sizeof(coap_parameters4));	
-	memset(dns_parameters,0,sizeof(dns_parameters));	
+	memset(dns_parameters,0,sizeof(dns_parameters));
+	memset(ntp_parameters,0,sizeof(ntp_parameters));		
 	general_parameters[0]=sensor.exit_count_pa4;
 	general_parameters[1]=sensor.count_mode<<16 |sys.inmod_pa4<<8 | sys.inmod_pa0;
 	general_parameters[2]=sys.mod<<24    | sys.tdc;
@@ -1196,10 +1278,10 @@ void config_Set(void)
 	general_parameters[4]=sys.rxdl<<16   | sys.power_time;
 	general_parameters[5]=(int)(sensor.GapValue *10000);
 	general_parameters[6]=sensor.exit_count;
-	general_parameters[11]=qband_flag<<24  |sys.tr_time<<16 | noud_flags<<8 | sys.sht_noud;
+	general_parameters[11]=qband_flag<<24  |sys.tr_time<<16 | sys.sht_noud;
 	general_parameters[12]=sys.platform<<24 |sys.ddns_flag<<16 |sys.dns_time<<8|sys.downlink_1t;
-	general_parameters[28]=mqtt_qos_flags<<24 |mqtt_qos <<16 |sys.cert<<8 |sys.tlsmod;
-	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8 |sys.log_seq;	
+	general_parameters[28]=mqtt_qos <<16 |sys.cert<<8 |sys.tlsmod;
+	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8;	
 	general_parameters[30]=sensor.exit_count_pa0;
 	general_parameters[31]=sys.downlink_debug;		
 	for(uint8_t i=0,j=0;i<strlen((char*)user.deui);i=i+4,j++)
@@ -1245,9 +1327,16 @@ void config_Set(void)
 			dns_parameters[10+j]=user.add_ip[i+0]<<24 | user.add_ip[i+1]<<16 | user.add_ip[i+2]<<8 | user.add_ip[i+3];
 
 			
+	for(uint8_t i=0,j=0;i<strlen((char*)user.ntp_add);i=i+4,j++)
+			ntp_parameters[j]=user.ntp_add[i+0]<<24 | user.ntp_add[i+1]<<16 | user.ntp_add[i+2]<<8 | user.ntp_add[i+3];
+
+	for(uint8_t i=0,j=0;i<strlen((char*)user.operator_code);i=i+4,j++)
+			ntp_parameters[16+j]=user.operator_code[i+0]<<24 | user.operator_code[i+1]<<16 | user.operator_code[i+2]<<8 | user.operator_code[i+3];
+
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);
 	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);	
-	FLASH_erase(FLASH_USER_DNSCFG,(FLASH_USER_DNSCFG_END - FLASH_USER_DNSCFG) / FLASH_PAGE_SIZE);		
+	FLASH_erase(FLASH_USER_DNSCFG,(FLASH_USER_DNSCFG_END - FLASH_USER_DNSCFG) / FLASH_PAGE_SIZE);	
+	FLASH_erase(FLASH_USER_NTP,(FLASH_USER_NTP_END - FLASH_USER_NTP) / FLASH_PAGE_SIZE);		
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);
 	FLASH_program(FLASH_USER_START_SERVADDR_ADD,servaddr_parameters, sizeof(servaddr_parameters)/4);
 //	FLASH_program(FLASH_USER_START_COAP,coap_parameters, sizeof(coap_parameters)/4);
@@ -1261,6 +1350,7 @@ void config_Set(void)
 	FLASH_program(FLASH_USER_COAP_URI3,coap_parameters3, sizeof(coap_parameters3)/4);		
 	FLASH_program(FLASH_USER_COAP_URI4,coap_parameters4, sizeof(coap_parameters4)/4);			
 	FLASH_program(FLASH_USER_DNSCFG,dns_parameters, sizeof(dns_parameters)/4);	
+	FLASH_program(FLASH_USER_NTP,ntp_parameters, sizeof(ntp_parameters)/4);			
 }
 
 void config_Get(void)
@@ -1306,7 +1396,7 @@ void config_Get(void)
 	EX_GPIO_Init_pa0(sys.inmod_pa0);
 	
 	sys.mod = FLASH_read(add+8) >>24;
-	if(sys.mod == 0 || sys.mod > model10)
+	if(sys.mod == 0 || sys.mod > model11)
 		sys.mod = model1;
 	
 	sys.tdc = FLASH_read(add+8)  & 0x00FFFFFF;
@@ -1336,11 +1426,9 @@ void config_Get(void)
 	if(sys.tr_time == 0)
 		sys.tr_time = 15;
 
-	noud_flags=FLASH_read(add+44)>>8&0xFF;
+//	noud_flags=FLASH_read(add+20)>>8&0xFF;
 	
-	sys.sht_noud=FLASH_read(add+44)&0xFF;
-	if((sys.sht_noud==0)&&(noud_flags==0))
-		sys.sht_noud = 8;
+	sys.sht_noud=FLASH_read(add+20)&0xFF;
 	
 	sys.csq_time = FLASH_read(add+12) &0xFF;
 	if(sys.csq_time==0)
@@ -1356,13 +1444,11 @@ void config_Get(void)
 	
   sys.cert	= FLASH_read(add+112)>>8 &0xFF;	
   
-	mqtt_qos_flags = FLASH_read(add+112)>>24 &0xFF;	
+//	mqtt_qos_flags = FLASH_read(add+112)>>24 &0xFF;	
 	
-  mqtt_qos  = FLASH_read(add+112)>>16 &0xFF;	
-	if((mqtt_qos==0)&&(mqtt_qos_flags==0))
-		mqtt_qos = 2;  
+  mqtt_qos  = FLASH_read(add+112)>>16 &0xFF;	 
 	
-	 sys.log_seq = FLASH_read(add+116) &0xFF;	
+//	 sys.retransmission_flag = FLASH_read(add+116) &0xFF;	
 
 	sys.clock_switch = FLASH_read(add+116)>>24 &0xFF;
 	
@@ -1580,4 +1666,35 @@ void config_Get(void)
 	{
 		sprintf((char*)user.uri4, "%s", "NULL");
 	}	
+	
+	add = FLASH_USER_NTP;
+	for(uint8_t i=0,j=0;i<16;i++,j=j+4)
+	{
+		uint32_t temp = FLASH_read(add+i*4);
+		user.ntp_add[j] 	= (temp>>24) & 0x000000FF;
+		user.ntp_add[j+1] = (temp>>16) & 0x000000FF;
+		user.ntp_add[j+2] = (temp>>8)  & 0x000000FF;
+		user.ntp_add[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.ntp_add) == 0)
+	{
+		sprintf((char*)user.ntp_add, "%s", "NULL");
+	}	
+	
+	add = FLASH_USER_NTP + 0x04*16;	
+	
+	for(uint8_t i=0,j=0;i<16;i++,j=j+4)
+	{
+		uint32_t temp = FLASH_read(add+i*4);
+		user.operator_code[j] 	= (temp>>24) & 0x000000FF;
+		user.operator_code[j+1] = (temp>>16) & 0x000000FF;
+		user.operator_code[j+2] = (temp>>8)  & 0x000000FF;
+		user.operator_code[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.operator_code) == 0)
+	{
+		sprintf((char*)user.operator_code, "%s", "NULL");
+	}	
+	
+	sys.log_seq=(*(__IO uint16_t *)EEPROM_USER_START_FDR_FLAG)>>8&0xff;
 }

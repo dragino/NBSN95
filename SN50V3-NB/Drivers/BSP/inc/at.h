@@ -59,6 +59,9 @@
 #define URI3    "+URI3"
 #define URI4    "+URI4"
 #define DOWNTE     "+DOWNTE"
+
+#define NTP    "+NTP"
+#define QCOPS    "+QCOPS"
 /**********************************************/
 
 typedef enum
@@ -172,6 +175,11 @@ ATEerror_t at_uri4_set(const char *param);
 ATEerror_t at_uri4_get(const char *param);
 ATEerror_t at_down1t_set(const char *param);
 ATEerror_t at_down1t_get(const char *param);
+
+ATEerror_t at_ntp_set(const char *param);
+ATEerror_t at_ntp_get(const char *param);
+ATEerror_t at_cops_set(const char *param);
+ATEerror_t at_cops_get(const char *param);
 /*Other*/
 char *rtrim(char *str);
 uint8_t hexDetection(char* str);
@@ -617,6 +625,27 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_down1t_set,
     .run = at_return_error,
 	},	
+
+	{
+	  .string = AT NTP,
+    .size_string = sizeof(AT NTP) - 1,
+#ifndef NO_HELP
+    .help_string = AT NTP ": Get or set NTP Server",
+#endif
+    .get = at_ntp_get,
+    .set = at_ntp_set,
+    .run = at_return_error,
+	},
+	{
+	  .string = AT QCOPS,
+    .size_string = sizeof(AT QCOPS) - 1,
+#ifndef NO_HELP
+    .help_string = AT QCOPS ": Get or set operator code",
+#endif
+    .get = at_cops_get,
+    .set = at_cops_set,
+    .run = at_return_error,
+	},
 };
 
 ATEerror_t ATInsPro( char* at);

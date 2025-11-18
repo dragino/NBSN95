@@ -7,9 +7,6 @@ char downlink_data[1000]={0};
 uint8_t at_downlink_flag=0;
 extern float hum_value;
 extern float tem_value;
-extern float ds1820_value;
-extern float ds1820_value2;
-extern float ds1820_value3;
 extern void pro_data(void);
 extern void pro_data_thingspeak(void);
 extern uint8_t mqtt_qos;
@@ -18,6 +15,10 @@ extern char 	*ATSendStr;
 extern int 	len_string;
 extern uint8_t  try_num;
 extern NB_TaskStatus  nb_cmd_status;
+extern uint8_t downlink_check_event;
+extern uint8_t received_dwonlink_flags;
+extern void downilnk_check_data(void);
+extern void downilnk_ack_data(void);
 /**
 	* @brief  Set MQTT configuration parameters
   * @param  Instruction parameter
@@ -445,7 +446,12 @@ NB_TaskStatus nb_MQTT_pub5_set(const char* param)
 	strcat(buff,AT QMTPUB"=0,1,1,0,\"");
 	strcat(buff,(char*)user.pubtopic);
 	strcat(buff,(char*)"\",");
-	pro_data();
+	if(downlink_check_event==1)
+		downilnk_check_data();
+		else if(received_dwonlink_flags==1)
+			downilnk_ack_data();		
+	else	
+    pro_data();
 	strcat(buff,"\r\n");			
 	ATSendStr  = NULL;
 	ATSendStr  = buff;
@@ -494,16 +500,25 @@ NB_TaskStatus nb_MQTT_data_read_run(const char* param)
 
 NB_TaskStatus nb_MQTT_data_read_set(const char* param)
 {
+	uint8_t downlink_code=0;
 	memset(downlink_data,0,1000);		
 	char* pos_start  = strstr((char*)nb.usart.data,"\",\"");	user_main_debug("pos_start:%p",&pos_start);
 	if(sys.downlink_debug==1)
 	{
 	 user_main_printf("Debug downlink data:%s",nb.usart.data);
 	}
-	if(pos_start[3]=='{')
+	if(strstr((char*)pos_start,"{\"Config\":\"[") != NULL)
 	{
-	  char* pos_end    = strchr(pos_start,'}');			user_main_debug("pos_end:%p",&pos_end);		
-	  memcpy(downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+3],(pos_end-pos_start-2));	
+	 downlink_code=1;
+	}
+	if(strstr((char*)nb.usart.data,"Event:Status") != NULL)
+	{
+	  downlink_check_event=1;
+	}	
+	if(downlink_code==1)
+	{
+	  char* pos_end    = strchr(pos_start,']');			user_main_debug("pos_end:%p",&pos_end);		
+	  memcpy(downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+14],(pos_end-pos_start-13));	
 	  at_downlink_flag=1;	
 	}
 	else
@@ -512,7 +527,8 @@ NB_TaskStatus nb_MQTT_data_read_set(const char* param)
 	  memcpy(downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+3],(pos_end-pos_start-5));		
 	}
 	user_main_printf("Received downlink data:%s",downlink_data);
-	rxPayLoadDeal(downlink_data);
+	if(downlink_check_event==0)
+	 rxPayLoadDeal(downlink_data);
 	
 	return nb_cmd_status;
 }

@@ -15,7 +15,7 @@ typedef enum
 
 #include "common.h"
 
-#define stack 							"D-BC660K-004"
+#define stack 							"D-BC660K-005"
 #define COAP_PRO  0x01
 #define UDP_PRO   0x02
 #define MQTT_PRO  0x03
@@ -46,6 +46,7 @@ typedef enum
 #define AT  				"AT"                     		/* state */
 #define ATE  				"ATE"                     	/* Echo Mode */
 #define QCFGEV  	  "+QCFG"                     	/* Echo Mode */
+#define COPS  	    "+COPS"  
 #define CSQ   			"+CSQ"               				/* singel */
 #define QENG   			"+QENG=0"               				/* singel */
 #define QRST			  "+QRST"											/* restart */
@@ -71,6 +72,7 @@ typedef enum
 #define CGSN 				"+CGSN=1"										/* GET IMEI. */
 #define QDNS 				"+QIDNSGIP"											/* QDNS. */
 #define QIDNSCFG		"+QIDNSCFG"									/* QDNS config. */
+#define QNTP		    "+QNTP"								
 
 #define QCOAPCFG		 "+QCOAPCFG"
 #define QCOAPOPEN		 "+QCOAPOPEN"
@@ -114,9 +116,11 @@ typedef enum
 	_AT_CCLK2,				//AT+CCLK?
 	_AT_CGDCONT,		//SET APN
 	_AT_CPSMS,     	//Power Saving ModeSetting
+	_AT_COPS,     	
 	_AT_CSQ,       	//Singal
 	_AT_QENG, 	
 	_AT_QDNSCFG,    //DNSCFG
+	_AT_QNTP,    
 	_AT_QDNS,       //DNS
 
 /*COAP*/
@@ -279,8 +283,14 @@ NB_TaskStatus nb_cpsms_run(const char* param);
 NB_TaskStatus nb_cpsms_set(const char* param);
 NB_TaskStatus nb_cpsms_get(const char* param);
 
+NB_TaskStatus nb_cops_run(const char* param);
+NB_TaskStatus nb_cops_set(const char* param);
+
 NB_TaskStatus nb_qdnscfg_run(const char* param);
 NB_TaskStatus nb_qdnscfg_set(const char* param);
+
+NB_TaskStatus nb_qntp_run(const char* param);
+NB_TaskStatus nb_qntp_set(const char* param);
 
 NB_TaskStatus nb_qcfgev_run(const char* param);
 NB_TaskStatus nb_qcfgev_set(const char* param);
@@ -648,6 +658,20 @@ static const struct NBTASK NBTask[] =
 		.get						= nb_cpsms_get,
 
   },
+/**************** COPS	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COPS,
+
+		.time_out 			= 300,
+
+    .run 						= nb_cops_run,
+		.set						= nb_cops_set,
+		.get						= nb_null_run,
+
+  },
 /**************** CSQ	****************/
 	{		
 
@@ -687,6 +711,20 @@ static const struct NBTASK NBTask[] =
 
     .run 						= nb_qdnscfg_run,
 		.set						= nb_qdnscfg_set,
+		.get						= nb_null_run,
+
+  },
+  /**************** QNTP	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_QNTP,
+
+		.time_out 			= 2000,
+
+    .run 						= nb_qntp_run,
+		.set						= nb_qntp_set,
 		.get						= nb_null_run,
 
   },
@@ -1266,5 +1304,6 @@ static const struct NBTASK NBTask[] =
 void stored_datalog(void);
 NB_TaskStatus nb_at_send(const struct NBTASK *NB_Task);
 ATCmdNum NBTASK(uint8_t *task);
+char *strrstr(char *s, char *str);
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

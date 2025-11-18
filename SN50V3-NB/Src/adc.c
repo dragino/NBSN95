@@ -58,6 +58,7 @@ void MX_ADC_Init(void)
   hadc.Init.LowPowerAutoWait = DISABLE;
   hadc.Init.LowPowerFrequencyMode = ENABLE;
   hadc.Init.LowPowerAutoPowerOff = DISABLE;
+//  hadc.Init.Oversample.Ratio = ADC_OVERSAMPLING_RATIO_256;
   if (HAL_ADC_Init(&hadc) != HAL_OK)
   {
     Error_Handler();

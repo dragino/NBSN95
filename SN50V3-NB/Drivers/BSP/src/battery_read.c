@@ -1,5 +1,6 @@
 #include "battery_read.h"
 extern bool tdc_clock_log_flag;
+extern uint8_t debugss_qsw;
 uint16_t HW_AdcReadChannel( uint32_t Channel )
 {
 
@@ -68,18 +69,37 @@ uint16_t ADCModel(uint32_t channel)
 //	uint16_t adc_mV_=adc_mV;
 //	return adc_mV_;
 	
-//	uint16_t buff[10]={0};
-//	for(uint8_t i=0;i<6;i++)
-//	{
+	float buff[100]={0};
+	float buff_cum=0;
+	float adc_mV_average=0;
+	if(sys.mod  == model11)
+	{
+	for(uint8_t i=0;i<100;i++)
+	{
 		uint16_t measuredLevel = HW_AdcReadChannel( channel );
-		float adc_mV= measuredLevel*sensor.batteryLevel_mV/4095;
-//		buff[i] = adc_mV;
-//		HAL_Delay(10);
-//	}
+		float adc_mV= (float)measuredLevel*10000.0/4095.0;
+		buff[i] = adc_mV;
+		buff_cum += buff[i];
+		HAL_Delay(10);
+		if(debugss_qsw==1)
+		 user_main_printf("adc:%.2f",buff[i]);			
+	}
 
-//	stob(buff,6);
-
-//	float adc_mV_average = (buff[1]+buff[2]+buff[3]+buff[4])/4;
+	adc_mV_average = buff_cum/100;
+ 		if(tdc_clock_log_flag==0)
+	{
+	if(channel == ADC_CHANNEL_4)
+		user_main_printf("adc_0.1mV/V(1):%.2f",adc_mV_average);
+	else if(channel == ADC_CHANNEL_1)
+		user_main_printf("adc_0.1mV/V(2):%.2f",adc_mV_average);
+	else if(channel == ADC_CHANNEL_0)
+		user_main_printf("adc_0.1mV/V(3):%.2f",adc_mV_average);
+  }
+ }
+	else
+	{
+		uint16_t measuredLevel = HW_AdcReadChannel( channel );
+		float adc_mV= measuredLevel*sensor.batteryLevel_mV/4095;	
  		if(tdc_clock_log_flag==0)
 	{
 	if(channel == ADC_CHANNEL_4)
@@ -88,12 +108,14 @@ uint16_t ADCModel(uint32_t channel)
 		user_main_printf("adc_mV(2):%.2f",adc_mV);
 	else if(channel == ADC_CHANNEL_0)
 		user_main_printf("adc_mV(3):%.2f",adc_mV);
-  }
-	uint16_t adc_mV_= adc_mV;
+		adc_mV_average = adc_mV;
+  }		
+	}
+	uint16_t adc_mV_= adc_mV_average;
 	return adc_mV_;
 }
 
-void stob(uint16_t* buf,int len)
+void stob(float* buf,int len)
 {
 	int t=0;
 	for(int i=0;i<len;i++)

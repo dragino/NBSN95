@@ -151,12 +151,12 @@ void pro_data(void)
      {
 			 uint32_t r_d1_ad0_data=*(__IO uint32_t *)(EEPROM_D1_AD0_START_ADD+num*0x04);
 			 ad0 = ((r_d1_ad0_data>>16)&0xFFFF);
-			  if((sys.mod!=model3))
+			  if((sys.mod!=model3 &&sys.mod!=model11))
 		   {
 				 d1 = (r_d1_ad0_data&0xFFFF);
 			 }
 		 }
-			if((sys.mod==model1)||(sys.mod==model3)||(sys.mod==model9))
+			if((sys.mod==model1)||(sys.mod==model3)||(sys.mod==model9)||(sys.mod==model11))
      {
 			uint32_t r_sht_data=*(__IO uint32_t *)(EEPROM_SHT_START_ADD+num*0x04);
 			tem = ((r_sht_data>>16)&0xFFFF);
@@ -167,7 +167,7 @@ void pro_data(void)
 			uint32_t r_distance_data=*(__IO uint32_t *)(EEPROM_DISTANCE_START_ADD+num*0x04);
 			distance = (r_distance_data&0xFFFF);
 		}
-		 else if(sys.mod==model3)
+		 else if(sys.mod==model3 ||sys.mod==model11)
     {	
 			uint32_t r_ad1_ad4_data=*(__IO uint32_t *)(EEPROM_AD1_AD4_START_ADD+num*0x04);
 			ad1 = ((r_ad1_ad4_data>>16)&0xFFFF);
@@ -232,7 +232,7 @@ void pro_data(void)
        {
 			  sprintf(buff+strlen(buff),"[%d,%d,%.1f,\"%s\"]",distance,ad0,(float)d1/10.0,mini);	
 		   }
-			 	else if(sys.mod==model3)
+			 	else if(sys.mod==model3 ||sys.mod==model11)
        {
 			  sprintf(buff+strlen(buff),"[%.1f,%.1f,%d,%d,%d,\"%s\"]",(float)tem/10.0,(float)hum/10.0,ad0,ad1,ad4,mini);	
 		   }
@@ -297,7 +297,7 @@ sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);
 	sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
 	sprintf(buff+strlen(buff), "\"distance\":%d",sensor.distance);			
 	}
-	else if(sys.mod == model3)
+	else if(sys.mod == model3||sys.mod==model11)
 	{
 	 sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
         sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
@@ -374,4 +374,42 @@ sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);
 		sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);	
 	 sprintf(buff+strlen(buff), "\"temperature\":%.2f",tem_value);			
 	}		
+}
+
+void downilnk_check_data(void)
+{
+		uint16_t str_end,str_beg=0;
+		for(uint8_t j=0;j<2;j++)
+	{
+     if(j==1)
+		 {
+       sprintf(buff+str_beg,"%d,",str_end-str_beg);
+			 	if(sys.protocol == UDP_PRO || sys.protocol == TCP_PRO)
+		      strcat(buff,(char*)"\"");
+		 }
+		 str_beg=strlen(buff);
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\",\"Image Version\":\"%s\",\"NB-IoT Stack\":\"%s\",\"Model\":\"SN50v3-NB\"}",user.deui,AT_VERSION_STRING,stack);	
+      str_end=strlen(buff);
+		if(sys.protocol == COAP_PRO)
+			break;
+	}
+}
+
+void downilnk_ack_data(void)
+{
+		uint16_t str_end,str_beg=0;
+		for(uint8_t j=0;j<2;j++)
+	{
+     if(j==1)
+		 {
+       sprintf(buff+str_beg,"%d,",str_end-str_beg);
+			 	if(sys.protocol == UDP_PRO || sys.protocol == TCP_PRO)
+		      strcat(buff,(char*)"\"");
+		 }
+		 str_beg=strlen(buff);
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\",\"Downklink_Ack\":\"success\"}",user.deui);	 
+      str_end=strlen(buff);
+		if(sys.protocol == COAP_PRO)
+			break;
+	}
 }

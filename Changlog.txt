@@ -1,3 +1,17 @@
+v1.4
+1. Add NTP function
+2. Add COPS function, which automatically sets the operator for each packet to prevent loss of operator code and signal loss
+3. Expand the stack size to prevent stack overflow
+4. Modify bugs where the signal exceeds the range
+5. Firmware upgrades will retain configurations with the same product ID, while configurations with different product IDs will be cleared
+6. Add automatic reset function for long-term undetected signals
+7. Unified JSON format downlink function
+8. Add a JSON format downlink command "Event: Status", which will send a device version data packet
+9. Add ACK sending function "Confirm=200" for UDP protocol, only for UDP
+10. Add AT+READPT command for the Datalog function of MQTT, TCP, UDP protocols to determine whether there is a signal or receive ACK retransmission
+11. Modify the storage method for the number of GETLOG groups
+
+
 v1.3.0
 1. Network Information is displayed when accessing the network
 2. Fix bugs where commands such as AT+UNAME display errors
