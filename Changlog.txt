@@ -1,3 +1,17 @@
+v1.5.2
+1. Fix the issue where clocklog cannot obtain ADC
+
+v1.5.1
+1.Modify the character length limit for OTA title
+
+v1.5
+1.OTA wireless upgrade
+2. TLS Certificate Writing Function
+3. GETLOG serial port log upload to platform function, command to send: 0xF8 01 or AT+GETLOG=1
+4.The default QOS level of MQTT is set to 0
+5. Optimize DNS domain name resolution to prevent errors
+
+
 v1.4
 1. Add NTP function
 2. Add COPS function, which automatically sets the operator for each packet to prevent loss of operator code and signal loss

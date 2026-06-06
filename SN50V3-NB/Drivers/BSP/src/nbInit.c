@@ -1,0 +1,2839 @@
+#include "nbInit.h"
+#include "gpio.h"
+#include "hw_rtc.h"
+
+char 	*ATSendStr;
+int 	len_string;
+uint8_t  try_num;
+NB_TaskStatus  nb_cmd_status;
+int32_t cal_time_difference=0;
+bool clock_cal_time_flag=0;
+static uint8_t net_acc_status_led = 0;
+static char buff[200]={0};
+static uint8_t	recieve_data[NB_RX_SIZE] = {0};	   	 			//Receive data
+extern uint8_t join_network_num;				  
+extern uint8_t join_network_flag;	
+extern uint8_t join_network_time;
+extern uint8_t join_network_timer;
+extern uint8_t error_num;
+extern uint8_t  rxbuf;
+extern bool at_sleep_flag;
+uint8_t reupload_time = 0;
+uint8_t downlink_check_event = 0;
+bool  succes_Status=false;
+extern uint8_t dns_timer_flag;
+extern uint8_t is_time_to_send;
+extern uint8_t sleep_status;
+extern uint8_t nbmodel_int;
+extern uint8_t  qband_flag;
+static uint8_t mqtt_close_flag = 0;
+static uint8_t resend_flag = 0;
+static uint8_t no_response_flag = 0;
+static uint8_t no_response_time = 0;
+extern uint8_t nb_no_rev;
+extern uint8_t received_dwonlink_flags;
+uint8_t read_flag = 0;
+bool no_singal_flag = 0;
+extern uint8_t no_singal_num;
+char record_log[512]={0};
+bool DNS_RE_FLAG = false;
+bool first_sample=0;
+volatile uint8_t	NB_get_FW_chunk_data_keep_status =0;
+static uint8_t tcp_fail_flag = 0;
+static uint8_t csq_fail_log = 0;
+static bool tls_flag = 0;
+extern void OnTxTimerEvent( void );
+extern void nb_intTimeoutEvent( void );
+extern TimerEvent_t TxTimer;
+extern TimerEvent_t nb_intTimeoutTimer;
+extern void compare_time(uint16_t time);
+extern TimerEvent_t CalibrationtimeTimer;
+extern TimerEvent_t timesampleTimer;
+extern void OntimesampleEvent(void);
+extern bool Calibrat_flag;
+
+extern bool nb_start;
+extern uint8_t  ota_upgrade_flag;
+extern uint8_t  Datalog_uplink;
+extern uint8_t connect_status;
+extern uint8_t uplink_time_num;
+extern volatile uint8_t get_sharekeys;
+extern volatile uint8_t check_firmware_exists;
+extern volatile uint8_t change_NB_uart_recv_status;
+extern uint32_t server_fw_size,record_server_fw_size;
+extern uint16_t chunk_data_size;
+extern uint16_t chunk_data_size_record;
+extern volatile	uint8_t firmware_crc_check;
+extern volatile	uint8_t firmware_crc_check_error;
+extern uint16_t chunk_index;
+extern volatile uint8_t wait_four_camma_status;
+volatile uint16_t NB_uart_response_index = 0;
+uint16_t uploading_percent=0;
+uint8_t  ota_continued=0;
+uint8_t  already_upgraded=0;
+uint8_t  ota_fail_times=0;
+uint8_t  ota_upgrade_error=0;
+NB nb = {.net_flag=no_status,.recieve_flag=0,.usart.len=0,.usart.data=recieve_data,
+				 .imei={0},.imsi={0},.singal=0};
+
+NB_TaskStatus nb_at_send(const struct NBTASK *NB_Task)
+{
+	nb.usart.len = 0;
+	memset(nb.usart.data,0,NB_RX_SIZE);	
+	HAL_UART_Transmit_DMA(&hlpuart1,(uint8_t*)ATSendStr,len_string);
+	uint32_t time = HAL_GetTick();
+	while(HAL_GetTick() - time < NB_Task->time_out)
+	{
+		user_main_info("...");
+	}
+	
+	user_main_info("recieve data:%s",nb.usart.data);
+	
+	if(strstr((char*)nb.usart.data,NB_Task->ATRecStrOK) != NULL)
+		nb_cmd_status =  NB_CMD_SUCC;
+	else if(strstr((char*)nb.usart.data,NB_Task->ATRecStrError) != NULL)
+		nb_cmd_status =  NB_CMD_FAIL;
+	else
+		nb_cmd_status =  NB_ERROR;
+	
+	return nb_cmd_status;
+}
+
+/**
+	* @brief  Empty function
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_null_run(const char* param)
+{
+	return NB_CMD_FAIL;
+}
+
+/**
+	* @brief  AT :Get module response
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_at_run(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = AT NEWLINE;
+	len_string = sizeof(AT  NEWLINE) - 1;
+	
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT]) == NB_CMD_SUCC )
+		{
+			break;
+		}
+	}
+	
+	return nb_cmd_status;
+}
+/**
+	* @brief  Echo mode OFF
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_ate_run(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = ATE"0" NEWLINE;
+	len_string = sizeof(ATE"0" NEWLINE) - 1;	
+	
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_ATE]) == NB_CMD_SUCC )
+		{
+			break;
+		}
+	}
+	
+	return nb_cmd_status;
+}
+
+/**
+	* @brief  AT+QCFGEV : Disable the reporting of deep sleep event URC. 
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_qcfgev_run(const char* param)
+{
+	NBTask[_AT_QCFGEV].set(param);
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QCFGEV])== NB_CMD_SUCC)
+		{
+			nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+			nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+NB_TaskStatus nb_qcfgev_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	
+	strcat(buff,AT QCFGEV "=\"dsevent\",0");
+	strcat(buff,NEWLINE);
+	
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_QCFGEV].ATSendStr:%s",ATSendStr);
+	
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cgatt_run(const char* param)
+{
+	uint8_t reties=0;
+	uint8_t status=0;	
+	NBTask[_AT_CGATT].set(param);
+	do
+	{	
+		HAL_IWDG_Refresh(&hiwdg);	
+		reties++;
+		if(nb_at_send(&NBTask[_AT_CGATT])== NB_CMD_SUCC)
+		{
+			status=1;
+			nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		HAL_Delay(300);
+		printf("%s\r\n",nb.usart.data);
+		
+  }while(status==0&&reties<50);
+	
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cgatt_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	strcat(buff,AT CGATT "?");
+	strcat(buff,NEWLINE);
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_CGATT].ATSendStr:%s",ATSendStr);
+	
+	return nb_cmd_status;
+}
+
+/**
+	* @brief  AT_CGSN :Get IMEI number
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_cgsn_get(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = AT CGSN NEWLINE;
+	len_string = sizeof(AT CGSN NEWLINE) - 1;
+	
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_IMEI])== NB_CMD_SUCC)
+		{
+		  char *p = strstr((char*)nb.usart.data,"IP");
+	    if(p==NULL)
+	   {	
+			memset(nb.imei,0,sizeof((nb.imei)));
+			char *pch = strchr((char*)nb.usart.data,':');
+			char *pch1 = strchr((char*)nb.usart.data,'O');
+			if(pch != NULL && pch1!=NULL)
+				strncpy((char*)nb.imei, pch +2,pch1 - pch -6);
+			break;
+		 }
+		 else
+     {
+		   nb_cmd_status = NB_CMD_FAIL;
+		 }
+		}
+	}
+	
+	return nb_cmd_status;
+}
+
+/**
+	* @brief  AT_CIMI :Get IMSI number
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_cimi_get(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = AT CIMI NEWLINE;
+	len_string = sizeof(AT CIMI NEWLINE) - 1;
+	
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_IMSI])== NB_CMD_SUCC)
+		{
+		  char *p = strstr((char*)nb.usart.data,"IP");
+	    if(p==NULL)
+	   {	
+			memset(nb.imsi,0,sizeof((nb.imsi)));
+			char *pch = strchr((char*)nb.usart.data,'\n');
+			char *pch1 = strchr((char*)nb.usart.data,'O');
+			if(pch != NULL && pch1!=NULL)
+				strncpy((char*)nb.imsi, pch +1,pch1 - pch -5);
+			break;
+		 }
+		 else
+     {
+		   nb_cmd_status = NB_CMD_FAIL;
+		 }
+		}
+	}
+	return nb_cmd_status;
+}
+/**
+	* @brief  AT_CFUNSTA : close UE Functionality
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_cfunsta_run(const char* param)
+{
+	try_num = 10;
+	NBTask[_AT_CFUNSTA].set(param);
+	
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CFUNSTA]) == NB_CMD_SUCC )
+		{
+			break;
+		}
+	}
+	
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cfunsta_get(const char* param)
+{
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cfunsta_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	strcat(buff,AT CFUNSTA "=1" NEWLINE);
+
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_CFUNSTA].ATSendStr:%s",ATSendStr);
+
+	return nb_cmd_status;
+}
+
+
+/**
+	* @brief  AT_CFUNOFF : close UE Functionality
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_cfunoff_run(const char* param)
+{
+	try_num = 10;
+	NBTask[_AT_CFUNOFF].set(param);
+	
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CFUNOFF]) == NB_CMD_SUCC )
+		{
+			break;
+		}
+	}
+	
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cfunoff_get(const char* param)
+{
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cfunoff_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	strcat(buff,AT CFUNOFF "=0" NEWLINE);
+
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_CFUNOFF].ATSendStr:%s",ATSendStr);
+
+	return nb_cmd_status;
+}
+
+
+/**
+	* @brief  AT_CFUNEND : close UE Functionality
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_cfun_run(const char* param)
+{
+	try_num = 10;
+	NBTask[_AT_CFUNEND].set(param);
+	
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CFUNEND]) == NB_CMD_SUCC )
+		{
+			break;
+		}
+	}
+	
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cfun_get(const char* param)
+{
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cfun_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	strcat(buff,AT CFUNEND "=0" NEWLINE);
+
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_CFUNEND].ATSendStr:%s",ATSendStr);
+
+	return nb_cmd_status;
+}
+
+
+NB_TaskStatus nb_qsclk_run(const char* param)
+{
+	try_num = 10;
+	NBTask[_AT_QSCLK].set(param);
+	
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QSCLK]) == NB_CMD_SUCC )
+		{
+			break;
+		}
+	}
+	
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_qsclk_get(const char* param)
+{
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_qsclk_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	strcat(buff,AT QSCLK "=1" NEWLINE);
+
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_QSCLK].ATSendStr:%s",ATSendStr);
+
+	return nb_cmd_status;
+}
+
+
+NB_TaskStatus nb_qicfg_run(const char* param)
+{
+	try_num = 10;
+	NBTask[_AT_QICFG].set(param);
+	
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QICFG]) == NB_CMD_SUCC )
+		{
+			break;
+		}
+	}
+	
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_qicfg_get(const char* param)
+{
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_qicfg_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	if(sys.platform==0)
+	strcat(buff,AT QICFG "=dataformat,1,0" NEWLINE);
+  else
+		strcat(buff,AT QICFG "=dataformat,0,0" NEWLINE);
+
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_QICFG].ATSendStr:%s",ATSendStr);
+
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_qsclkoff_run(const char* param)
+{
+	try_num = 10;
+	NBTask[_AT_QSCLKOFF].set(param);
+	
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QSCLKOFF]) == NB_CMD_SUCC )
+		{
+			break;
+		}
+	}
+	
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_qsclkoff_get(const char* param)
+{
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_qsclkoff_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	strcat(buff,AT QSCLKOFF "=0" NEWLINE);
+
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_QSCLKOFF].ATSendStr:%s",ATSendStr);
+
+	return nb_cmd_status;
+}
+/**
+	* @brief  AT_NBAND : Get/Set frequency band
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_qband_run(const char* param)
+{
+	try_num = 3;
+	NBTask[_AT_QBAND].set(NULL);
+
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QBAND])== NB_CMD_SUCC)
+		{
+			if(qband_flag==0)
+      {
+			nb_cmd_status = NBTask[_AT_QBAND].get(NULL);
+			break;
+			}
+			qband_flag=0;
+			NBTask[_AT_QBAND].set(NULL);
+		}
+	}
+	
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_qband_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	if(qband_flag==1)
+	strcat(buff,AT QBAND "=10,8,20,28,2,4,12,13,66,85,5" NEWLINE);		
+	else
+	strcat(buff,AT QBAND "?" NEWLINE);
+	
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_NBAND].ATSendStr:%s",ATSendStr);
+	
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_qband_get(const char* param)
+{
+
+		printf("Currently set frequency band");
+		char *pch = strchr((char*)nb.usart.data,':');
+		if(pch!=NULL)
+		{
+			while(*pch != '\n')
+				printf("%c",*pch++);
+			printf("\n");
+		}
+		
+		nb_cmd_status = NB_CMD_SUCC;
+	return nb_cmd_status;
+}
+
+/**
+	* @brief  AT_CGMM: Request Manufacturer Model
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_cgmm_run(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = AT CGMM NEWLINE;
+	len_string = sizeof(AT CGMM  NEWLINE) - 1;
+	
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CGMM])== NB_CMD_SUCC)
+		{
+			nb_cmd_status = nb_cgmm_get(param);
+			break;
+		}
+		else
+			nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cgmm_get(const char* param)
+{
+	char *p = strstr((char*)nb.usart.data,"BC660K");
+	if(p!=NULL)
+	{	
+	nb_cmd_status = NB_CMD_SUCC;	
+	}
+	if(p==NULL)
+	{	
+	nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+
+
+/**
+	* @brief  AT_CCLK : Get Time
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_cclk_run(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = AT CCLK "?" NEWLINE;
+	len_string = sizeof(AT CCLK "?" NEWLINE) - 1;
+	
+	sensor.time_stamp = 0;
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CCLK])== NB_CMD_SUCC)
+		{
+			nb_cmd_status = nb_cclk_get(param);
+			break;
+		}
+		else
+			nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cclk_get(const char* param)
+{
+	char *p = strstr((char*)nb.usart.data,CCLK);
+	if( p==NULL)
+		nb_cmd_status = NB_NO_TIME;
+	else
+	{
+		char date[20]={0};
+		strcat(date,"20");
+		memcpy(&date[2],&p[7],17);
+		sensor.time_stamp = GetTick(date);
+		
+		if(Calibrat_flag==1)
+		{	
+			uint32_t rtc_time=0;
+			SysTime_t sysTimeCurrent = { 0 };
+			sysTimeCurrent=SysTimeGet();
+			rtc_time=sysTimeCurrent.Seconds;		
+
+			cal_time_difference=rtc_time-sensor.time_stamp;
+			
+			SysTime_t sysTime = { 0 };
+			sysTime.Seconds=sensor.time_stamp;
+			SysTimeSet( sysTime );
+			
+			clock_cal_time_flag=1;				
+			Calibrat_flag=0;
+		}	
+		   if(first_sample==0)
+		  {
+			  uint16_t time_test=0;
+			  struct tm localtime;
+			  SysTimeLocalTime( sensor.time_stamp, &localtime );
+			  time_test=localtime.tm_min*60+localtime.tm_sec;
+			  TimerInit( &timesampleTimer,  OntimesampleEvent); 
+			  compare_time(time_test);
+			  first_sample=1;			
+		  }	
+		user_main_debug("time_stamp:%d",sensor.time_stamp);
+	}
+	return nb_cmd_status;
+}
+
+/**
+	* @brief  AT_CCLK2 : Get Time
+  * @param  Instruction parameter
+  * @retval NB_TaskStatus
+  */
+NB_TaskStatus nb_cclk2_run(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = AT CCLK2 "?" NEWLINE;
+	len_string = sizeof(AT CCLK2 "?" NEWLINE) - 1;
+	
+	sensor.time_stamp = 0;
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CCLK2])== NB_CMD_SUCC)
+		{
+			nb_cmd_status = nb_cclk2_get(param);
+			break;
+		}
+		else
+			nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cclk2_get(const char* param)
+{
+	char *p = strstr((char*)nb.usart.data,CCLK2);
+	if( p==NULL)
+		nb_cmd_status = NB_NO_TIME;
+	else
+	{
+		char date[20]={0};
+		strcat(date,"20");
+		memcpy(&date[2],&p[7],17);
+		sensor.time_stamp = GetTick(date);
+		
+		if(Calibrat_flag==1)
+		{		
+			uint32_t rtc_time=0;
+			SysTime_t sysTimeCurrent = { 0 };
+			sysTimeCurrent=SysTimeGet();
+			rtc_time=sysTimeCurrent.Seconds;		
+
+			cal_time_difference=rtc_time-sensor.time_stamp;
+			
+			SysTime_t sysTime = { 0 };
+			sysTime.Seconds=sensor.time_stamp;
+			SysTimeSet( sysTime );
+			
+			clock_cal_time_flag=1;
+			Calibrat_flag=0;
+		}		
+		   if(first_sample==0)
+		  {
+			  uint16_t time_test=0;
+			  struct tm localtime;
+			  SysTimeLocalTime( sensor.time_stamp, &localtime );
+			  time_test=localtime.tm_min*60+localtime.tm_sec;
+			  TimerInit( &timesampleTimer,  OntimesampleEvent); 
+			  compare_time(time_test);
+			  first_sample=1;			
+		  }
+		user_main_debug("time_stamp:%d",sensor.time_stamp);
+	}
+	return nb_cmd_status;
+}
+
+
+/**
+	* @brief  AT+CGDCONT : Define a PDP Context
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_cgdcont_run(const char* param)
+{
+	try_num = 2;
+	NBTask[_AT_CGDCONT].set(param);
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CGDCONT]) == NB_CMD_SUCC )
+		{
+			break;
+		}
+	}
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cgdcont_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	sprintf(buff,AT CGDCONT "=1,\"IPV4V6\",\"%s\"" NEWLINE,user.apn);
+	
+	ATSendStr  = NULL;
+	ATSendStr = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_CGDCONT].ATSendStr:%s",ATSendStr);
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cgdcont_get(const char* param)
+{
+	return nb_cmd_status;
+}
+/**
+	* @brief  AT+CPSMS : Power Saving ModeSetting
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_cpsms_run(const char* param)
+{
+	NBTask[_AT_CPSMS].set(param);
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_CPSMS])== NB_CMD_SUCC)
+		{
+			nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+			nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cpsms_get(const char* param)
+{
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cpsms_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	strcat(buff,AT CPSMS"=1,,,");
+	strcat(buff,(char*)"\"01011111\"");
+	strcat(buff,(char*)",\"00000000\"\r\n");
+	
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_CPSMS].ATSendStr:%s",ATSendStr);
+	
+	return nb_cmd_status;
+}
+
+/**
+	* @brief  AT+CSQ : Get signal strength
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_csq_get(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = AT CSQ NEWLINE;
+	len_string = sizeof(AT CSQ NEWLINE) - 1;
+	
+	try_num = 2;
+	while(try_num--)
+	{
+	if(nb_at_send(&NBTask[_AT_CSQ])== NB_CMD_SUCC)
+	{
+		char singalBuff[5]={0}; 	
+		char *pch1 = strrchr((char*)nb.usart.data,':');
+		char *pch2 = strchr((char*)nb.usart.data,',');
+		for(int i =0;i<(pch2 - pch1)-1;i++)
+			sprintf(singalBuff+strlen(singalBuff), "%c", nb.usart.data[7+i]);
+		nb.singal = atoi(singalBuff);
+			
+		if(nb.singal > 31 || nb.singal == 0)
+			nb_cmd_status = NB_CMD_OFF;
+
+	}
+  }
+
+	return nb_cmd_status;
+}
+
+/**
+	* @brief  AT+QENG : Get Network information
+  * @param  Instruction parameter
+  * @retval None
+  */
+
+NB_TaskStatus nb_qeng_get(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = AT QENG NEWLINE;
+	len_string = sizeof(AT QENG NEWLINE) - 1;
+  int rssi,sinr,band;	
+	if(nb_at_send(&NBTask[_AT_QENG])== NB_CMD_SUCC)
+	{
+	  char *p = strstr((char*)nb.usart.data,"+QENG");
+	  if( p==NULL)
+		  nb_cmd_status = NB_CMD_FAIL;
+	  else
+	 {
+		 	char *pch1 = strchr((char*)nb.usart.data,':');
+		 for(uint8_t i=0;i<7;i++)
+		 {
+		  pch1 = strchr((char*)pch1,',');
+			pch1=pch1+1;   
+		 }
+		 rssi = atoi(pch1);
+		 pch1 = strchr((char*)pch1,',');
+		 pch1=pch1+1; 
+     sinr = atoi(pch1);
+		 pch1 = strchr((char*)pch1,',');
+		 pch1=pch1+1; 
+		 band = atoi(pch1);
+		 user_main_printf("Network Information:\"RSSI:%d\",\"SINR:%d\",\"BAND:%d\"",rssi,sinr,band);
+	 }	
+	}
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_cops_run(const char* param)
+{
+	NBTask[_AT_COPS].set(param);
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_COPS])== NB_CMD_SUCC)
+		{
+			nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+			nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+NB_TaskStatus nb_cops_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	
+	strcat(buff,AT COPS "=1,2,\"");
+	strcat(buff,(char*)user.operator_code);
+	strcat(buff,"\"");	
+	strcat(buff,NEWLINE);
+	
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_COPS].ATSendStr:%s",ATSendStr);
+	
+	return nb_cmd_status;
+}
+
+/**
+	* @brief  AT+QDNSCFG : DNS Server 
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_qdnscfg_run(const char* param)
+{
+	NBTask[_AT_QDNSCFG].set(param);
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QDNSCFG])== NB_CMD_SUCC)
+		{
+			nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+			nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+NB_TaskStatus nb_qdnscfg_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	
+	strcat(buff,AT QIDNSCFG "=0,");
+	strcat(buff,(char*)user.dns_add);
+	strcat(buff,NEWLINE);
+	
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_QDNSCFG].ATSendStr:%s",ATSendStr);
+	
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_qntp_run(const char* param)
+{
+	NBTask[_AT_QNTP].set(param);
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QNTP])== NB_CMD_SUCC)
+		{
+			nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+			nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+NB_TaskStatus nb_qntp_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	
+	strcat(buff,AT QNTP "=0,");
+	strcat(buff,(char*)user.ntp_add);
+	strcat(buff,NEWLINE);
+	
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_QNTP].ATSendStr:%s",ATSendStr);
+	
+	return nb_cmd_status;
+}
+/**
+	* @brief  AT+QDNS : DNS resolve domain name 
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_qdns_run(const char* param)
+{
+	NBTask[_AT_QDNS].set(param);
+	try_num = 4;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QDNS])== NB_CMD_SUCC)
+		{
+					nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+			nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+NB_TaskStatus nb_qdns_set(const char* param)
+{
+	memset(buff,0,sizeof(buff));
+	char *p=strrchr((char*)user.add,',');
+	if(p!=NULL)
+	{
+		strcat(buff,AT QDNS "=0,");
+		strcat(buff,"\"");
+		memcpy(buff+strlen(buff),user.add,p-(char*)user.add);
+	  strcat(buff,"\"");
+		strcat(buff,NEWLINE);
+	}
+
+	ATSendStr  = NULL;
+	ATSendStr  = buff;
+	len_string = strlen(ATSendStr);
+	user_main_debug("NBTask[_AT_QDNS].ATSendStr:%s",ATSendStr);
+	
+	return nb_cmd_status;
+}
+NB_TaskStatus nb_qdns_get(const char* param)
+{
+	char *p1=strrchr((char*)nb.usart.data,'P');	
+	char *q1=strrchr((char*)user.add,',');
+	uint8_t q2,q3;
+	
+     if(countchar((char*)nb.usart.data,'.')>=3)
+			  q2=1;
+     else
+				q2=0;  
+     if(countchar((char*)nb.usart.data,':')>3)
+        q3=1;
+     else
+				q3=0; 	
+    if(p1==NULL || q1==NULL || (q2==0&&q3==0))
+	{
+		user_main_printf("Domain name resolution failed");
+	  sprintf(record_log+strlen(record_log), "Domain name resolution failed\r\n");		
+		nb_cmd_status = NB_CMD_FAIL;
+	}
+	else
+	{
+		p1 = strchr(p1,':');
+		char *p2=strchr(p1,'\n');
+		memset(user.add_ip,0,sizeof(user.add_ip));
+		memcpy(user.add_ip+strlen((char*)user.add_ip),p1+2,p2-p1-3);
+		memcpy(user.add_ip+strlen((char*)user.add_ip),q1,strlen(q1));
+		user_main_printf("Domain IP:%s",user.add_ip);
+	  sprintf(record_log+strlen(record_log), "Domain IP:%s\r\n",user.add_ip);
+    config_Set();			
+		nb_cmd_status = NB_CMD_SUCC;
+	}	
+
+	return nb_cmd_status;
+}
+/**
+	* @brief  AT+QRST : Restart
+  * @param  Instruction parameter
+  * @retval None
+  */
+NB_TaskStatus nb_qrst_run(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = AT QRST "=1" NEWLINE;
+	len_string = sizeof(AT QRST "=1" NEWLINE) - 1;
+	
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QRST]) == NB_CMD_SUCC )
+		{
+			nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+			nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+
+NB_TaskStatus nb_qrst2_run(const char* param)
+{
+	ATSendStr  = NULL;
+	ATSendStr  = AT QRST2 "=1" NEWLINE;
+	len_string = sizeof(AT QRST2 "=1" NEWLINE) - 1;
+	
+	try_num = 3;
+	while(try_num--)
+	{
+		if(nb_at_send(&NBTask[_AT_QRST2]) == NB_CMD_SUCC )
+		{
+			nb_cmd_status = NB_CMD_SUCC;
+			break;
+		}
+		else
+			nb_cmd_status = NB_CMD_FAIL;
+	}
+	return nb_cmd_status;
+}
+/**
+	* @brief  NB task
+  * @param  Task instruction code
+  * @retval ATCmdNum
+  */
+ATCmdNum NBTASK(uint8_t *task)
+{
+	ATCmdNum at_state = _AT_IDLE;
+	NB_TaskStatus uri_state = NB_IDIE;
+	uint8_t reties=0;
+	switch(*task)
+	{
+case _AT:{
+				if(NBTask[_AT].run(NULL) == NB_CMD_SUCC)
+				{
+					no_response_time=0;
+					*task = _AT_QRST2;				
+					user_main_printf("NBIOT has responded.");
+				}
+				else
+				{
+					at_state = _AT_ERROR;			
+					user_main_printf("NBIOT did not respond.");			
+				}
+			}
+			break;			
+case _AT_QRST2:{
+				if(NBTask[_AT_QRST2].run(NULL) == NB_CMD_SUCC)
+				{
+					*task = _ATE;
+				}
+				else
+				{
+					at_state = _AT_ERROR;			
+					user_main_printf("No response when shutting down");	
+				}
+			}
+				break;
+case _ATE:{
+				if(NBTask[_ATE].run(NULL) == NB_CMD_SUCC)
+				{
+					*task = _AT_QCFGEV;
+					user_main_printf("Echo mode turned off successfully.");
+				}
+				else
+				{
+					at_state = _AT_ERROR;			
+					user_main_printf("Echo mode turned off failed.");			
+				}
+			}
+			break;	
+case _AT_QCFGEV:{
+				if(NBTask[_AT_QCFGEV].run(NULL) == NB_CMD_SUCC)
+				{
+					*task = _AT_CGMM;
+					user_main_printf("Disable the reporting of deep sleep event URC.");
+				}
+				else
+				{
+					at_state = _AT_ERROR;			
+					user_main_printf("Failed to turn off sleep event reporting.");			
+				}
+			}
+			break;			
+case _AT_CGMM:{
+				if(NBTask[_AT_CGMM].run(NULL) == NB_CMD_SUCC)
+				{
+					*task = _AT_IMEI;
+					user_main_printf("Model information:BC660K-GL.");
+				}			
+				else
+				{
+					at_state = _AT_ERROR;			
+					user_main_printf("Request for manufacturer model failed.");			
+				}
+			}
+			break;		
+case _AT_IMEI:{
+				if(NBTask[_AT_IMEI].get(NULL) == NB_CMD_SUCC)
+				{
+					*task = _AT_IMSI;
+					user_main_printf("The IMEI number is:%s.",nb.imei);
+					
+					if(strstr((char*)user.deui,"NULL") != NULL)
+					{
+						memset(user.deui,0,sizeof(user.deui));
+						memcpy(user.deui,nb.imei,15);	
+            config_Set();	 						
+					}
+				}
+				else 
+				{
+					at_state = _AT_ERROR;
+					user_main_printf("Failed to read IMEI number.");
+				}
+			}
+			break;			
+case _AT_IMSI:{
+				if(NBTask[_AT_IMSI].get(NULL) == NB_CMD_SUCC)
+				{
+					*task=_AT_QICFG;
+					user_main_printf("The IMSI number is:%s.",nb.imsi);
+					memset(user.ccid,0,sizeof(user.ccid));
+					memcpy(user.ccid,nb.imsi,15);						
+
+				}
+				else 
+				{
+					at_state = _AT_ERROR;
+					user_main_printf("Failed to read IMSI number.");
+				}
+			}
+			break;	
+case _AT_QICFG:{
+				if(NBTask[_AT_QICFG].run(NULL) == NB_CMD_SUCC)
+				{
+				     *task = _AT_QBAND;	
+					user_main_printf("Set the data format for sending and receiving.");					
+				}
+				else
+				{
+					at_state = _AT_ERROR;
+					user_main_printf("Failed to set the data format.");
+				}
+			}
+			break;
+			
+case _AT_QBAND:{
+				NB_TaskStatus nband_state = NBTask[_AT_QBAND].run(NULL);
+				if(nband_state == NB_CMD_SUCC)
+					*task=_AT_CGDCONT;
+				else 
+				{
+					*task=_AT_IDLE;
+					at_state = _AT_ERROR;
+				}
+			}
+			break;		
+case _AT_CGDCONT:{
+				if(strstr((char*)user.apn,"NULL") == NULL)
+				{
+					if(NBTask[_AT_CGDCONT].run(NULL) != NB_CMD_SUCC)
+					{
+						at_state = _AT_ERROR;
+						user_main_printf("Failed to set APN");
+					}
+					else
+					{
+						user_main_printf("Set APN successfully");
+						*task=_AT_QSCLKOFF;
+					}
+				}
+				else
+				{
+					*task=_AT_QSCLKOFF;
+				}
+			}
+			break;			
+
+case _AT_QSCLK:{
+				if(NBTask[_AT_QSCLK].run(NULL) == NB_CMD_SUCC)
+				{
+				  *task = _AT_CFUNEND;				
+				}
+				else
+				{
+					at_state = _AT_ERROR;
+				}
+			}
+
+			break;
+case _AT_CFUNEND:{
+				if(NBTask[_AT_CFUNEND].run(NULL) == NB_CMD_SUCC)
+				{
+				  *task = _AT_IDLE;
+				}
+				else
+				{
+					at_state = _AT_ERROR;
+				}
+				nb.uplink_flag = no_status;
+				user_main_printf("Enter sleep mode");		
+			}
+			break;
+
+case _AT_CFUNOFF:{
+				if(NBTask[_AT_CFUNOFF].run(NULL) == NB_CMD_SUCC)
+				{
+				  *task = _AT_QSCLK;
+					if(sleep_status==0)
+					{
+				    TimerInit( &TxTimer, OnTxTimerEvent );
+            TimerSetValue( &TxTimer,  sys.tdc*1000); 
+            TimerStart( &TxTimer);						
+					}
+					if(no_singal_flag==1)
+					{
+				  sprintf(record_log+strlen(record_log), "Signal Strength:%d *%d\r\n",nb.singal,csq_fail_log);
+					no_singal_num++;
+          no_singal_flag=0;			
+					}						
+					user_main_printf("Turn off the module receiving and sending RF function.");
+					sprintf(record_log+strlen(record_log), "Turn off the module receiving and sending RF function.\r\n");
+				}
+				else
+				{
+					at_state = _AT_ERROR;
+					*task = _AT_QSCLK;
+				}
+				csq_fail_log=0;
+				stored_datalog();
+			}
+			break;	
+
+case _AT_QSCLKOFF:{
+		     memset(record_log,0,sizeof(record_log));
+				if(NBTask[_AT_QSCLKOFF].run(NULL) == NB_CMD_SUCC)
+				{
+					if(NBTask[_AT_QSCLKOFF].run(NULL) == NB_CMD_SUCC)
+				                   *task = _AT_CFUNSTA;	
+          user_main_printf("Exit sleep mode");						
+					sprintf(record_log, "Exit sleep mode\r\n");
+				}
+				else
+				{
+					at_state = _AT_ERROR;
+					user_main_printf("No response");	
+					sprintf(record_log, "No response\r\n");
+				}
+			}
+			break;
+			
+case _AT_CFUNSTA:{
+				if(NBTask[_AT_CFUNSTA].run(NULL) == NB_CMD_SUCC)
+				{
+					if(strstr((char*)user.operator_code,"NULL") != NULL)
+				    *task = _AT_CSQ;	
+          else		
+            *task = _AT_COPS;							
+				}
+				else
+				{
+					at_state = _AT_ERROR;
+					user_main_printf("No response");	
+					sprintf(record_log+strlen(record_log), "No response\r\n");
+				}
+			}
+			break;
+			
+case _AT_COPS:{
+				if(NBTask[_AT_COPS].run(NULL) == NB_CMD_SUCC)
+				{
+				  *task = _AT_CSQ;				
+				}
+				else
+				{
+					at_state = _AT_ERROR;
+					user_main_printf("Failed to set COPS");	
+					sprintf(record_log+strlen(record_log), "Failed to set COPS\r\n");
+				}
+			}
+			break;			
+case _AT_CSQ:{
+				NBTask[_AT_CSQ].get((char*)NBTask[_AT_CSQ].cmd_num);
+				user_main_printf("Signal Strength:%d",nb.singal);
+				if(nb_cmd_status == NB_CMD_SUCC)
+				{
+					if(csq_fail_log>0)
+				 sprintf(record_log+strlen(record_log), "Signal Strength:99 *%d\r\n",csq_fail_log);
+				 sprintf(record_log+strlen(record_log), "Signal Strength:%d\r\n",nb.singal);
+					*task=(net_acc_status_led == 0)?_AT_QENG:_AT_CCLK;				
+					nb.net_flag = success;
+					no_singal_num=0;
+					if(net_acc_status_led == 0)
+					{
+						led_on(3000);
+						net_acc_status_led = 1;
+					}
+					led_on(500);
+					join_network_timer=0;
+					join_network_time=0;
+					is_time_to_send=0;
+					csq_fail_log=0;
+				}
+				else
+				{
+					csq_fail_log++;
+					*task = _AT_IDLE;	
+				  join_network_flag=1;
+					nb.net_flag = fail;
+				}
+			}
+			break;	
+case _AT_QENG:{
+				if(NBTask[_AT_QENG].get(NULL) == NB_CMD_SUCC)
+				{
+				     *task = _AT_CPSMS;				
+				}
+			}
+			break;			
+case _AT_CPSMS:{
+				if(NBTask[_AT_CPSMS].run(NULL) == NB_CMD_SUCC)
+				{
+					user_main_printf("PSM mode configured ");
+				  sprintf(record_log+strlen(record_log), "PSM mode configured\r\n");
+				}
+				else 
+				{
+					user_main_printf("PSM mode configuration failed ");	
+					sprintf(record_log+strlen(record_log), "PSM mode configuration failed\r\n");
+				}					
+				*task=_AT_QDNSCFG;
+			}
+			break;
+case _AT_CCLK2:{
+				if(NBTask[_AT_CCLK2].run(NULL) != NB_CMD_SUCC)
+				{
+					at_state = _AT_ERROR;
+					user_main_printf("Failed to get time");
+					sprintf(record_log+strlen(record_log), "Failed to get time\r\n");
+				}		
+       if(sys.tlsmod==0)				
+				*task=_AT_QDNS;
+			 else if(sys.tlsmod==1 && sys.protocol == MQTT_PRO)	
+				*task=_AT_QSSLCFG;		
+       else
+				*task=_AT_QDNS; 
+			}
+			break;			
+			
+case _AT_QDNSCFG:{
+				if(NBTask[_AT_QDNSCFG].run(NULL) == NB_CMD_SUCC)
+				{
+					user_main_printf("DNS configuration is successful");
+					sprintf(record_log+strlen(record_log), "DNS configuration is successful\r\n");
+				}
+				else 
+				{
+					user_main_printf("DNS configuration failed");	
+					sprintf(record_log+strlen(record_log), "DNS configuration failed\r\n");
+				}
+				*task=_AT_QNTP; 
+			}
+			break;
+case _AT_QNTP:{
+		   if(strstr((char*)user.ntp_add,"NULL") == NULL)			 
+			 {
+				if(NBTask[_AT_QNTP].run(NULL) == NB_CMD_SUCC)
+				{
+					user_main_printf("NTP configuration is successful");
+					sprintf(record_log+strlen(record_log), "NTP configuration is successful\r\n");
+				}
+				else 
+				{
+					user_main_printf("NTP configuration failed");	
+					sprintf(record_log+strlen(record_log), "NTP configuration failed\r\n");
+				}
+			}
+				*task=_AT_CCLK2; 
+			}
+			break;
+
+case _AT_QSSLCFG:
+			if(NBTask[_AT_QSSLCFG].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_QMTCFG_SSL;	
+				user_main_printf("Manage server and client authentication.");						
+			}
+			else 
+			{
+					*task=_AT_QRST;
+					at_state = _AT_ERROR;
+				user_main_printf("Failed to configure authentication mode");
+			}
+			break;			
+
+case _AT_QMTCFG_SSL:
+			if(NBTask[_AT_QMTCFG_SSL].run(NULL) == NB_CMD_SUCC)
+			{
+				if(tls_flag==1)
+				*task=_AT_UPLOAD_START;	
+				else
+				*task=_AT_QDNS;		
+				user_main_printf("Enable SSL and configure SSL context/connect index.");				
+			}
+			else 
+			{
+					*task=_AT_QRST;
+				user_main_printf("Failed to enable SSL mode");
+			}
+			tls_flag=0;
+			break;
+			
+case _AT_QDNS:{
+				if(((is_ipv4_addr((char*)user.add) == 1) ||(is_ipv4_addr((char*)user.add) == 2) || (is_ipv6_addr((char*)user.add) == 1)|| (is_ipv6_addr((char*)user.add) == 2))&&(dns_timer_flag!=1) )
+				{
+          *task = _AT_UPLOAD_START;
+					user_main_printf("No DNS resolution required");		
+					sprintf(record_log+strlen(record_log), "No DNS resolution required\r\n");					
+				}
+				else  
+				{
+					NB_TaskStatus nbtask_state = NBTask[_AT_QDNS].run(NULL);
+					if(nbtask_state == NB_CMD_SUCC)
+					{
+						user_main_printf("Resolving domain name...");		
+					  sprintf(record_log+strlen(record_log), "Resolving domain name...\r\n");									
+						*task = _AT_IDLE;
+						nb.dns_flag = running;
+						nb.uplink_flag = no_status;
+						DNS_RE_FLAG=true;
+					}					
+				}
+			}
+			break;
+case _AT_CCLK:{
+				if(NBTask[_AT_CCLK].run(NULL) != NB_CMD_SUCC)
+				{
+					at_state = _AT_ERROR;
+					user_main_printf("Failed to get time");
+					sprintf(record_log+strlen(record_log), "Failed to get time\r\n");
+				}		
+			 if(sys.tlsmod==1 && sys.protocol == MQTT_PRO)
+			 {				 
+				*task=_AT_QSSLCFG;	
+				 tls_flag=1;
+			 }
+			 else
+				*task=_AT_UPLOAD_START;
+			}
+			break;
+case _AT_UPLOAD_START:{
+				stored_datalog();
+				memset(record_log,0,sizeof(record_log));
+				nb.uplink_flag = send;
+				nb.recieve_flag = NB_IDIE;
+	    if(nb_start==1)
+			{
+				nb_start=0;
+				TimerSetValue(&TxTimer,sys.tdc*1000); 
+        TimerStart( &TxTimer);
+			}
+      if(sys.protocol == COAP_PRO)	{*task=_AT_COAP_CONFIG;}
+      else if(sys.protocol == UDP_PRO)	{*task=_AT_UDP_OPEN;}			
+			else if(sys.protocol == MQTT_PRO)	{*task=_AT_MQTT_Config;}
+			else if(sys.protocol == TCP_PRO)	{*task=_AT_TCP_OPEN;}
+      sprintf(record_log+strlen(record_log), "*****Upload start:%d*****\r\n",sys.uplink_count);				
+			user_main_printf("*****Upload start:%d*****",sys.uplink_count++);
+			if(sensor.exit_state==0)
+			{
+			 sensor.exit_level = HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_15);
+		  }
+			if(sensor.exit_state_pa4==0)
+			{
+			 sensor.exit_level_pa4 = HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4);
+		  }
+			if(sensor.exit_state_pa0==0)
+			{
+			 sensor.exit_level_pa0 = HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_0);
+		  }				
+			txPayLoadDeal(&sensor);
+			memset((char*)nb.usart.data,0,sizeof(nb.usart.data));
+			}
+			break;
+/***************************************************COAP******************************************************************************/
+case _AT_COAP_CONFIG:
+			if(strstr((char*)user.add,"NULL") != NULL || strstr((char*)user.uri1,"NULL") != NULL)
+			{
+				*task=_AT_UPLOAD_END;
+				user_main_printf("COAP parameter configuration error");
+				sprintf(record_log+strlen(record_log), "COAP parameter configuration error\r\n");
+				break;
+			}
+			if(NBTask[_AT_COAP_CONFIG].set(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_COAP_OPEN;				
+				user_main_printf("COAP configuration successfully");
+				sprintf(record_log+strlen(record_log), "COAP configuration successfully\r\n");
+			}
+			else
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_UPLOAD_END;
+				user_main_printf("COAP configuration failed");
+				sprintf(record_log+strlen(record_log), "COAP configuration failed\r\n");
+			}
+			break;
+case _AT_COAP_OPEN:
+			if(NBTask[_AT_COAP_OPEN].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE;
+				user_main_printf("Failed to Create a CoAP session");
+				sprintf(record_log+strlen(record_log), "Failed to Create a CoAP session\r\n");
+			}
+			break;
+case _AT_COAP_QCOAPHEAD:
+			if(NBTask[_AT_COAP_QCOAPHEAD].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_COAP_OPTION1;
+				user_main_printf("Set the CoAP message ID and automatically generate a token");
+				sprintf(record_log+strlen(record_log), "Set the CoAP message ID and automatically generate a token\r\n");
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE;
+				user_main_printf("Failed to Set a CoAP message ID");
+				sprintf(record_log+strlen(record_log), "Failed to Set a CoAP message ID\r\n");
+			}
+			break;
+case _AT_COAP_OPTION1:
+			if(NBTask[_AT_COAP_OPTION1].run(NULL) == NB_CMD_SUCC)
+			{
+				if(strstr((char*)user.uri2,"NULL") != NULL)	
+				{
+					if(sys.platform==0)
+				  *task=_AT_COAP_SEND_HEX;		
+          else
+				  *task=_AT_COAP_SEND_CONFIG;	
+				}					
+        else					
+				*task=_AT_COAP_OPTION2;				
+				user_main_printf("Successfully configured CoAP option index 1");
+				sprintf(record_log+strlen(record_log), "Successfully configured CoAP option index 1\r\n");
+			}
+			else
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE;
+				user_main_printf("Failed to configure the CoAP option index 1");
+				sprintf(record_log+strlen(record_log), "Failed to configure the CoAP option index 1\r\n");
+			}
+			break;
+case _AT_COAP_OPTION2:
+			if(NBTask[_AT_COAP_OPTION2].run(NULL) == NB_CMD_SUCC)
+			{
+				if(strstr((char*)user.uri3,"NULL") != NULL)	
+				{
+					if(sys.platform==0)
+				  *task=_AT_COAP_SEND_HEX;		
+          else
+				  *task=_AT_COAP_SEND_CONFIG;	
+				}						
+        else					
+				*task=_AT_COAP_OPTION3;				
+				user_main_printf("Successfully configured CoAP option index 2");
+				sprintf(record_log+strlen(record_log), "Successfully configured CoAP option index 2\r\n");
+			}
+			else
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE;
+				user_main_printf("Failed to configure the CoAP option index 2");
+				sprintf(record_log+strlen(record_log), "Failed to configure the CoAP option index 2\r\n");
+			}
+			break;
+case _AT_COAP_OPTION3:
+			if(NBTask[_AT_COAP_OPTION3].run(NULL) == NB_CMD_SUCC)
+			{
+				if(strstr((char*)user.uri4,"NULL") != NULL)	
+				{
+					if(sys.platform==0)
+				  *task=_AT_COAP_SEND_HEX;		
+          else
+				  *task=_AT_COAP_SEND_CONFIG;	
+				}					
+        else					
+				*task=_AT_COAP_OPTION4;				
+				user_main_printf("Successfully configured CoAP option index 3");
+				sprintf(record_log+strlen(record_log), "Successfully configured CoAP option index 3\r\n");
+			}
+			else
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE;
+				user_main_printf("Failed to configure the CoAP option index 3");
+				sprintf(record_log+strlen(record_log), "Failed to configure the CoAP option index 3\r\n");				
+			}
+			break;
+case _AT_COAP_OPTION4:
+			if(NBTask[_AT_COAP_OPTION4].run(NULL) == NB_CMD_SUCC)
+			{
+					if(sys.platform==0)
+				  *task=_AT_COAP_SEND_HEX;		
+          else
+				  *task=_AT_COAP_SEND_CONFIG;								
+				user_main_printf("Successfully configured CoAP option index 4");
+				sprintf(record_log+strlen(record_log), "Successfully configured CoAP option index 4\r\n");					
+			}
+			else
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE;
+				user_main_printf("Failed to configure the CoAP option index 4");
+				sprintf(record_log+strlen(record_log), "Failed to configure the CoAP option index 4\r\n");				
+			}
+			break;
+case _AT_COAP_SEND_HEX:
+			if(NBTask[_AT_COAP_SEND_HEX].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_COAP_READ;
+				user_main_printf("Upload data successfully");	
+				sprintf(record_log+strlen(record_log), "Upload data successfully\r\n");					
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE;
+				user_main_printf("Failed to upload data");
+				sprintf(record_log+strlen(record_log), "Failed to upload data\r\n");						
+			}
+			break;		
+case _AT_COAP_SEND_CONFIG:
+			if(NBTask[_AT_COAP_SEND_CONFIG].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_COAP_SEND;
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE;
+				user_main_printf("Failed to upload data");
+				sprintf(record_log+strlen(record_log), "Failed to upload data\r\n");							
+				break;
+			}
+			
+case _AT_COAP_SEND:
+			if(NBTask[_AT_COAP_SEND].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_COAP_READ;
+				user_main_printf("Upload data successfully");	
+				sprintf(record_log+strlen(record_log), "Upload data successfully\r\n");					
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_COAP_CLOSE;
+				user_main_printf("Failed to upload data");
+				sprintf(record_log+strlen(record_log), "Failed to upload data\r\n");						
+			}
+			break;	
+case _AT_COAP_READ:
+			HAL_Delay(sys.rxdl);
+      read_flag=1;
+	    succes_Status=true;
+      reupload_time=0;
+			*task = _AT_IDLE;
+			break;	
+case _AT_COAP_CLOSE:
+			if(NBTask[_AT_COAP_CLOSE].run(NULL) == NB_CLOSE_SUCC)
+			{
+				if(succes_Status==true)
+				*task=_AT_UPLOAD_SUCC;
+				else
+				*task=_AT_UPLOAD_FAIL;	
+				user_main_printf("Closed the CoAP session successfully");
+				sprintf(record_log+strlen(record_log), "Closed the CoAP session successfully\r\n");				
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task=_AT_UPLOAD_FAIL;
+				user_main_printf("Failed to close CoAP session");
+				sprintf(record_log+strlen(record_log), "Failed to close CoAP session\r\n");				
+			}
+			break;
+case _AT_COAP_URI:
+			uri_state = NBTask[_AT_COAP_URI].run(NULL);
+			if(uri_state == NB_STA_SUCC)
+			{
+				if(downlink_check_event==1)
+				{
+				   if(NBTask[_AT_COAP_SEND_CONFIG].run(NULL) == NB_CMD_SUCC)
+				  {
+				    NBTask[_AT_COAP_SEND].run(NULL);
+				  }
+					downlink_check_event=0;
+				}		
+				if(received_dwonlink_flags==1)
+				{
+				   if(NBTask[_AT_COAP_SEND_CONFIG].run(NULL) == NB_CMD_SUCC)
+				  {
+				    NBTask[_AT_COAP_SEND].run(NULL);
+				  }	
+					received_dwonlink_flags=0;
+				}						
+				if(Datalog_uplink==1)
+				{
+          Datalog_request(&sensor);					
+					Datalog_uplink=0;
+				}					
+				read_flag=0;
+				*task = _AT_COAP_CLOSE;			
+			}
+       else if(uri_state == NB_QCOAPOPEN_SUCC)
+			{
+				*task=_AT_COAP_QCOAPHEAD;				
+				user_main_printf("Create a CoAP session and connect to the CoAP server");
+				sprintf(record_log+strlen(record_log), "Create a CoAP session and connect to the CoAP server\r\n");					
+			}
+			else
+			{
+				*task = _AT_IDLE;
+			}
+			break;		
+/***************************************************MQTT******************************************************************************/		
+case _AT_MQTT_Config:
+			if(strstr((char*)user.add,"NULL") != NULL || strstr((char*)user.pubtopic,"NULL") != NULL )
+			{
+				*task=_AT_UPLOAD_END;
+				user_main_printf("MQTT parameter configuration error");
+				sprintf(record_log+strlen(record_log), "MQTT parameter configuration error\r\n");
+				break;
+			}
+			if(NBTask[_AT_MQTT_Config].set(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_MQTT_OPEN;			
+				user_main_info("_AT_MQTT_Config successfully");
+			}
+			else
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_UPLOAD_END;
+				user_main_printf("MQTT configuration failed");
+				sprintf(record_log+strlen(record_log),"MQTT configuration failed\r\n");
+			}
+			break;
+
+case _AT_MQTT_OPEN:
+			if(NBTask[_AT_MQTT_OPEN].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_MQTT_CLOSE;
+				user_main_printf("Failed to open the MQTT client network");
+				sprintf(record_log+strlen(record_log), "Failed to open the MQTT client network\r\n");				
+			}
+			break;
+
+case _AT_MQTT_CONN:
+			if(NBTask[_AT_MQTT_CONN].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_MQTT_CLOSE;
+				user_main_printf("Failed to connect to server");
+				sprintf(record_log+strlen(record_log), "Failed to connect to server\r\n");				
+			}
+			break;
+			
+case _AT_MQTT_SUB:
+			if(NBTask[_AT_MQTT_SUB].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+			 HAL_Delay(sys.rxdl);				
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_MQTT_CLOSE;
+				user_main_printf("Failed to subscribe to topic");
+				sprintf(record_log+strlen(record_log), "Failed to subscribe to topic\r\n");				
+			}
+			break;
+case _AT_MQTT_PUB1:
+			if(NBTask[_AT_MQTT_PUB1].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_MQTT_CLOSE;
+				user_main_printf("Failed to Set PUB");
+				sprintf(record_log+strlen(record_log), "Failed to Set PUB\r\n");				
+			}
+				break;	
+case _AT_MQTT_PUB2:
+			if(NBTask[_AT_MQTT_PUB2].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_MQTT_CLOSE;
+				user_main_printf("Failed to Set PUB");
+				sprintf(record_log+strlen(record_log), "Failed to Set PUB\r\n");				
+			}
+				break;	
+case _AT_MQTT_PUB3:
+			if(NBTask[_AT_MQTT_PUB3].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_MQTT_CLOSE;
+				user_main_printf("Failed to Set PUB");
+				sprintf(record_log+strlen(record_log), "Failed to Set PUB\r\n");				
+			}
+				break;				
+case _AT_MQTT_PUB5:
+			if(NBTask[_AT_MQTT_PUB5].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_MQTT_CLOSE;
+				user_main_printf("Failed to Set PUB");
+				sprintf(record_log+strlen(record_log), "Failed to Set PUB\r\n");				
+			}
+				break;				
+case _AT_MQTT_PUB:
+			if(NBTask[_AT_MQTT_PUB].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_MQTT_SEND;			
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_MQTT_CLOSE;
+				user_main_printf("Failed to Set PUB");
+				sprintf(record_log+strlen(record_log), "Failed to Set PUB\r\n");				
+				break;
+			}
+			
+case _AT_MQTT_SEND:
+			if(NBTask[_AT_MQTT_SEND].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task = _AT_MQTT_CLOSE;
+				user_main_printf("Failed to upload data");
+				sprintf(record_log+strlen(record_log), "Failed to upload data\r\n");				
+			}
+			break;
+case _AT_MQTT_READ:
+	    read_flag=1;
+      mqtt_close_flag=1;
+	    succes_Status=true;
+      reupload_time=0;
+				if(downlink_check_event==1)
+				{
+				  NBTask[_AT_MQTT_PUB5].run(NULL);			
+					downlink_check_event=0;
+				}
+				if(received_dwonlink_flags==1)
+				{
+				  NBTask[_AT_MQTT_PUB5].run(NULL);			
+					received_dwonlink_flags=0;
+				}
+				if(Datalog_uplink==1)
+				{
+          Datalog_request(&sensor);					
+					Datalog_uplink=0;
+				}				
+			*task = _AT_MQTT_CLOSE;
+			break;
+			
+case _AT_MQTT_CLOSE:
+			if(NBTask[_AT_MQTT_CLOSE].run(NULL) == NB_CMD_SUCC && mqtt_close_flag==1)
+			{
+				*task=_AT_MQTT_URI;			
+        mqtt_close_flag=0;				
+			}
+			else
+			{
+				at_state = _AT_ERROR;
+				*task=_AT_UPLOAD_FAIL;
+				user_main_printf("Failed to close the port");
+				sprintf(record_log+strlen(record_log), "Failed to close the port\r\n");				
+			}
+			read_flag=0;
+			break;
+			
+case _AT_MQTT_URI:
+			uri_state = NBTask[_AT_MQTT_URI].run(NULL);
+			switch((uint8_t)uri_state)
+			{
+				case NB_OPEN_SUCC:
+							*task=_AT_MQTT_CONN;
+							user_main_printf("Opened the MQTT client network successfully");
+				      sprintf(record_log+strlen(record_log), "Opened the MQTT client network successfully\r\n");				
+						break;
+				case NB_CONN_SUCC:
+					   if(sys.platform==0)
+							*task=_AT_MQTT_PUB;
+						 else if(sys.platform==1)
+							*task=_AT_MQTT_PUB1; 
+						 else if(sys.platform==2)
+							*task=_AT_MQTT_PUB2; 
+						 else if(sys.platform==3)
+							*task=_AT_MQTT_PUB3; 						
+						 else if(sys.platform==5)
+							*task=_AT_MQTT_PUB5; 
+							user_main_printf("Successfully connected to the server");
+				      sprintf(record_log+strlen(record_log), "Successfully connected to the server\r\n");						 
+						break;
+				case NB_SUB_SUCC:
+							*task=_AT_MQTT_READ;
+							user_main_printf("Subscribe to topic successfully");	
+							sprintf(record_log+strlen(record_log), "Subscribe to topic successfully\r\n");
+						break;
+				case NB_PUB_SUCC:
+							*task=_AT_MQTT_SUB;
+							user_main_printf("Upload data successfully");	
+							sprintf(record_log+strlen(record_log), "Upload data successfully\r\n");
+						break;
+				case NB_CLOSE_SUCC:
+							*task = _AT_UPLOAD_SUCC;
+							user_main_printf("Close the port successfully");
+							sprintf(record_log+strlen(record_log), "Close the port successfully\r\n");
+						break;
+				case NB_ERROR:
+							at_state = _AT_ERROR;
+							*task = _AT_UPLOAD_FAIL;
+				    break;
+				default:
+							*task = _AT_IDLE;
+						break;
+			}
+			
+			break;
+/**************************************************UDP***********************************************************************************/
+case _AT_UDP_OPEN:	
+			if(strstr((char*)user.add,"NULL") != NULL)
+			{
+				*task=_AT_UPLOAD_END;
+				user_main_printf("UDP parameter configuration error");
+				sprintf(record_log+strlen(record_log), "UDP parameter configuration error\r\n");				
+				break;
+			}		
+			if(NBTask[_AT_UDP_OPEN].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_UDP_SEND;
+				user_main_printf("Open a Socket Service successfully");
+				sprintf(record_log+strlen(record_log), "Open a Socket Service successfully\r\n");				
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+			 *task=_AT_UDP_CLOSE;
+				user_main_printf("Failed to open a Socket Service");
+				sprintf(record_log+strlen(record_log),"Failed to open a Socket Service\r\n");				
+			}
+			break;
+
+case _AT_UDP_SEND:	
+			if(NBTask[_AT_UDP_SEND].run(NULL) == NB_CMD_SUCC)
+			{		
+				if(resend_flag==3)
+				*task = _AT_UDP_CLOSE;					
+				else
+				*task = _AT_IDLE;												
+			}
+			else
+			{
+				at_state = _AT_ERROR;
+			 *task=_AT_UDP_CLOSE;
+				user_main_printf("Failed to send");
+				sprintf(record_log+strlen(record_log), "Failed to send\r\n");				
+			}
+				break;	
+case _AT_UDP_READ:
+			HAL_Delay(sys.rxdl);
+      read_flag=1;
+			*task = _AT_IDLE;
+	    succes_Status=true;
+      reupload_time=0;
+			break;
+			
+case _AT_UDP_CLOSE:
+			if(NBTask[_AT_UDP_CLOSE].run(NULL) == NB_CMD_SUCC)
+			{
+				read_flag=0;
+				resend_flag=0;
+				if(succes_Status==true)
+				*task = _AT_UPLOAD_SUCC;
+				else
+				*task=_AT_UPLOAD_FAIL;
+			user_main_printf("Close the port successfully");
+				sprintf(record_log+strlen(record_log), "Close the port successfully\r\n");				
+			}
+			else
+			{
+				read_flag=0;
+				resend_flag=0;
+				*task=_AT_UPLOAD_FAIL;
+				at_state = _AT_ERROR;				
+				user_main_printf("Failed to close the port");
+				sprintf(record_log+strlen(record_log),"Failed to close the port\r\n");				
+			}
+			break;
+case _AT_UDP_URI:
+			uri_state = NBTask[_AT_UDP_URI].run(NULL);
+			if(uri_state == NB_STA_SUCC)
+			{
+				resend_flag=0;
+				user_main_printf("Datagram is sent by RF");
+				sprintf(record_log+strlen(record_log), "Datagram is sent by RF\r\n");				
+				if(downlink_check_event==1)
+				{
+				  NBTask[_AT_UDP_SEND].run(NULL);
+					downlink_check_event=0;
+				}
+				if(received_dwonlink_flags==1)
+				{
+				  NBTask[_AT_UDP_SEND].run(NULL);	
+					received_dwonlink_flags=0;
+				}				
+				if(Datalog_uplink==1&&sys.platform==5)
+				{
+          Datalog_request(&sensor);					
+					Datalog_uplink=0;
+				}
+        read_flag=0;				
+			*task = _AT_UDP_CLOSE;
+			}
+			else if(uri_state == NB_SEND_SUCC)			
+			{
+				*task = _AT_UDP_READ;		
+				user_main_printf("Upload data successfully");	
+				sprintf(record_log+strlen(record_log), "Upload data successfully\r\n");				
+			}
+			else if(uri_state == NB_SEND_FAIL)			
+			{
+				resend_flag++;
+				*task = _AT_UDP_SEND;		
+				user_main_printf("Failed to upload data,resend data");
+				sprintf(record_log+strlen(record_log), "Failed to upload data,resend data\r\n");				
+			}
+			else
+			{
+				*task = _AT_IDLE;	
+			}
+			break;
+/***************************************************TCP******************************************************************************/		
+case _AT_TCP_OPEN:
+			if(strstr((char*)user.add,"NULL") != NULL)
+			{
+				*task=_AT_UPLOAD_END;
+				user_main_printf("TCP parameter configuration error");
+				sprintf(record_log+strlen(record_log), "TCP parameter configuration error\r\n");				
+				break;
+			}
+			if(NBTask[_AT_TCP_OPEN].run(NULL) == NB_CMD_SUCC)
+			{
+//				*task=_AT_IDLE;		
+				  *task=_AT_TCP_SEND;	
+				user_main_printf("Open a Socket Service successfully");			
+				sprintf(record_log+strlen(record_log), "Open a Socket Service successfully\r\n");				
+				
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				tcp_fail_flag=1;
+				*task = _AT_TCP_CLOSE;
+				user_main_printf("Failed to open a Socket Service");
+				sprintf(record_log+strlen(record_log), "Failed to open a Socket Service\r\n");				
+			}
+			break;
+case _AT_TCP_SEND:
+			if(NBTask[_AT_TCP_SEND].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_TCP_READ;	
+				user_main_printf("Upload data successfully");		
+				sprintf(record_log+strlen(record_log), "Upload data successfully\r\n");				
+			}
+			else	
+			{
+				at_state = _AT_ERROR;
+				tcp_fail_flag=1;
+				*task = _AT_TCP_CLOSE;
+				user_main_printf("Failed to upload data");	
+				sprintf(record_log+strlen(record_log), "Failed to upload data\r\n");				
+			}
+				break;					
+case _AT_TCP_READ:
+			HAL_Delay(sys.rxdl);
+			*task = _AT_IDLE;
+	    succes_Status=true;
+      reupload_time=0;
+      read_flag=1;
+			break;
+case _AT_TCP_CLOSE:
+			if(NBTask[_AT_TCP_CLOSE].run(NULL) == NB_CMD_SUCC)
+			{
+				if(tcp_fail_flag==1)
+				*task=_AT_UPLOAD_FAIL;
+				else
+				*task=_AT_UPLOAD_SUCC;
+				 tcp_fail_flag=0;
+				 read_flag=0;
+				user_main_printf("Close the port successfully");
+				sprintf(record_log+strlen(record_log), "Close the port successfully\r\n");
+			}
+			else 
+			{
+				at_state = _AT_ERROR;
+				*task=_AT_UPLOAD_FAIL;
+				read_flag=0;
+				user_main_printf("Failed to close the port");
+				sprintf(record_log+strlen(record_log), "Failed to close the port\r\n");				
+			}				
+			break;
+case _AT_TCP_URI:
+			uri_state = NBTask[_AT_TCP_URI].run(NULL);
+//			if(uri_state == NB_OPEN_SUCC)
+//			{
+//				*task = _AT_TCP_SEND;
+//				user_main_printf("Open a Socket Service successfully");				
+//			}
+			if(uri_state == NB_STA_SUCC && succes_Status==true)
+			{
+				if(downlink_check_event==1)
+				{
+				  NBTask[_AT_TCP_SEND].run(NULL);
+					downlink_check_event=0;
+				}
+				if(received_dwonlink_flags==1)
+				{
+				  NBTask[_AT_TCP_SEND].run(NULL);	
+					received_dwonlink_flags=0;
+				}					
+				if(Datalog_uplink==1&&sys.platform==5)
+				{
+          Datalog_request(&sensor);					
+					Datalog_uplink=0;
+				}		
+				read_flag=0;					
+				*task = _AT_TCP_CLOSE;
+			}
+			else if(succes_Status==true)
+			{ 
+				read_flag=0;				
+				at_state = _AT_ERROR;
+				*task=_AT_UPLOAD_FAIL;
+				user_main_printf("Message failed");
+				sprintf(record_log+strlen(record_log), "Message failed\r\n");				
+			}
+			break;
+/******************************************************************************************************************************************/			
+case _AT_UPLOAD_END:
+			user_main_printf("*****End of upload*****\r\n");	
+			sprintf(record_log+strlen(record_log), "*****End of upload*****\r\n");
+			stored_datalog();
+			memset(record_log,0,sizeof(record_log));
+      error_num = 0;
+			memset((char*)nb.usart.data,0,sizeof(nb.usart.data));
+			if(succes_Status==false && reupload_time<3)
+			{
+				nb.uplink_flag = send;
+				nb.recieve_flag = NB_IDIE;
+        if(sys.protocol == COAP_PRO)	{*task=_AT_COAP_CONFIG;}
+        else if(sys.protocol == UDP_PRO)	{*task=_AT_UDP_OPEN;}				
+		  	else if(sys.protocol == MQTT_PRO)	{*task=_AT_MQTT_Config;}
+			  else if(sys.protocol == TCP_PRO)	{*task=_AT_TCP_OPEN;}
+			  reupload_time++;
+			}	
+		 if(succes_Status==true ||reupload_time==3)
+		{
+			reupload_time=0;	
+      sensor.exit_state = 0;		
+      sensor.exit_state_pa4 = 0;	
+      sensor.exit_state_pa0 = 0;																 
+			*task = _AT_QSCLK;
+		}
+			succes_Status=false;	
+			break;
+
+case _AT_UPLOAD_SUCC:
+			*task = _AT_UPLOAD_END;
+			user_main_printf("Send complete");
+				sprintf(record_log+strlen(record_log), "Send complete\r\n");
+			break;
+
+case _AT_UPLOAD_FAIL:
+			user_main_printf("Failed to send");	
+				sprintf(record_log+strlen(record_log), "Failed to send\r\n");
+			*task = _AT_UPLOAD_END;
+			break;
+case _AT_QDETECT:{
+      if(NBTask[_AT].run(NULL) == NB_CMD_SUCC)
+	   {
+			 nb_no_rev=0;
+	     NBTask[_AT_QSCLK].run(NULL); 
+	   }else
+      {
+				  nb_no_rev++;
+	 				RESET_GPIO_Init();
+				  HAL_Delay(100);
+				  RESET_GPIO_DeInit();
+					HAL_Delay(2000);
+		    if(NBTask[_AT_QSCLK].run(NULL) == NB_CMD_SUCC)
+				{
+				  if(NBTask[_AT_CFUNEND].run(NULL) == NB_CMD_SUCC)
+				  { 
+						printf("Enter sleep mode");
+				  }
+			  }
+	    }
+      nb.uplink_flag = no_status;				
+			*task=_AT_IDLE;		
+		}
+					break;
+case _AT_DNSDETECT:{
+			NBTask[_AT].run(NULL); 
+		  NBTask[_AT_CFUNSTA].run(NULL); 
+		  NBTask[_AT_QDNSCFG].run(NULL);	
+			HAL_Delay(5000);
+			*task=_AT_QDNS;		
+		}
+					break;
+case _AT_QRST:{
+				if(NBTask[_AT_QRST].run(NULL) != NB_CMD_SUCC)
+				{
+					at_state = _AT_ERROR;
+					user_main_printf("No response when shutting down");
+					sprintf(record_log+strlen(record_log), "No response when shutting down\r\n");					
+				  RESET_GPIO_Init();
+				  HAL_Delay(100);
+				  RESET_GPIO_DeInit();
+					HAL_Delay(2000);
+					no_response_flag=1;
+					no_response_time++;
+				}
+				if(no_response_flag==0||no_response_time==6)
+				{
+					no_response_time=0;
+					no_response_flag=0;
+		      *task=_AT_IDLE;		
+          TimerInit( &TxTimer, OnTxTimerEvent );
+          TimerSetValue( &TxTimer,  sys.tdc*1000); 
+          TimerStart( &TxTimer);	
+				}
+				else
+				{
+				 *task=_AT;
+					no_response_flag=0;
+				}
+				nb.net_flag = no_status;
+				net_acc_status_led = 0;
+				nb.uplink_flag = no_status;		
+				
+				break;
+			}
+/***************************************************OTA******************************************************************************/		
+case _AT_OTAOPEN:
+			if(strstr((char*)user.otaadd,"NULL") != NULL)
+			{
+				 *task=_AT_OTACLOSE;	
+				 ota_fail_times=3;
+				 ota_upgrade_error=4;	
+		     printf("OTA parameter configuration error\r\n");	
+ 				 break;				
+			}		
+				do
+			{			
+			    if(NBTask[_AT_OTAOPEN].run(NULL) == NB_CMD_SUCC)
+			  {
+				  *task=_AT_IDLE;
+					 break;	
+			  }		
+			 reties++;
+		  }while(reties<3);
+			if(reties>=3) 
+			{
+				*task = _AT_OTACLOSE;
+				 printf("Failed to open the OTA client network\r\n");				
+			}					
+			break;
+
+case _AT_OTACONN:
+			if(NBTask[_AT_OTACONN].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+			}
+			else 
+			{
+				ota_upgrade_error=4;
+				*task = _AT_OTACLOSE;
+				printf("Failed to connect to ota server\r\n");		
+			}
+			break;
+						
+case _AT_OTAPUB_current_fw_info:
+	    connect_status=0;
+			if(NBTask[_AT_OTAPUB].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+			}
+			else 
+			{
+				*task = _AT_OTACLOSE;
+				printf("Failed to Set firmware information\r\n");				
+			}
+				break;		
+case _AT_OTAPUB_request_fw_info:
+	    connect_status=1;
+			if(NBTask[_AT_OTAPUB].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+			}
+			else 
+			{
+				ota_upgrade_error=5;
+				*task = _AT_OTACLOSE;
+				printf("Failed to Set request firmware information\r\n");				
+			}
+				break;
+case _AT_OTAPUB_fw_downloading:
+	    connect_status=2;
+			if(NBTask[_AT_OTAPUB].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+			}
+			else 
+			{
+				*task = _AT_OTACLOSE;
+				printf("Failed to Set request download\r\n");				
+			}
+				break;
+case _AT_OTAPUB_request_fw_chunk:
+	    uplink_time_num = 0;
+	    connect_status=3;
+			if(server_fw_size/1028>0)
+			{
+				 chunk_data_size = 1028;
+			}
+			else
+			{
+					chunk_data_size = server_fw_size % 1028;
+			}
+			NB_uart_response_index =0;
+			wait_four_camma_status =0;
+      NB_get_FW_chunk_data_keep_status =1;
+			do
+			{
+			  if(NBTask[_AT_OTAPUB].run(NULL) == NB_CMD_SUCC)
+			 {
+				if(NB_get_FW_chunk_data_keep_status == 1)
+	      {
+	          change_NB_uart_recv_status = 1;		
+	      }		
+				*task=_AT_IDLE;	
+         break;				
+			 }
+			 reties++;
+		  }while(reties<3);
+			if(reties>=3) 
+			{
+				ota_continued=1;
+				*task = _AT_OTAOPEN;			
+			}			
+				break;
+case _AT_OTAPUB_updated:
+	    connect_status=4;
+			if(NBTask[_AT_OTAPUB].run(NULL) == NB_CMD_SUCC)
+			{
+				*task=_AT_IDLE;			
+			}
+			else 
+			{
+				*task = _AT_OTACLOSE;
+				printf("Failed to Set ota update information\r\n");				
+			}
+				break;			
+			
+case _AT_OTACLOSE:
+				 change_NB_uart_recv_status=0;
+			   NBTask[_AT_MQTT_CLOSE].run(NULL);
+         HAL_Delay(300);	
+         if(ota_fail_times>=3||ota_upgrade_error==100)
+				 {
+           ota_getlog_uplink();
+					 if(server_fw_size == 0 && ota_upgrade_error==100)
+					 {											
+									NVIC_SystemReset();
+					 }						 
+					 
+           ota_upgrade_error=0;					 
+					 ota_fail_times=0;
+					 NBTask[_AT_QSCLK].run(NULL);
+					 NBTask[_AT_CFUNEND].run(NULL);
+					 *task=_AT_IDLE;	
+					 ZB25VQ32_EnterDeepPowerDown();
+					 get_sharekeys=0;
+					 nb.uplink_flag = no_status;	
+					 ota_upgrade_flag=0;	
+					 ota_continued=0;
+					 already_upgraded=0;
+					 connect_status=0;
+					 GPIO_InitTypeDef GPIO_InitStruct = {0};
+					 __HAL_RCC_GPIOB_CLK_ENABLE();					 
+					 GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14;
+					 GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+					 GPIO_InitStruct.Pull = GPIO_NOPULL;
+					 GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;	
+					 HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+					
+					 HAL_GPIO_WritePin(GPIOB,GPIO_PIN_12,GPIO_PIN_RESET);
+					 HAL_GPIO_WritePin(GPIOB,GPIO_PIN_13,GPIO_PIN_RESET);
+					 HAL_GPIO_WritePin(GPIOB,GPIO_PIN_14,GPIO_PIN_RESET);
+					 printf("Close OTA upgrade\r\n");
+				 }
+				 else
+				 {
+					 *task=_AT_OTAOPEN;	
+					 if(already_upgraded==1)
+					    ota_continued=1;
+				 }
+			break;
+			
+case _AT_OTA_URI:
+			uri_state = NBTask[_AT_OTA_URI].run(NULL);
+			switch((uint8_t)uri_state)
+			{
+				case NB_OPEN_SUCC:
+							*task=_AT_OTACONN;
+							printf("MQTT open success\r\n");				
+						break;
+				case NB_CONN_SUCC:
+					    if(ota_continued==1)
+							{
+								ota_continued=0;
+							 *task=_AT_OTAPUB_request_fw_chunk;							
+							}
+							else{
+							*task=_AT_OTAPUB_current_fw_info;
+							}
+							printf("MQTT connect success\r\n");				 
+						break;
+				case NB_PUB_SUCC:
+					   if(connect_status==0)
+						 {
+							 get_sharekeys=1;
+							 *task=_AT_OTAPUB_request_fw_info;
+							 	printf("Upload firmware information successfully\r\n");
+						 }
+						 else if(connect_status==1)
+						 {
+							 *task = _AT_IDLE;
+							 	printf("Upload request firmware information successfully\r\n");
+						 }
+						 else if(connect_status==2)
+						 {
+							 *task = _AT_OTAPUB_request_fw_chunk;
+							 	printf("Request download successfully\r\n");
+						 }						 
+						 else if(connect_status==3)
+						 {
+							 *task = _AT_IDLE;
+						 }							 	
+						 else if(connect_status==4)
+						 {
+							 *task = _AT_OTACLOSE;
+               ZB25VQ32_EnterDeepPowerDown();	
+							 printf("uploading 100%%,the device will disconnect MQTT server and power off NB module\r\n");	
+							 HAL_Delay(300);			
+							 ota_upgrade_error=100;							 
+						 }
+						break;
+				case NB_CLOSE_SUCC:
+							*task = _AT_UPLOAD_SUCC;
+							printf("Close the port successfully\r\n");
+						break;
+				case NB_CMD_ON:
+					    if(connect_status==1)
+							  *task = _AT_OTAPUB_fw_downloading;
+					    if(connect_status==3)
+							{
+								if(ota_continued==0)
+								{
+								  *task = _AT_OTAPUB_request_fw_chunk;
+								  NB_get_FW_chunk_data_keep_status =0;	
+								  if(firmware_crc_check==1)
+								 {
+									 firmware_crc_check =0;
+									 firmware_crc_check_error=0;
+								   chunk_index=chunk_index+1;
+									
+									 server_fw_size = server_fw_size - chunk_data_size_record;
+									 uploading_percent=(record_server_fw_size - server_fw_size)*100/record_server_fw_size;
+									 already_upgraded=1;
+									 printf("Downloading %d%%\r\n",uploading_percent);
+                  HAL_Delay(100);									
+								 }
+								
+							    if(server_fw_size==0)
+								 {								
+							     *task = _AT_OTAPUB_updated;	
+								 }		
+								
+							    if(firmware_crc_check_error > 3)
+								 {
+									 firmware_crc_check_error=0;
+									 connect_status=0;
+									 *task = _AT_OTACLOSE;
+								 }	
+							  }
+                else
+								{
+								 *task = _AT_OTAOPEN;
+								}									
+							}								
+				    break;				
+				case NB_CMD_OFF:
+							*task = _AT_OTACLOSE;
+				    break;
+				default:
+							*task = _AT_IDLE;
+						break;
+			}
+			
+			break;
+case _AT_URI:{
+	      if(nb.uplink_flag == upgrading)
+				{
+					*task = _AT_OTA_URI;	
+				}
+				else{
+				  if(sys.protocol == COAP_PRO)	*task = _AT_COAP_URI;	
+				  else if(sys.protocol == UDP_PRO)	*task = _AT_UDP_URI;
+				  else if(sys.protocol == MQTT_PRO)	*task = _AT_MQTT_URI;
+				  else if(sys.protocol == TCP_PRO)	*task = _AT_TCP_URI;
+				}
+			}
+			break;
+case _AT_FLAG_INIT:{
+				nb.uplink_flag = no_status;
+				nb.net_flag = no_status;
+				net_acc_status_led = 0;
+	      nbmodel_int=1;
+	      tls_flag=0;
+		    uint32_t r_sleep=*(__IO uint32_t *)(EEPROM_USER_SLEEP_FLAG);	
+		    //printf("r_sleep:%x",r_sleep);
+		      if(r_sleep==0xA8)
+				{
+				 at_sleep_flag=1;
+				}	
+	      TimerInit( &nb_intTimeoutTimer, nb_intTimeoutEvent );
+			  TimerSetValue( &nb_intTimeoutTimer, 8000);
+			  TimerStart( &nb_intTimeoutTimer );
+	      user_main_printf("NB module is initializing...");
+	      *task=_AT_IDLE;
+			  MX_USART2_UART_Init();
+				HAL_UART_Receive_IT(&huart2,(uint8_t*)&rxbuf,RXSIZE);	
+			}
+			break;
+
+case _AT_IDLE:
+
+			break;			
+		//....
+default:
+			user_main_info("No NB Task.");
+			*task=_AT_IDLE;
+			break;
+	}
+	return at_state;
+}
+
+void stored_datalog(void)
+{
+	uint32_t parameters_log[128]={0};
+	for(uint16_t i=0,j=0;i<strlen((char*)record_log);i=i+4,j++)
+		 parameters_log[j]=record_log[i+0]<<24 | record_log[i+1]<<16 | record_log[i+2]<<8 | record_log[i+3];
+		 FLASH_erase(FLASH_USER_START_DATALOG+sys.log_seq * FLASH_PAGE_SIZE*4,((FLASH_USER_START_DATALOG+(sys.log_seq+1) * FLASH_PAGE_SIZE*4	) - (FLASH_USER_START_DATALOG+sys.log_seq * FLASH_PAGE_SIZE*4	)) / FLASH_PAGE_SIZE);
+	   FLASH_program(FLASH_USER_START_DATALOG+sys.log_seq * FLASH_PAGE_SIZE*4,parameters_log, sizeof(parameters_log)/4);	
+     sys.log_seq++;
+     if(sys.log_seq==20)
+        sys.log_seq=0;
+		 
+		HAL_FLASHEx_DATAEEPROM_Unlock();
+		HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_FDR_FLAG,sys.log_seq<<8);
+		HAL_FLASHEx_DATAEEPROM_Lock();			 
+}			
+
+void ota_getlog_uplink(void)
+{
+	 if(ota_upgrade_error>0)
+	 {
+		if(strstr((char*)user.add,"NULL") == NULL)	
+		{						 
+			if(sys.protocol == COAP_PRO && strstr((char*)user.uri1,"NULL") == NULL)
+			{
+					 if(NBTask[_AT_COAP_OPEN].run(NULL) == NB_CMD_SUCC)
+					{
+							HAL_Delay(1000);	
+							if(NBTask[_AT_COAP_QCOAPHEAD].run(NULL) == NB_CMD_SUCC)
+							{
+								 HAL_Delay(500);												
+								 if(NBTask[_AT_COAP_OPTION1].run(NULL) == NB_CMD_SUCC)
+								{
+									HAL_Delay(500);
+									if(strstr((char*)user.uri2,"NULL") == NULL)	
+								 {
+									if(NBTask[_AT_COAP_OPTION2].run(NULL) == NB_CMD_SUCC)
+									{
+										HAL_Delay(500);													
+										if(strstr((char*)user.uri3,"NULL") == NULL)	
+										{
+											if(NBTask[_AT_COAP_OPTION3].run(NULL) == NB_CMD_SUCC)
+											{
+												HAL_Delay(500);													
+												if(strstr((char*)user.uri4,"NULL") == NULL)	
+												{
+													if(NBTask[_AT_COAP_OPTION4].run(NULL) == NB_CMD_SUCC)
+													{
+														HAL_Delay(500);													
+													}																	
+												}
+											}
+										}	
+									}														
+								 }
+									if(NBTask[_AT_COAP_SEND_CONFIG].run(NULL) == NB_CMD_SUCC)
+								 {
+										HAL_Delay(500);														 
+										if(NBTask[_AT_COAP_SEND].run(NULL) == NB_CMD_SUCC)
+									 {
+											HAL_Delay(500);															 
+											if(NBTask[_AT_COAP_CLOSE].run(NULL) == NB_CLOSE_SUCC)
+										{	
+										}																
+									 }
+								 }													
+								}
+							}												
+					}								
+			}
+			else if(sys.protocol == UDP_PRO&&sys.platform==5)	
+			{
+					 if(NBTask[_AT_UDP_OPEN].run(NULL) == NB_CMD_SUCC)
+					{
+							HAL_Delay(1000);	
+							if(NBTask[_AT_UDP_SEND].run(NULL) == NB_CMD_SUCC)
+							{
+								 HAL_Delay(500);												
+								 if(NBTask[_AT_UDP_CLOSE].run(NULL) == NB_CMD_SUCC)
+								{
+								}
+							}												
+					}							
+			}								
+			else if(sys.protocol == MQTT_PRO && strstr((char*)user.pubtopic,"NULL") == NULL )	
+			{
+					 if(NBTask[_AT_MQTT_OPEN].run(NULL) == NB_CMD_SUCC)
+					{
+							HAL_Delay(1000);
+							if(NBTask[_AT_MQTT_CONN].run(NULL) == NB_CMD_SUCC)
+							{
+								HAL_Delay(500);
+								if(NBTask[_AT_MQTT_PUB5].run(NULL) == NB_CMD_SUCC)
+								{
+									 HAL_Delay(500);
+										if(NBTask[_AT_MQTT_CLOSE].run(NULL) == NB_CMD_SUCC)
+									 {
+									 }
+								}
+							}
+					}	
+			}
+			else if(sys.protocol == TCP_PRO&&sys.platform==5)	
+			{
+					 if(NBTask[_AT_TCP_OPEN].run(NULL) == NB_CMD_SUCC)
+					{
+							HAL_Delay(1000);	
+							if(NBTask[_AT_TCP_SEND].run(NULL) == NB_CMD_SUCC)
+							{
+								 HAL_Delay(500);												
+								 if(NBTask[_AT_TCP_CLOSE].run(NULL) == NB_CMD_SUCC)
+								{
+								}
+							}												
+					}
+			}								
+	 }
+	}
+}	
+
+char *strrstr(char *s, char *str)
+{
+    char *p; 
+    int len = strlen(s);
+    for (p = s + len - 1; p >= s; p--) {
+        if ((*p == *str) && (memcmp(p, str, strlen(str)) == 0)) 
+            return p;
+    }   
+    return NULL;
+}
