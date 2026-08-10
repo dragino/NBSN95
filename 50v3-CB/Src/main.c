@@ -69,7 +69,7 @@
 
 uint8_t  rxbuf = 0;				
 static uint16_t rxlen = 0;
-static uint8_t  rxDATA[300]={0};
+uint8_t  rxDATA[300]={0};
 static uint8_t  uart2_recieve_flag = 0;
 
 static uint8_t rxbuf_lp[5] = {0};
@@ -84,16 +84,23 @@ extern uint16_t 	adc0_datalog,adc1_datalog,adc4_datalog;
 extern uint16_t distance_datalog;
 extern uint8_t mode2_flag;
 static uint8_t pwd_time_count = 0;			//Password time count times
-
+uint8_t connect_status = 0;
+uint16_t chunk_index=0;
 uint8_t task_num = _AT_IDLE;			//NB task directory
 extern bool no_singal_flag ;
+uint8_t no_singal_num= 0;
 uint8_t error_num = 0;				    //Error count
 uint8_t press_button_times=0;//Press the button times in a row fast
 uint8_t is_time_to_send=0;
 uint8_t dns_reset_num=0;
 uint8_t dns_log=0;
-static uint8_t uplink_time_num = 0;
+uint8_t uplink_time_num = 0;
+static uint8_t uplink_time_max = 0;
 
+extern uint8_t  ota_upgrade_flag;
+extern uint8_t  ota_fail_times;
+extern uint8_t  ota_upgrade_error;
+extern uint8_t  Datalog_uplink;
 bool nb_start=0;
 extern uint8_t udp_close_flag;
 extern uint8_t tcp_close_flag;
@@ -108,6 +115,7 @@ uint8_t join_network_time = 0;
 uint8_t join_network_timer = 0;
 uint8_t nb_no_rev= 0;
 uint8_t user_key_exti_flag=0;
+uint8_t rece_firmware_end=0;
 extern int32_t cal_time_difference;
 extern bool clock_cal_time_flag;
 bool act_network_flag=0;
@@ -152,9 +160,33 @@ void user_key_event(void);
 void OntimesampleEvent(void);
 void compare_time(uint16_t time);
 void onCalibrationtimeEvent(void);
+void NB_OTA_FW_Update_process(void);
+void NB_uart_recv_event(void);
 /* USER CODE BEGIN PFP */
 static void USERTASK(void);
 void HW_GetUniqueId( uint8_t *id );
+volatile uint8_t change_NB_uart_recv_status = 0;
+volatile uint8_t qmtrecv_comma_times=0;
+volatile uint16_t expected_recv_data_size=512;
+volatile uint8_t wait_four_camma_status = 0;
+
+volatile uint32_t server_fw_size=0,record_server_fw_size=0;
+volatile uint16_t chunk_data_size=0;
+volatile uint16_t chunk_data_size_record=0;
+
+volatile uint8_t get_sharekeys=0;
+volatile uint8_t check_firmware_exists=0;
+
+volatile uint16_t storedatasize = 0;
+volatile uint16_t i_index =0;
+volatile uint16_t j_index =0;
+static uint32_t crc_crc32_data=0;
+static uint32_t crc_crc32_value=0;
+volatile	uint8_t firmware_crc_check=0;
+volatile	uint8_t firmware_crc_check_error=0;
+static uint8_t dataota[256];
+uint32_t zb25vq32_firmware_store_address=0;
+uint32_t crc32(uint8_t *data, uint32_t size);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -276,12 +308,12 @@ int main(void)
 			nb_no_rev++;
 			error_num = 0;
 		}
-		if(dns_reset_num > 4 || nb_no_rev>=3 )
+		if(dns_reset_num > 4 || nb_no_rev>=3||no_singal_num>=12)
 		{
 		NVIC_SystemReset();	
 
 		}
-		if(/*nb.recieve_flag == NB_RECIEVE &&*/ nb.uplink_flag == send && task_num == _AT_IDLE && sleep_status==0)
+		if(/*nb.recieve_flag == NB_RECIEVE &&*/ (nb.uplink_flag == send || nb.uplink_flag == upgrading) && task_num == _AT_IDLE && sleep_status==0)
 		{
 			task_num = _AT_URI;
 			nb.recieve_flag = NB_IDIE;
@@ -347,12 +379,9 @@ int main(void)
 	
      if(at_sleep_flag==1 && nb.uplink_flag == no_status)
 		 {
-			  sys.inmod= 0;
-				sys.inmod_pa4= 0;
-				sys.inmod_pa0= 0;
 			 	EX_GPIO_Init(0);
 				EX_GPIO_Init_pa4(0);
-				EX_GPIO_Init_pa0(0);;
+				EX_GPIO_Init_pa0(0);
 			 	at_sleep_flag=0;
 		   	sleep_status=1;
 			  TimerStop(&CheckBLETimesTimer);
@@ -378,6 +407,13 @@ int main(void)
 				printf("SLEEP\r\n");
 		 }	
 	
+     if(ota_upgrade_flag==1 && nb.uplink_flag == no_status&& sleep_status==0)
+		 {
+			 nb.uplink_flag = upgrading;
+	     NB_OTA_FW_Update_process();
+			 ota_upgrade_flag=0;
+		 }		 
+		 
 #ifdef lowpower_enter
 		if(task_num == _AT_IDLE && uart2_recieve_flag==0)
 		{
@@ -488,6 +524,10 @@ static void USERTASK(void)
 			memset(nb.usart.data,0,NB_RX_SIZE);
 			rxDATA[strlen((char*)rxDATA)] = '\r';
 			rxDATA[strlen((char*)rxDATA)] = '\n';
+			if(nb.uplink_flag == writing)
+			{
+				printf("%s",rxDATA);	
+			}			
 			HAL_UART_Transmit_DMA(&hlpuart1,(uint8_t*)rxDATA,strlen((char*)rxDATA));		
 			HAL_Delay(1500);					//Waiting to Send
 		}
@@ -507,7 +547,7 @@ static void USERTASK(void)
 		memset(nb.usart.data,0,NB_RX_SIZE);
 	}
 
-	if(tdc_clock_log_flag==1 && sys.clock_switch==1 && nb.uplink_flag !=send&& nb.uplink_flag !=running && sleep_status==0)
+	if(tdc_clock_log_flag==1 && sys.clock_switch==1 && nb.uplink_flag !=send&& nb.uplink_flag !=running  && nb.uplink_flag !=upgrading&& sleep_status==0)
 	{
     get_sensorvalue();
 		SysTime_t sysTimeCurrent = { 0 };
@@ -528,12 +568,15 @@ static void USERTASK(void)
 		HAL_Delay(3000);		
 		if(NBTask[_AT_QDNS].get(NULL) == NB_CMD_SUCC)
 		{
-			 if(gps_flag==1)	
-			 task_num = _AT_QGPS;
-			 else
-			 task_num=_AT_UPLOAD_START;	
-			dns_reset_num=0;
-			break;
+			 if((is_ipv4_addr((char*)user.add_ip) == 1)|| (is_ipv6_addr((char*)user.add_ip) == 1)|| (is_ipv6_addr((char*)user.add_ip) == 3))
+			{			
+				 if(gps_flag==1)	
+				 task_num = _AT_QGPS;
+				 else
+				 task_num=_AT_UPLOAD_START;	
+				dns_reset_num=0;
+				break;
+			}			 
 		}
 		else
 		{
@@ -563,19 +606,193 @@ static void USERTASK(void)
 	}	
 }
 
+void NB_OTA_FW_Update_process(void)
+{
+	printf("FW check\r\n");
+
+	uint8_t id[3];
+	ZB25VQ32_Init();
+	ZB25VQ32_ReleaseDeepPowerDown();
+	ZB25VQ32_ReadID(id);
+
+	while(HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_13)==1)
+	{
+		 bg95module_on();
+		 HAL_Delay(1000);	
+	}		
+	nb_ate_run(NULL);
+	
+	if(id[0] == 0x5e && id[1] == 0x40)
+	{		
+	  printf("Successfully awakened module\r\n");		
+
+		qmtrecv_comma_times=0;
+
+		expected_recv_data_size=512;
+
+		wait_four_camma_status =0;
+
+		get_sharekeys=0;
+
+		check_firmware_exists =0;
+
+		nb_cgatt_run(NULL);
+		
+    task_num = _AT_OTAOPEN;		
+	}
+	else
+	{
+	  printf("Hardware Not Support\r\n");
+		nb.uplink_flag = no_status;
+		ota_upgrade_error=2;
+		ZB25VQ32_EnterDeepPowerDown();
+		get_sharekeys=0;				
+		nb_cgatt_run(NULL);
+    ota_getlog_uplink();			
+		while(HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_13)==0)
+		{
+		bg95module_off();
+		HAL_Delay(1000);				
+		}
+    ota_upgrade_error=0;								
+	}
+}
+
+void NB_uart_recv_event(void)
+{
+		nb.usart.data[nb.usart.len] = rxbuf_lp[0];		
+		if(nb.usart.data[nb.usart.len] == ',' && wait_four_camma_status == 0)
+		{
+			qmtrecv_comma_times++;
+			if(qmtrecv_comma_times>=3)
+			{
+				qmtrecv_comma_times=0;
+				wait_four_camma_status =1;
+				expected_recv_data_size = chunk_data_size + nb.usart.len + 1;
+//				printf("expected_recv_data_size %d\r\n",expected_recv_data_size);
+			}
+		}
+		
+		nb.usart.len++;
+		
+		if(nb.usart.data[0] != '+' && nb.usart.data[4] != 'R' && wait_four_camma_status == 0)
+		{
+			nb.usart.len =0;
+		}
+		
+		if(nb.usart.len > expected_recv_data_size)
+		{		
+//			if(strstr((char *)nb.usart.data,"v2/fw/response/1/chunk/") != NULL)
+			if (strncmp((char *)nb.usart.data, "+QMTRECV", 8) == 0)
+			{
+				wait_four_camma_status =0;
+				chunk_data_size_record = chunk_data_size;
+				
+				crc_crc32_data = nb.usart.data[expected_recv_data_size]<<24 | nb.usart.data[expected_recv_data_size-1]<<16 | nb.usart.data[expected_recv_data_size-2]<<8 | nb.usart.data[expected_recv_data_size-3];
+				crc_crc32_value = crc32((nb.usart.data+expected_recv_data_size-chunk_data_size+1), chunk_data_size-4);
+				
+				if(crc_crc32_data == crc_crc32_value)
+				{
+          firmware_crc_check=1;					
+					chunk_data_size = chunk_data_size -4;//-4bytes CRC32
+					for(i_index=expected_recv_data_size-chunk_data_size-4;i_index<expected_recv_data_size-4;)
+					{	
+						memset(dataota, 0xFF, 256);
+						if(chunk_data_size/256 >0)
+						{
+							for(j_index=0;j_index<256;j_index++)
+							{
+								dataota[j_index]=nb.usart.data[i_index+1];
+								i_index++;
+							}
+							storedatasize = 256;
+							chunk_data_size = chunk_data_size - storedatasize;						
+						}
+						else
+						{
+							for(j_index=0;j_index<chunk_data_size%256;j_index++)
+							{							
+								dataota[j_index]=nb.usart.data[i_index+1];
+								i_index++;
+							}
+							storedatasize = chunk_data_size%256;
+							chunk_data_size = chunk_data_size - storedatasize;						
+						}
+						
+						if(storedatasize > 0)
+						{
+							ZB25VQ32_WriteEnable();
+							ZB25VQ32_PageProgram(dataota, zb25vq32_firmware_store_address, storedatasize);
+							ZB25VQ32_WriteDisable();
+							HAL_Delay(5);//A 5ms delay is required						
+							zb25vq32_firmware_store_address = zb25vq32_firmware_store_address + storedatasize;
+						}
+					}
+				}
+        else
+				{
+					ota_upgrade_error=7;
+					firmware_crc_check =0;
+					firmware_crc_check_error++;
+					printf("CRC error %08X %08X\r\n", crc_crc32_data, crc_crc32_value);
+				}	
+				
+  			if(connect_status==3)
+				{     
+					rece_firmware_end=1;
+				}					
+//				 printf("zb25vq32_firmware_store_address==%d,expected_recv_data_size=%d\r\n",zb25vq32_firmware_store_address,expected_recv_data_size);
+
+				expected_recv_data_size=512;
+
+				change_NB_uart_recv_status=0;		
+			}			
+		}	
+}
+
+uint32_t crc32(uint8_t *data, uint32_t size)
+{
+    // The CRC calculation follows CCITT - 0x04C11DB7
+    const uint32_t reversedPolynom = 0xEDB88320;
+
+    // CRC initial value
+    uint32_t crc = 0xFFFFFFFF;
+
+    if( data == NULL )
+    {
+        return 0;
+    }
+
+    for( uint32_t i = 0; i < size; ++i )
+    {
+        crc ^= ( uint32_t )data[i];
+        for( uint32_t i = 0; i < 8; i++ )
+        {
+            crc = ( crc >> 1 ) ^ ( reversedPolynom & ~( ( crc & 0x01 ) - 1 ) );
+        }
+    }
+
+    return ~crc;
+}
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if(huart == &hlpuart1)
 	{
-		nb.usart.data[nb.usart.len++] = rxbuf_lp[0];	
-		if(task_num == _AT_IDLE)
-		{
-			if(rxbuf_lp[1] == '\r' && rxbuf_lp[0] == '\n')
+		if(change_NB_uart_recv_status==1)
+		  NB_uart_recv_event();
+		else
+    {		
+			nb.usart.data[nb.usart.len++] = rxbuf_lp[0];	
+			if(task_num == _AT_IDLE && nb.uplink_flag !=upgrading)
 			{
-				lpuart_recieve_flag = 1;
+				if(rxbuf_lp[1] == '\r' && rxbuf_lp[0] == '\n')
+				{
+					lpuart_recieve_flag = 1;
+				}
 			}
-		}
-		rxbuf_lp[1] = rxbuf_lp[0];
+			rxbuf_lp[1] = rxbuf_lp[0];
+	  }		
 		HAL_UART_Receive_IT(&hlpuart1,rxbuf_lp,RXSIZE);		
 	}
 	else if(huart == &huart2)
@@ -604,7 +821,7 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
 {
 	HAL_IWDG_Refresh(&hiwdg);	
 #ifdef NBIOT	
-	if(sys.pwd_flag==1)
+	if(sys.pwd_flag==1 && nb.uplink_flag != writing)
 	{
 		pwd_time_count++;
 		if(pwd_time_count == 30)
@@ -622,17 +839,29 @@ void HAL_RTCEx_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
     join_network_flag=0;
 	}
 
-	if(nb.net_flag == success && nb.uplink_flag == send && sleep_status==0)
+	if(nb.net_flag == success && (nb.uplink_flag == send || nb.uplink_flag == upgrading ) && sleep_status==0)
 	{
+		if(nb.uplink_flag == upgrading )
+		  uplink_time_max=6;		
+		else
+		  uplink_time_max=12;			
 		uplink_time_num++;
-		if(uplink_time_num>=12)
+		if(uplink_time_num>=uplink_time_max)
 		{
 			uplink_time_num = 0;
-			error_num++;
-			if(sys.protocol == COAP_PRO)	{task_num	=	_AT_COAP_CLOSE;}			
-			else if(sys.protocol == UDP_PRO)	{task_num	=	_AT_UDP_CLOSE;udp_close_flag=1;}
-			else if(sys.protocol == MQTT_PRO)	{task_num	=	_AT_MQTT_CLOSE;}
-			else if(sys.protocol == TCP_PRO)	{task_num	=	_AT_TCP_CLOSE;tcp_close_flag=1;}
+			if(nb.uplink_flag != upgrading)
+			{			
+				error_num++;
+				if(sys.protocol == COAP_PRO)	{task_num	=	_AT_COAP_CLOSE;}			
+				else if(sys.protocol == UDP_PRO)	{task_num	=	_AT_UDP_CLOSE;udp_close_flag=1;}
+				else if(sys.protocol == MQTT_PRO)	{task_num	=	_AT_MQTT_CLOSE;}
+				else if(sys.protocol == TCP_PRO)	{task_num	=	_AT_TCP_CLOSE;tcp_close_flag=1;}
+			}
+			else
+      {
+			 ota_fail_times++;
+			 task_num	=	_AT_OTACLOSE;
+			}			
 		}
 	}
 	else 
@@ -937,9 +1166,6 @@ void user_key_event(void)
 			
 			case 2://sleep
 			{
-			  sys.inmod= 0;
-				sys.inmod_pa4= 0;
-				sys.inmod_pa0= 0;
 			 	EX_GPIO_Init(0);
 				EX_GPIO_Init_pa4(0);
 				EX_GPIO_Init_pa0(0);

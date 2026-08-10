@@ -9,6 +9,9 @@ extern float ds1820_value2;
 extern float ds1820_value3;
 extern uint16_t pro_data_num;
 extern int32_t Weight_Shiwu;
+extern char server_fw_version[15];
+extern char server_fw_title[20];
+extern char record_log[512];
 void pro_data_thingspeak(void)
 {
 	memset(buff,0,sizeof(buff));	
@@ -114,7 +117,7 @@ void pro_data(void)
     char nowtime[80];	
 	  memset(nowtime,0,sizeof(nowtime));
 		strftime(nowtime, 80, "%Y-%m-%dT%H:%M:%SZ", info);
-	sprintf(buff+strlen(buff),  "{\"IMEI\":\"%s\",\"IMSI\":\"%s\",\"Model\":\"SN50V3-CB\",\"mod\":%d,\"battery\":%.2f,\"signal\":%d,\"time\":\"%s\",\"latitude\":%f,\"longitude\":%f,\"gps_time\":\"%s\",",user.deui,user.ccid,sys.mod,batteryLevel_mV/1000.0,nb.singal,nowtime,sensor.latitude,sensor.longitude,gpstime);	
+	sprintf(buff+strlen(buff),  "{\"IMEI\":\"%s\",\"IMSI\":\"%s\",\"Model\":\"%s\",\"mod\":%d,\"battery\":%.2f,\"signal\":%d,\"time\":\"%s\",\"latitude\":%f,\"longitude\":%f,\"gps_time\":\"%s\",",user.deui,user.ccid,firmware_title,sys.mod,batteryLevel_mV/1000.0,nb.singal,nowtime,sensor.latitude,sensor.longitude,gpstime);	
    mode_data(buff);
 		int num = sys.sht_seq;
 		int16_t tem,hum,d1,d2,d3;
@@ -149,12 +152,12 @@ void pro_data(void)
      {
 			 uint32_t r_d1_ad0_data=*(__IO uint32_t *)(EEPROM_D1_AD0_START_ADD+num*0x04);
 			 ad0 = ((r_d1_ad0_data>>16)&0xFFFF);
-			  if((sys.mod!=model3))
+			  if((sys.mod!=model3 &&sys.mod!=model11))
 		   {
 				 d1 = (r_d1_ad0_data&0xFFFF);
 			 }
 		 }
-			if((sys.mod==model1)||(sys.mod==model3)||(sys.mod==model9))
+			if((sys.mod==model1)||(sys.mod==model3)||(sys.mod==model9)||(sys.mod==model11))
      {
 			uint32_t r_sht_data=*(__IO uint32_t *)(EEPROM_SHT_START_ADD+num*0x04);
 			tem = ((r_sht_data>>16)&0xFFFF);
@@ -165,7 +168,7 @@ void pro_data(void)
 			uint32_t r_distance_data=*(__IO uint32_t *)(EEPROM_DISTANCE_START_ADD+num*0x04);
 			distance = (r_distance_data&0xFFFF);
 		}
-		 else if(sys.mod==model3)
+		 else if(sys.mod==model3 ||sys.mod==model11)
     {	
 			uint32_t r_ad1_ad4_data=*(__IO uint32_t *)(EEPROM_AD1_AD4_START_ADD+num*0x04);
 			ad1 = ((r_ad1_ad4_data>>16)&0xFFFF);
@@ -230,7 +233,7 @@ void pro_data(void)
        {
 			  sprintf(buff+strlen(buff),"[%d,%d,%.1f,\"%s\"]",distance,ad0,(float)d1/10.0,mini);	
 		   }
-			 	else if(sys.mod==model3)
+			 	else if(sys.mod==model3 ||sys.mod==model11)
        {
 			  sprintf(buff+strlen(buff),"[%.1f,%.1f,%d,%d,%d,\"%s\"]",(float)tem/10.0,(float)hum/10.0,ad0,ad1,ad4,mini);	
 		   }
@@ -292,7 +295,7 @@ sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);
 	sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
 	sprintf(buff+strlen(buff), "\"distance\":%d",sensor.distance);			
 	}
-	else if(sys.mod == model3)
+	else if(sys.mod == model3||sys.mod==model11)
 	{
 	 sprintf(buff+strlen(buff), "\"adc1\":%d,",sensor.adc1);
         sprintf(buff+strlen(buff), "\"digital_in\":%d,",HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));	
@@ -369,4 +372,110 @@ sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);
 		sprintf(buff+strlen(buff), "\"interrupt_level\":%d,",sensor.exit_level);	
 	 sprintf(buff+strlen(buff), "\"temperature\":%.2f",tem_value);			
 	}		
+}
+
+void downilnk_check_data(void)
+{
+	memset(buff,0,sizeof(buff));
+  sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\",\"Image Version\":\"%s\",\"NB-IoT Stack\":\"%s\",\"Model\":\"%s\"}",user.deui,AT_VERSION_STRING,stack,firmware_title);	
+  pro_data_num=strlen(buff);
+}
+
+void downilnk_ack_data(void)
+{
+	memset(buff,0,sizeof(buff));
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\",\"Downklink_Ack\":\"success\"}",user.deui);	 
+  pro_data_num=strlen(buff);
+}
+
+void Thingseye_mqtt_send_current_fw_info(void)
+{
+	memset(buff,0,sizeof(buff));
+	sprintf(buff+strlen(buff), "{\"current_fw_title\": \"%s\", \"current_fw_version\": \"%s\"}",user.otaver,user.otaver);	
+  pro_data_num=strlen(buff);
+}
+
+void Thingseye_mqtt_request_fw_info(void)
+{
+	memset(buff,0,sizeof(buff));
+	sprintf(buff+strlen(buff), "{\"sharedKeys\": \"fw_checksum,fw_checksum_algorithm,fw_size,fw_title,fw_version\"}");	
+  pro_data_num=strlen(buff);
+}
+
+void Thingseye_mqtt_send_fw_downloading(void)
+{
+	memset(buff,0,sizeof(buff));
+	sprintf(buff+strlen(buff), "{\"current_fw_title\": \"%s\", \"current_fw_version\": \"%s\", \"fw_state\": \"DOWNLOADING\"}",user.otaver,user.otaver);	
+  pro_data_num=strlen(buff);
+}
+
+void Thingseye_mqtt_send_updated(void)
+{
+	memset(buff,0,sizeof(buff));
+	sprintf(buff+strlen(buff), "{\"current_fw_title\": \"%s\", \"current_fw_version\": \"%s\", \"fw_state\": \"UPDATED\"}",user.otaver,user.otaver);	
+  pro_data_num=strlen(buff);
+}
+
+
+void Thingseye_mqtt_send_message_error_1(void)
+{
+	memset(buff,0,sizeof(buff));	
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\", \"Message\": \"Firmware Title Mismatch\"}",user.deui);	
+  pro_data_num=strlen(buff);
+}
+
+void Thingseye_mqtt_send_message_error_2(void)
+{
+	memset(buff,0,sizeof(buff));	
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\", \"Message\": \"Hardware Not Support\"}",user.deui);	
+  pro_data_num=strlen(buff);
+}
+
+void Thingseye_mqtt_send_message_error_3(void)
+{
+	memset(buff,0,sizeof(buff));	
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\", \"Message\": \"Error Format : command incorrect\"}",user.deui);	
+  pro_data_num=strlen(buff);
+}
+
+void Thingseye_mqtt_send_message_error_4(void)
+{
+	memset(buff,0,sizeof(buff));	
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\", \"Message\": \"OTA server connecting timeout\"}",user.deui);	
+  pro_data_num=strlen(buff);
+}
+
+void Thingseye_mqtt_send_message_error_5(void)
+{
+	memset(buff,0,sizeof(buff));	
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\", \"Message\": \"Firmware Title not found\"}",user.deui);	
+  pro_data_num=strlen(buff);
+}
+
+void Thingseye_mqtt_send_message_error_6(void)
+{
+	memset(buff,0,sizeof(buff));	
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\", \"Message\": \"Consistent firmware Version\"}",user.deui);	
+  pro_data_num=strlen(buff);
+}
+
+void Thingseye_mqtt_send_message_error_7(void)
+{
+	memset(buff,0,sizeof(buff));	
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\", \"Message\": \"Firmware CheckSum Error\"}",user.deui);	
+  pro_data_num=strlen(buff);
+}
+
+void Thingseye_mqtt_send_message_update(void)
+{
+	memset(buff,0,sizeof(buff));	
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\", \"Message\": \"OTA Update OK, Firmware Title: %s Ver: %s\"}",user.deui,server_fw_title,server_fw_version);	
+  pro_data_num=strlen(buff);
+}
+
+void Uplink_serial_log(void)
+{
+	memset(buff,0,sizeof(buff));	
+	sprintf(buff+strlen(buff), "{\"IMEI\":\"%s\", \"Log\": \"%s\"}",user.deui,sensor.data);	
+  pro_data_num=strlen(buff);
 }

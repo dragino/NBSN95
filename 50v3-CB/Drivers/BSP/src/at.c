@@ -16,13 +16,12 @@ static uint32_t coap_parameters2[32]={0};
 static uint32_t coap_parameters3[32]={0};
 static uint32_t coap_parameters4[32]={0};
 static uint32_t coap_parameters5[32]={0};
-static uint32_t coap_parameters6[32]={0};
-static uint32_t coap_parameters7[32]={0};
-static uint32_t coap_parameters8[32]={0};
 static uint32_t band_parameters[32]={0};
 static uint32_t dns_parameters[32]={0};
-static uint8_t  noud_flags = 0;
-uint8_t  mqtt_qos_flags = 0;
+static uint32_t ntp_parameters[32]={0};
+static uint32_t ota_parameters[32]={0};
+uint8_t  ota_upgrade_flag = 0;
+uint8_t  Datalog_uplink = 0;
 uint8_t mqtt_qos=0;
 uint8_t ipv46=0;
 uint8_t gps_flag=0;
@@ -33,6 +32,7 @@ uint16_t gnss_timer=0;
 extern bool at_sleep_flag;
 extern bool sleep_status;
 extern bool first_sample;
+extern uint8_t firmware_flag;
 ATEerror_t ATInsPro(char* atdata)
 {
 	uint8_t i = 0;
@@ -130,9 +130,9 @@ ATEerror_t at_model_get(const char *param)
 	#endif
 #else	
 	#if defined NB_NS
-	printf("SN50V3-CS,%s\r\n",AT_VERSION_STRING);
+	printf("%s,%s\r\n",firmware_title,AT_VERSION_STRING);
 	#else	
-	printf("SN50V3-CB,%s\r\n",AT_VERSION_STRING);
+	printf("%s,%s\r\n",firmware_title,AT_VERSION_STRING);
 	#endif	
 	#endif
 	return AT_OK;
@@ -183,6 +183,10 @@ ATEerror_t at_mod_set(const char *param)
 	else if(mod == model10)
 	{
 		printf("\r\nUse Sensor is TMP117\r\n");
+	}	
+	else if(mod == model11)
+	{
+		printf("\r\n3 ADC ratiometric + I2C\r\n");
 	}	
 	else
 	{
@@ -275,14 +279,20 @@ ATEerror_t at_fdr_run(const char *param)
 	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);		
 	FLASH_erase(FLASH_USER_BAND_START,(FLASH_USER_BAND_END - FLASH_USER_BAND_START) / FLASH_PAGE_SIZE);		
 	FLASH_erase(FLASH_USER_DNSCFG,(FLASH_USER_DNSCFG_END - FLASH_USER_DNSCFG) / FLASH_PAGE_SIZE);	
+	FLASH_erase(FLASH_USER_NTP,(FLASH_USER_NTP_END - FLASH_USER_NTP) / FLASH_PAGE_SIZE);
+	FLASH_erase(FLASH_OTA_ADDR,(FLASH_OTA_END_ADDR - FLASH_OTA_ADDR) / FLASH_PAGE_SIZE);		
 	DatalogClear();
 	memset(general_parameters,0,sizeof(general_parameters));	
 	sys.clock_switch=1;
 	sys.strat_time=65535;
   sys.iotmode=2;
 	sys.ddns_flag=1;
+	mqtt_qos = 0; 
+	sys.sht_noud = 8;	
   general_parameters[13]=sys.ddns_flag<<24;
+  general_parameters[11]=sys.sht_noud;		
 	general_parameters[12]=sys.iotmode;
+	general_parameters[28]=mqtt_qos <<16;			
 	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8;		
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);		
   Entersleep_Write(( uint32_t )0x12);	
@@ -315,16 +325,21 @@ ATEerror_t at_fdr1_run(const char *param)
 	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);	
 	FLASH_erase(FLASH_USER_BAND_START,(FLASH_USER_BAND_END - FLASH_USER_BAND_START) / FLASH_PAGE_SIZE);		
 	FLASH_erase(FLASH_USER_DNSCFG,(FLASH_USER_DNSCFG_END - FLASH_USER_DNSCFG) / FLASH_PAGE_SIZE);		
+	FLASH_erase(FLASH_USER_NTP,(FLASH_USER_NTP_END - FLASH_USER_NTP) / FLASH_PAGE_SIZE);		
 	DatalogClear();
 	memset(general_parameters,0,sizeof(general_parameters));	
 	sys.clock_switch=1;
 	sys.strat_time=65535;
   sys.iotmode=2;	
 	sys.ddns_flag=1;
+	mqtt_qos = 0; 
+	sys.sht_noud = 8;	
 	for(uint8_t i=0,j=0;i<strlen((char*)user.deui);i=i+4,j++)
 			general_parameters[7+j]=user.deui[i+0]<<24 | user.deui[i+1]<<16 | user.deui[i+2]<<8 | user.deui[i+3];
   general_parameters[13]=sys.ddns_flag<<24;
+  general_parameters[11]=sys.sht_noud;	
 	general_parameters[12]=sys.iotmode;
+	general_parameters[28]=mqtt_qos <<16;		
 	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8;		
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);			
   Entersleep_Write(( uint32_t )0x12);	
@@ -1010,7 +1025,29 @@ ATEerror_t at_mqos_set(const char *param)
 		return AT_PARAM_ERROR;
 	}
 	mqtt_qos = noud;
-	mqtt_qos_flags=1;
+	return AT_OK;
+}
+
+
+/************** 			AT+SNI		**************/
+ATEerror_t at_sni_get(const char *param)
+{
+	if(keep)
+		printf(AT SNI"=");
+	printf("%d\r\n",sys.snimod);	
+	return AT_OK;
+}
+
+ATEerror_t at_sni_set(const char *param)
+{
+	char* pos = strchr(param,'=');
+	uint8_t noud = atoi((param+(pos-param)+1));
+	if(noud > 1)
+	{
+		return AT_PARAM_ERROR;
+	}
+	sys.snimod = noud;
+
 	return AT_OK;
 }
 /************** 			AT+IPTYPE		**************/
@@ -1154,78 +1191,7 @@ ATEerror_t at_uri5_set(const char *param)
 	
   return AT_OK;
 }
-/************** 			AT+OPTION6		 **************/
-ATEerror_t at_uri6_get(const char *param)
-{
-	if(keep)
-		printf("AT+URI6=");
-	printf("%s\r\n",user.uri6);
-	
-  return AT_OK;
-}
 
-ATEerror_t at_uri6_set(const char *param)
-{
-	space_fun((char*)param);
-	char* pos = strchr(param,'=');
-	if(strlen(param) - (pos-param)-1 >128)
-	{
-		return AT_PARAM_ERROR;
-	}
-	
-	memset(user.uri6,0,sizeof(user.uri6));
-	memcpy(user.uri6,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
-	
-  return AT_OK;
-}
-/************** 			AT+OPTION7		 **************/
-ATEerror_t at_uri7_get(const char *param)
-{
-	if(keep)
-		printf("AT+URI7=");
-	printf("%s\r\n",user.uri7);
-	
-  return AT_OK;
-}
-
-ATEerror_t at_uri7_set(const char *param)
-{
-	space_fun((char*)param);
-	char* pos = strchr(param,'=');
-	if(strlen(param) - (pos-param)-1 >128)
-	{
-		return AT_PARAM_ERROR;
-	}
-	
-	memset(user.uri7,0,sizeof(user.uri7));
-	memcpy(user.uri7,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
-	
-  return AT_OK;
-}
-/************** 			AT+OPTION8		 **************/
-ATEerror_t at_uri8_get(const char *param)
-{
-	if(keep)
-		printf("AT+URI8=");
-	printf("%s\r\n",user.uri8);
-	
-  return AT_OK;
-}
-
-ATEerror_t at_uri8_set(const char *param)
-{
-	space_fun((char*)param);
-	char* pos = strchr(param,'=');
-	if(strlen(param) - (pos-param)-1 >128)
-	{
-		return AT_PARAM_ERROR;
-	}
-	
-	memset(user.uri8,0,sizeof(user.uri8));
-	memcpy(user.uri8,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
-	
-  return AT_OK;
-}
 /************** 			QSW			 **************/
 ATEerror_t at_qsw_run(const char *param)
 {
@@ -1323,12 +1289,21 @@ ATEerror_t at_getlog_set(const char *param)
 {
 	char* pos = strchr(param,'=');
 	uint8_t cdp = param[(pos-param)+1];
-	if(cdp != '0')
+	if(cdp == '0')
 	{
-		return AT_PARAM_ERROR;
+	 DatalogClear();
+	 sys.log_seq=0;		
 	}
-	DatalogClear();
-	sys.log_seq=0;
+  else if(cdp == '1') 
+	{
+	 Datalog_uplink=1;
+	}		
+	else
+	{
+		return AT_PARAM_ERROR;	
+	}
+	
+	
 	return AT_OK;
 }
 
@@ -1357,13 +1332,6 @@ ATEerror_t at_clocklog_set(const char *param)
 		sys.strat_time=bb;
 		sys.tr_time=cc;
 		sys.sht_noud=dd;
-		first_sample=0;
-		noud_flags = 1;
-			if(HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_13)==0)
-		{
-			nb_ate_run(NULL);
-		  nb_cclk_run(NULL);
-		}
 	}
   else
 	{
@@ -1460,6 +1428,252 @@ ATEerror_t at_down1t_set(const char *param)
 	sys.downlink_debug =tem2;	
   return AT_OK;
 }
+/************** 			AT+NTP		 **************/
+ATEerror_t at_ntp_get(const char *param)
+{
+	if(keep)
+		printf("AT+NTP=");
+	printf("%s\r\n",user.ntp_add);
+	
+  return AT_OK;
+}
+
+ATEerror_t at_ntp_set(const char *param)
+{
+	space_fun((char*)param);	
+	char* pos = strchr(param,'=');
+	
+	if(strlen(param) - (pos-param)-1 >63)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.ntp_add,0,sizeof(user.ntp_add));
+	memcpy(user.ntp_add,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
+	
+  return AT_OK;
+}
+/************** 			AT+QCOPS		 **************/
+ATEerror_t at_cops_get(const char *param)
+{
+	if(keep)
+		printf("AT+QCOPS=");
+	printf("%s\r\n",user.operator_code);
+	
+  return AT_OK;
+}
+
+ATEerror_t at_cops_set(const char *param)
+{
+	space_fun((char*)param);	
+	char* pos = strchr(param,'=');
+	
+	if(strlen(param) - (pos-param)-1 >63)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.operator_code,0,sizeof(user.operator_code));
+	memcpy(user.operator_code,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
+	
+  return AT_OK;
+}
+
+/************** 			AT+CERTMOD		**************/
+ATEerror_t at_certmod_run(const char *param)
+{
+	if(nb.uplink_flag == no_status ||nb.uplink_flag == writing)
+	{
+		if(HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_13)==1)
+		{ 
+			while(HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_13)==1)
+			{
+			 bg95module_on();
+			 HAL_Delay(1000);
+			}
+			user_main_printf("Enter certificate mode");
+			nb.uplink_flag = writing;	
+		}
+		else
+		{
+			while(HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_13)==0)
+			{
+			 bg95module_off();
+			 HAL_Delay(1000);
+			}
+			user_main_printf("Exit certificate mode");
+			nb.uplink_flag = no_status;			
+		}	
+	}
+	else
+  {
+		printf("The device is busy.\r\n");	
+    return AT_BUSY_ERROR;	
+	}			
+	
+  return AT_OK;		
+}
+
+/************** 			AT+UPGRADE		**************/
+ATEerror_t at_upgrade_run(const char *param)
+{
+	if(nb.uplink_flag != no_status)
+	{
+		printf("The device is busy.\r\n");	
+    return AT_BUSY_ERROR;	
+	}	
+    ota_upgrade_flag=1;
+	
+  return AT_OK;		
+}
+
+/************** 			AT+OTASER		 **************/
+ATEerror_t at_otaservaddr_get(const char *param)
+{
+	if(keep)
+		printf("AT+OTASER=");
+	printf("%s\r\n",user.otaadd);
+	
+  return AT_OK;
+}
+
+ATEerror_t at_otaservaddr_set(const char *param)
+{
+	space_fun((char*)param);	
+	char* pos = strchr(param,'=');
+  if(strchr(param,',')==NULL)
+  {
+		printf("NOTE:SERVADDR FORMAT ERROR\r\n");
+    return AT_PARAM_ERROR; 
+  }	
+	if(strlen(param) - (pos-param)-1 >40)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.otaadd,0,sizeof(user.otaadd));
+	memcpy(user.otaadd,(param+(pos-param)+1),strlen((param+(pos-param)+1)));	
+  return AT_OK;
+}
+
+/************** 			AT+OTACLT		 **************/
+ATEerror_t at_otaclient_get(const char *param)
+{
+	if(keep)
+		printf(AT OTACLT"=");
+
+	printf("%s\r\n",user.otaclient);
+  return AT_OK;
+}
+
+ATEerror_t at_otaclient_set(const char *param)
+{
+	space_fun((char*)param);
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >44)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.otaclient,0,sizeof(user.otaclient));
+	memcpy(user.otaclient,(param+(pos-param)+1),strlen((param+(pos-param)+1)));
+	
+  return AT_OK;
+}
+/************** 			AT+OTAUNAME		 **************/
+ATEerror_t at_otauname_get(const char *param)
+{
+	if(keep)
+		printf(AT OTAUNAME"=");
+
+	printf("%s\r\n",user.otauname);
+	
+  return AT_OK;
+}
+
+ATEerror_t at_otauname_set(const char *param)
+{
+	space_fun((char*)param);
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >44)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.otauname,0,sizeof(user.otauname));
+	memcpy(user.otauname,(param+(pos-param)+1),strlen((param+(pos-param)+1)));
+	
+  return AT_OK;
+}
+/************** 			AT+OTAPWD		 **************/
+ATEerror_t at_otapwd_get(const char *param)
+{
+	if(keep)
+		printf("AT+OTAPWD=");
+
+	printf("%s\r\n",user.otapwd);
+  return AT_OK;
+}
+
+ATEerror_t at_otapwd_set(const char *param)
+{
+	space_fun((char*)param);
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >48)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.otapwd,0,sizeof(user.otapwd));
+	memcpy(user.otapwd,(param+(pos-param)+1),strlen((param+(pos-param)+1)));
+  return AT_OK;
+}
+/************** 			AT+OTATITLE		 **************/
+ATEerror_t at_otafirmwaretitle_get(const char *param)
+{
+	if(keep)
+		printf(AT OTATITLE"=");
+
+	printf("%s\r\n",user.otatitle);
+  return AT_OK;
+}
+
+ATEerror_t at_otafirmwaretitle_set(const char *param)
+{
+	space_fun((char*)param);
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >20)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.otatitle,0,sizeof(user.otatitle));
+	memcpy(user.otatitle,(param+(pos-param)+1),strlen((param+(pos-param)+1)));
+  return AT_OK;
+}
+/************** 			AT+OTAVER		 **************/
+ATEerror_t at_otafirmwarever_get(const char *param)
+{
+	if(keep)
+		printf(AT OTAVER"=");
+
+	printf("%s\r\n",user.otaver);
+  return AT_OK;
+}
+
+ATEerror_t at_otafirmwarever_set(const char *param)
+{
+	space_fun((char*)param);
+	char* pos = strchr(param,'=');
+	if(strlen(param) - (pos-param)-1 >8)
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	memset(user.otaver,0,sizeof(user.otaver));
+	memcpy(user.otaver,(param+(pos-param)+1),strlen((param+(pos-param)+1)));
+  return AT_OK;
+}
 /************** 		Other		 **************/
 char *rtrim(char* str)
 {
@@ -1495,11 +1709,10 @@ void config_Set(void)
 	memset(coap_parameters3,0,sizeof(coap_parameters3));
 	memset(coap_parameters4,0,sizeof(coap_parameters4));
 	memset(coap_parameters5,0,sizeof(coap_parameters5));
-	memset(coap_parameters6,0,sizeof(coap_parameters6));
-	memset(coap_parameters7,0,sizeof(coap_parameters7));
-	memset(coap_parameters8,0,sizeof(coap_parameters8));
 	memset(band_parameters,0,sizeof(band_parameters));	
 	memset(dns_parameters,0,sizeof(dns_parameters));
+	memset(ntp_parameters,0,sizeof(ntp_parameters));	
+	memset(ota_parameters,0,sizeof(ota_parameters));	
 	general_parameters[0]=sys.inmod_pa4<<24 | sys.inmod_pa0<<16 |sys.gps_tdc;
 	general_parameters[1]=sensor.exit_count_pa4;
 	general_parameters[2]=sys.mod<<24    | sys.tdc;
@@ -1507,10 +1720,10 @@ void config_Set(void)
 	general_parameters[4]=sys.rxdl<<16   | sys.power_time;
 	general_parameters[5]=(int)(sensor.GapValue *10000);
 	general_parameters[6]=sensor.exit_count;
-	general_parameters[11]=sys.tr_time<<16 | noud_flags<<8 | sys.sht_noud;
+	general_parameters[11]=sys.tr_time<<16 |  sys.sht_noud;
 	general_parameters[12]=sys.platform<<24 |sensor.count_mode<<16 |sys.dns_time<<8 |sys.iotmode;
-	general_parameters[28]=mqtt_qos_flags<<24 |mqtt_qos <<16 |sys.cert<<8 |sys.tlsmod;
-	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8 |sys.log_seq;	
+	general_parameters[28]=mqtt_qos <<16 |sys.cert<<8 |sys.tlsmod;
+	general_parameters[29]=sys.clock_switch<<24 | sys.strat_time<<8 |sys.snimod;	
 	general_parameters[30]=gnss_timer<<16 | gps_flag<<8 |ipv46;		
 	general_parameters[31]=sensor.exit_count_pa0;
 	general_parameters[13]=sys.ddns_flag<<24 |sys.ddns_time<<16|sys.downlink_1t<<8|sys.downlink_debug;
@@ -1553,14 +1766,6 @@ void config_Set(void)
 	for(uint8_t i=0,j=0;i<strlen((char*)user.uri5);i=i+4,j++)
 			coap_parameters5[j]=user.uri5[i+0]<<24 | user.uri5[i+1]<<16 | user.uri5[i+2]<<8 | user.uri5[i+3];
 
-	for(uint8_t i=0,j=0;i<strlen((char*)user.uri6);i=i+4,j++)
-			coap_parameters6[j]=user.uri6[i+0]<<24 | user.uri6[i+1]<<16 | user.uri6[i+2]<<8 | user.uri6[i+3];
-			
-	for(uint8_t i=0,j=0;i<strlen((char*)user.uri7);i=i+4,j++)
-			coap_parameters7[j]=user.uri7[i+0]<<24 | user.uri7[i+1]<<16 | user.uri7[i+2]<<8 | user.uri7[i+3];
-
-	for(uint8_t i=0,j=0;i<strlen((char*)user.uri8);i=i+4,j++)
-			coap_parameters8[j]=user.uri8[i+0]<<24 | user.uri8[i+1]<<16 | user.uri8[i+2]<<8 | user.uri8[i+3];
 
 	for(uint8_t i=0,j=0;i<strlen((char*)user.qband);i=i+4,j++)
 			band_parameters[j]=user.qband[i+0]<<24 | user.qband[i+1]<<16 | user.qband[i+2]<<8 | user.qband[i+3];
@@ -1571,10 +1776,27 @@ void config_Set(void)
 	for(uint8_t i=0,j=0;i<strlen((char*)user.add_ip);i=i+4,j++)
 			dns_parameters[10+j]=user.add_ip[i+0]<<24 | user.add_ip[i+1]<<16 | user.add_ip[i+2]<<8 | user.add_ip[i+3];			
 			
+	for(uint8_t i=0,j=0;i<strlen((char*)user.ntp_add);i=i+4,j++)
+			ntp_parameters[j]=user.ntp_add[i+0]<<24 | user.ntp_add[i+1]<<16 | user.ntp_add[i+2]<<8 | user.ntp_add[i+3];
+
+	for(uint8_t i=0,j=0;i<strlen((char*)user.operator_code);i=i+4,j++)
+			ntp_parameters[16+j]=user.operator_code[i+0]<<24 | user.operator_code[i+1]<<16 | user.operator_code[i+2]<<8 | user.operator_code[i+3];
+
+	for(uint8_t i=0,j=0;i<strlen((char*)user.otaadd);i=i+4,j++)
+			ota_parameters[j]=user.otaadd[i+0]<<24 | user.otaadd[i+1]<<16 | user.otaadd[i+2]<<8 | user.otaadd[i+3];
+			
+	for(uint8_t i=0,j=0;i<strlen((char*)user.otaclient);i=i+4,j++)
+			ota_parameters[10+j]=user.otaclient[i+0]<<24 | user.otaclient[i+1]<<16 | user.otaclient[i+2]<<8 | user.otaclient[i+3];			
+
+	for(uint8_t i=0,j=0;i<strlen((char*)user.otauname);i=i+4,j++)
+			ota_parameters[21+j]=user.otauname[i+0]<<24 | user.otauname[i+1]<<16 | user.otauname[i+2]<<8 | user.otauname[i+3];
+
 	FLASH_erase(FLASH_USER_START_ADDR_CONFIG,(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR_CONFIG) / FLASH_PAGE_SIZE);
 	FLASH_erase(FLASH_USER_COAP_URI1,(FLASH_USER_COAP_END - FLASH_USER_COAP_URI1) / FLASH_PAGE_SIZE);	
 	FLASH_erase(FLASH_USER_BAND_START,(FLASH_USER_BAND_END - FLASH_USER_BAND_START) / FLASH_PAGE_SIZE);		
 	FLASH_erase(FLASH_USER_DNSCFG,(FLASH_USER_DNSCFG_END - FLASH_USER_DNSCFG) / FLASH_PAGE_SIZE);	
+	FLASH_erase(FLASH_USER_NTP,(FLASH_USER_NTP_END - FLASH_USER_NTP) / FLASH_PAGE_SIZE);	
+	FLASH_erase(FLASH_OTA_ADDR,(FLASH_OTA_END_ADDR - FLASH_OTA_ADDR) / FLASH_PAGE_SIZE);	
 	FLASH_program(FLASH_USER_START_ADDR_CONFIG,general_parameters, sizeof(general_parameters)/4);
 	FLASH_program(FLASH_USER_START_SERVADDR_ADD,servaddr_parameters, sizeof(servaddr_parameters)/4);
 //	FLASH_program(FLASH_USER_START_COAP,coap_parameters, sizeof(coap_parameters)/4);
@@ -1588,11 +1810,20 @@ void config_Set(void)
 	FLASH_program(FLASH_USER_COAP_URI3,coap_parameters3, sizeof(coap_parameters3)/4);		
 	FLASH_program(FLASH_USER_COAP_URI4,coap_parameters4, sizeof(coap_parameters4)/4);			
 	FLASH_program(FLASH_USER_COAP_URI5,coap_parameters5, sizeof(coap_parameters5)/4);		
-	FLASH_program(FLASH_USER_COAP_URI6,coap_parameters6, sizeof(coap_parameters6)/4);		
-	FLASH_program(FLASH_USER_COAP_URI7,coap_parameters7, sizeof(coap_parameters7)/4);		
-	FLASH_program(FLASH_USER_COAP_URI8,coap_parameters8, sizeof(coap_parameters8)/4);
 	FLASH_program(FLASH_USER_BAND_START,band_parameters, sizeof(band_parameters)/4);	
 	FLASH_program(FLASH_USER_DNSCFG,dns_parameters, sizeof(dns_parameters)/4);		
+	FLASH_program(FLASH_USER_NTP,ntp_parameters, sizeof(ntp_parameters)/4);			
+	FLASH_program(FLASH_OTA_ADDR,ota_parameters, sizeof(ota_parameters)/4);	
+	memset(ota_parameters,0,sizeof(ota_parameters));	
+	for(uint8_t i=0,j=0;i<strlen((char*)user.otapwd);i=i+4,j++)
+			ota_parameters[j]=user.otapwd[i+0]<<24 | user.otapwd[i+1]<<16 | user.otapwd[i+2]<<8 | user.otapwd[i+3];
+			
+	for(uint8_t i=0,j=0;i<strlen((char*)user.otatitle);i=i+4,j++)
+			ota_parameters[12+j]=user.otatitle[i+0]<<24 | user.otatitle[i+1]<<16 | user.otatitle[i+2]<<8 | user.otatitle[i+3];			
+
+	for(uint8_t i=0,j=0;i<strlen((char*)user.otaver);i=i+4,j++)
+			ota_parameters[17+j]=user.otaver[i+0]<<24 | user.otaver[i+1]<<16 | user.otaver[i+2]<<8 | user.otaver[i+3];
+	FLASH_program(FLASH_OTA_ADDR+ FLASH_PAGE_SIZE,ota_parameters, sizeof(ota_parameters)/4);			
 }
 
 void config_Get(void)
@@ -1641,7 +1872,7 @@ void config_Get(void)
 		sys.gps_tdc =24;
 
 	sys.mod = FLASH_read(add+8) >>24;
-	if(sys.mod == 0 || sys.mod > model10)
+	if(sys.mod == 0 || sys.mod > model11)
 		sys.mod = model1;
 	
 	sys.tdc = FLASH_read(add+8)  & 0x00FFFFFF;
@@ -1671,11 +1902,10 @@ void config_Get(void)
 	if(sys.tr_time == 0)
 		sys.tr_time = 15;
 
-	noud_flags=FLASH_read(add+44)>>8&0xFF;
+//	noud_flags=FLASH_read(add+44)>>8&0xFF;
 	
 	sys.sht_noud=FLASH_read(add+44)&0xFF;
-	if((sys.sht_noud==0)&&(noud_flags==0))
-		sys.sht_noud = 8;
+
 	
 	sys.csq_time = FLASH_read(add+12) &0xFF;
 	if(sys.csq_time==0)
@@ -1689,13 +1919,12 @@ void config_Get(void)
 	
   sys.cert	= FLASH_read(add+112)>>8 &0xFF;	
   
-	mqtt_qos_flags = FLASH_read(add+112)>>24 &0xFF;	
+//	mqtt_qos_flags = FLASH_read(add+112)>>24 &0xFF;	
 	
   mqtt_qos  = FLASH_read(add+112)>>16 &0xFF;	
-	if((mqtt_qos==0)&&(mqtt_qos_flags==0))
-		mqtt_qos = 2;  
+
 	
-	 sys.log_seq = FLASH_read(add+116) &0xFF;	
+	 sys.snimod = FLASH_read(add+116) &0xFF;	
 
 	sys.clock_switch = FLASH_read(add+116)>>24 &0xFF;
 	
@@ -1943,45 +2172,9 @@ void config_Get(void)
 	{
 		sprintf((char*)user.uri5, "%s", "NULL");
 	}
-	add = FLASH_USER_COAP_URI6;
-	for(uint8_t i=0,j=0;i<32;i++,j=j+4)
-	{
-		uint32_t temp = FLASH_read(add+i*4);
-		user.uri6[j] 	= (temp>>24) & 0x000000FF;
-		user.uri6[j+1] = (temp>>16) & 0x000000FF;
-		user.uri6[j+2] = (temp>>8)  & 0x000000FF;
-		user.uri6[j+3] = (temp)     & 0x000000FF;
-	}
-	if(strlen((char*)user.uri6) == 0)
-	{
-		sprintf((char*)user.uri6, "%s", "NULL");
-	}
-	add = FLASH_USER_COAP_URI7;
-	for(uint8_t i=0,j=0;i<32;i++,j=j+4)
-	{
-		uint32_t temp = FLASH_read(add+i*4);
-		user.uri7[j] 	= (temp>>24) & 0x000000FF;
-		user.uri7[j+1] = (temp>>16) & 0x000000FF;
-		user.uri7[j+2] = (temp>>8)  & 0x000000FF;
-		user.uri7[j+3] = (temp)     & 0x000000FF;
-	}
-	if(strlen((char*)user.uri7) == 0)
-	{
-		sprintf((char*)user.uri7, "%s", "NULL");
-	}
-	add = FLASH_USER_COAP_URI8;
-	for(uint8_t i=0,j=0;i<32;i++,j=j+4)
-	{
-		uint32_t temp = FLASH_read(add+i*4);
-		user.uri8[j] 	= (temp>>24) & 0x000000FF;
-		user.uri8[j+1] = (temp>>16) & 0x000000FF;
-		user.uri8[j+2] = (temp>>8)  & 0x000000FF;
-		user.uri8[j+3] = (temp)     & 0x000000FF;
-	}
-	if(strlen((char*)user.uri8) == 0)
-	{
-		sprintf((char*)user.uri8, "%s", "NULL");
-	}	
+
+
+	
 	add = FLASH_USER_BAND_START;
 	for(uint8_t i=0,j=0;i<13;i++,j=j+4)
 	{
@@ -1995,4 +2188,138 @@ void config_Get(void)
 	{
 		sprintf((char*)user.qband, "%s", "0x100002000000000f0e189f,0x10004200000000090e189f");
 	}	
+	
+	add = FLASH_USER_NTP;
+	for(uint8_t i=0,j=0;i<16;i++,j=j+4)
+	{
+		uint32_t temp = FLASH_read(add+i*4);
+		user.ntp_add[j] 	= (temp>>24) & 0x000000FF;
+		user.ntp_add[j+1] = (temp>>16) & 0x000000FF;
+		user.ntp_add[j+2] = (temp>>8)  & 0x000000FF;
+		user.ntp_add[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.ntp_add) == 0)
+	{
+		sprintf((char*)user.ntp_add, "%s", "NULL");
+	}	
+	
+	add = FLASH_USER_NTP + 0x04*16;	
+	
+	for(uint8_t i=0,j=0;i<16;i++,j=j+4)
+	{
+		uint32_t temp = FLASH_read(add+i*4);
+		user.operator_code[j] 	= (temp>>24) & 0x000000FF;
+		user.operator_code[j+1] = (temp>>16) & 0x000000FF;
+		user.operator_code[j+2] = (temp>>8)  & 0x000000FF;
+		user.operator_code[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.operator_code) == 0)
+	{
+		sprintf((char*)user.operator_code, "%s", "NULL");
+	}	
+	
+	//ota-add
+	add = FLASH_OTA_ADDR;		
+	for(uint8_t i=0,j=0;i<10;i++,j=j+4)
+	{
+		uint32_t temp  = FLASH_read(add+i*4);
+		user.otaadd[j] 	 = (temp>>24) & 0x000000FF;
+		user.otaadd[j+1] = (temp>>16) & 0x000000FF;
+		user.otaadd[j+2] = (temp>>8)  & 0x000000FF;
+		user.otaadd[j+3] = (temp)     & 0x000000FF;
+	}	
+	
+	if(strlen((char*)user.otaadd) == 0)
+	{
+		sprintf((char*)user.otaadd, "%s", "NULL");
+	}	
+	
+	//ota-client
+	for(uint8_t i=0,j=0;i<11;i++,j=j+4)
+	{
+		uint32_t temp    = FLASH_read(add+(i+10)*4);		
+		user.otaclient[j] 	 = (temp>>24) & 0x000000FF;
+		user.otaclient[j+1] = (temp>>16) & 0x000000FF;
+		user.otaclient[j+2] = (temp>>8)  & 0x000000FF;
+		user.otaclient[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.otaclient) == 0)
+	{
+		sprintf((char*)user.otaclient, "%s", "NULL");
+	}	
+	
+	//ota-uname
+	for(uint8_t i=0,j=0;i<11;i++,j=j+4)
+	{
+		uint32_t temp   = FLASH_read(add+(i+21)*4);
+		user.otauname[j] 	= (temp>>24) & 0x000000FF;
+		user.otauname[j+1] = (temp>>16) & 0x000000FF;
+		user.otauname[j+2] = (temp>>8)  & 0x000000FF;
+		user.otauname[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.otauname) == 0)
+	{
+		sprintf((char*)user.otauname, "%s", "NULL");
+	}
+	
+	//ota-pwd
+	add = FLASH_OTA_ADDR + FLASH_PAGE_SIZE;	
+	for(uint8_t i=0,j=0;i<12;i++,j=j+4)
+	{
+		uint32_t temp = FLASH_read(add+i*4);
+		user.otapwd[j] 	= (temp>>24) & 0x000000FF;
+		user.otapwd[j+1] = (temp>>16) & 0x000000FF;
+		user.otapwd[j+2] = (temp>>8)  & 0x000000FF;
+		user.otapwd[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.otapwd) == 0)
+	{
+		sprintf((char*)user.otapwd, "%s", "NULL");
+	}
+	
+	if(firmware_flag==1)
+	{
+	  FLASH_erase(FLASH_OTA_ADDR,(FLASH_OTA_END_ADDR - FLASH_OTA_ADDR) / FLASH_PAGE_SIZE);					
+	}
+	//ota-firmware title
+	for(uint8_t i=0,j=0;i<5;i++,j=j+4)
+	{
+		uint32_t temp      = FLASH_read(add+(i+12)*4);		
+		user.otatitle[j] 	 = (temp>>24) & 0x000000FF;
+		user.otatitle[j+1] = (temp>>16) & 0x000000FF;
+		user.otatitle[j+2] = (temp>>8)  & 0x000000FF;
+		user.otatitle[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.otatitle) == 0)
+	{
+		sprintf((char*)user.otatitle, "%s", firmware_title);
+	}
+	//ota-firmware version
+	for(uint8_t i=0,j=0;i<2;i++,j=j+4)
+	{
+		uint32_t temp      = FLASH_read(add+(i+17)*4);		
+		user.otaver[j] 	 = (temp>>24) & 0x000000FF;
+		user.otaver[j+1] = (temp>>16) & 0x000000FF;
+		user.otaver[j+2] = (temp>>8)  & 0x000000FF;
+		user.otaver[j+3] = (temp)     & 0x000000FF;
+	}
+	if(strlen((char*)user.otaver) == 0)
+	{
+		sprintf((char*)user.otaver, "%s", AT_VERSION_STRING);
+	}	
+	if(firmware_flag==1)
+	{	
+		firmware_flag=0;
+		memset(ota_parameters,0,sizeof(ota_parameters));	
+		for(uint8_t i=0,j=0;i<strlen((char*)user.otapwd);i=i+4,j++)
+				ota_parameters[j]=user.otapwd[i+0]<<24 | user.otapwd[i+1]<<16 | user.otapwd[i+2]<<8 | user.otapwd[i+3];
+				
+		for(uint8_t i=0,j=0;i<strlen((char*)user.otatitle);i=i+4,j++)
+				ota_parameters[12+j]=user.otatitle[i+0]<<24 | user.otatitle[i+1]<<16 | user.otatitle[i+2]<<8 | user.otatitle[i+3];			
+
+		for(uint8_t i=0,j=0;i<strlen((char*)user.otaver);i=i+4,j++)
+				ota_parameters[17+j]=user.otaver[i+0]<<24 | user.otaver[i+1]<<16 | user.otaver[i+2]<<8 | user.otaver[i+3];
+		FLASH_program(FLASH_OTA_ADDR+ FLASH_PAGE_SIZE,ota_parameters, sizeof(ota_parameters)/4);					
+	}
+	sys.log_seq=(*(__IO uint16_t *)EEPROM_USER_START_FDR_FLAG)>>8&0xff;
 }

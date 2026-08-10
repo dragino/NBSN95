@@ -28,10 +28,36 @@ void sht31LowPower(void)
 	HAL_I2C_Master_Transmit(&hi2c1,0x88,SHT3X_Modecommand_Buffer,strlen((char*)SHT3X_Modecommand_Buffer),1000);
 }
 
+float temp_Dxpd(float adc_nums[])
+{
+    uint8_t i, j, isSorted;
+    float temp=0.0;
+    
+    for(i=0; i<4-1; i++)
+    {
+        isSorted = 1;  
+        for(j=0; j<4-1-i; j++)
+        {
+            if(adc_nums[j] > adc_nums[j+1])
+            {
+                temp = adc_nums[j];
+                adc_nums[j] = adc_nums[j+1];
+                adc_nums[j+1] = temp;
+                isSorted = 0; 
+            }
+        }
+        if(isSorted) break;
+    }
+  return adc_nums[1];
+}
+
 void sht31Data(void)
 {
   HAL_StatusTypeDef   error;
+  uint32_t currentTime=0;	
   uint8_t times = 0;	
+  float temp1_value[4];
+  float temp2_value[4];	
 	float hum=0.0;
 	float tem=0.0;
 	uint8_t rxdata[6]={0};
@@ -42,7 +68,15 @@ void sht31Data(void)
      times++;
 	  sht31Init();
 	  HAL_Delay(100);		
-    HAL_I2C_Master_Transmit(&hi2c1,0x88,SHT3X_Start_Buffer,2,1000);
+		currentTime = TimerGetCurrentTime();
+    while(HAL_I2C_Master_Transmit(&hi2c1,0x88,SHT3X_Start_Buffer,2,1000) != HAL_OK)
+		{
+			if(TimerGetElapsedTime(currentTime) >= 1000)
+			{
+				HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0);
+				break;
+			}
+		}			
 		error = HAL_I2C_Master_Receive(&hi2c1,0x89,rxdata,6,1000);
   }while(times < 4 && error != HAL_OK);	
 	AD_code=(rxdata[3]<<8)+rxdata[4];
@@ -54,24 +88,41 @@ void sht31Data(void)
 
 
    if(error != HAL_OK ||tem-gxht30_temp_record>30 || tem-gxht30_temp_record<-30
-            || hum<20 || hum>=100 || hum-gxht30_hum_record>20 || hum-gxht30_hum_record<-20)
+            || hum<15 || hum>=100 || hum-gxht30_hum_record>10 || hum-gxht30_hum_record<-10)
    {
-       times = 0;       
+     times = 0;    
+     for(uint8_t kkk=0;kkk<4;kkk++)
+     {		 
        do
        {
           times++;
 				 	sht31Init();
 	        HAL_Delay(100);
-          HAL_I2C_Master_Transmit(&hi2c1,0x88,SHT3X_Start_Buffer,2,1000);
+		      currentTime = TimerGetCurrentTime();
+          while(HAL_I2C_Master_Transmit(&hi2c1,0x88,SHT3X_Start_Buffer,2,1000) != HAL_OK)
+		    {
+			      if(TimerGetElapsedTime(currentTime) >= 1000)
+			     {
+				     HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0);
+				     break;
+			     }
+		    }	
 		      error = HAL_I2C_Master_Receive(&hi2c1,0x89,rxdata,6,1000);
-       }while(times < 4 && error != HAL_OK);
-			 
-	AD_code=(rxdata[3]<<8)+rxdata[4];
-	AD_code &=~0x0003;   //14bit
-	hum=AD_code*100.0/(65536-1);
-	AD_code=(rxdata[0]<<8)+rxdata[1];
-//	AD_code &=~0x0003;   //14bit
-	tem=AD_code*175.0/(65536-1)-45.0;
+       }while(times < 4 && error != HAL_OK);	 
+	    AD_code=(rxdata[3]<<8)+rxdata[4];
+	    AD_code &=~0x0003;   //14bit
+	    hum=AD_code*100.0/(65536-1);
+	    AD_code=(rxdata[0]<<8)+rxdata[1];
+   //	AD_code &=~0x0003;   //14bit
+	    tem=AD_code*175.0/(65536-1)-45.0;
+		  HAL_Delay(15);	 
+      temp1_value[kkk]=tem;
+      temp2_value[kkk]=hum;		
+		 }	
+       temp_Dxpd(temp1_value);
+       temp_Dxpd(temp2_value);
+       tem=(temp1_value[1]+temp1_value[2])/2.0;
+       hum=(temp2_value[1]+temp2_value[2])/2.0;		 
    }
 	
 	  if(error == HAL_OK)

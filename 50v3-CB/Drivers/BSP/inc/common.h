@@ -24,6 +24,7 @@
 #include "ult.h"
 #include "maxsonar.h"
 #include "ne117.h"
+#include "zb25vq32.h"
 #ifdef __cplusplus
  extern "C" {
 #endif
@@ -41,7 +42,12 @@
  * @retval None
  */
 
-#define AT_VERSION_STRING 	"v1.1.4"
+#define AT_VERSION_STRING 	"v1.3.2"
+#if defined NB_NS
+	#define firmware_title      "SN50v3-CS"
+#else
+	#define firmware_title      "SN50v3-CB"
+#endif
 #define product_id 					 0x04
 
 typedef enum
@@ -56,6 +62,7 @@ typedef enum
  model8 ,
  model9 ,
  model10 ,
+ model11 ,
 }model;
 
 typedef struct
@@ -91,6 +98,7 @@ typedef struct
 	USART				usart;
 	uint8_t  		platform;		
 	bool  		tlsmod;		 
+	uint8_t  		snimod;	
 	uint8_t  		cert;		
 	uint8_t			log_seq;
 	bool        clock_switch;
@@ -121,10 +129,15 @@ typedef struct
 	uint8_t  uri3[129];
 	uint8_t  uri4[129];
 	uint8_t  uri5[129];	
-	uint8_t  uri6[129];	
-	uint8_t  uri7[129];	
-	uint8_t  uri8[129];	
 	uint8_t  qband[52];		
+	uint8_t  ntp_add[64];	
+	uint8_t  operator_code[64];	
+	uint8_t  otaadd[40];
+	uint8_t  otaclient[44];
+	uint8_t  otauname[44];
+	uint8_t  otapwd[48];
+	char  otatitle[20];
+	char  otaver[8];	
 }USER;
 
 typedef struct
@@ -195,6 +208,7 @@ void bg95module_off(void);
 void DatalogPrint(void);
 void DatalogClear(void);
 void get_sensorvalue(void);
+void Datalog_request(SENSOR* Sensor);
 void Entersleep_Write(uint32_t write_sleep);
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

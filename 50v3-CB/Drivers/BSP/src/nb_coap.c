@@ -1,6 +1,7 @@
 #include "nb_coap.h"
 #include "time.h"
 #include <time.h>
+#include "nb_payload.h"
 extern char buff[2000];
 extern char downlink_data[1000];
 extern float hum_value;
@@ -12,6 +13,13 @@ extern NB_TaskStatus  nb_cmd_status;
 extern void pro_data(void);
 extern char record_log[512];
 extern uint16_t pro_data_num;
+extern uint8_t read_flag;
+extern uint8_t downlink_check_event;
+extern uint8_t received_dwonlink_flags;
+extern uint8_t  ota_upgrade_error;
+extern uint8_t  Datalog_uplink;
+extern void downilnk_check_data(void);
+extern void downilnk_ack_data(void);
 /**
 	* @brief  Configure to show the CoAP option of sender
   * @param  Instruction parameter
@@ -326,110 +334,6 @@ NB_TaskStatus nb_COAP_option5_get(const char* param)
 	return nb_cmd_status;
 }
 
-NB_TaskStatus nb_COAP_option6_run(const char* param)
-{
-	try_num = 0;
-	NBTask[_AT_COAP_OPTION6].set(param);
-	
-		if(nb_at_send(&NBTask[_AT_COAP_OPTION6]) == NB_CMD_SUCC )
-		{
-			nb_cmd_status = NB_CMD_SUCC;
-		}
-		else
-		{
-			nb_cmd_status = NB_CMD_FAIL;
-		}
-	return nb_cmd_status;
-}
-
-NB_TaskStatus nb_COAP_option6_set(const char* param)
-{
-	memset(buff,0,sizeof(buff));
-	strcat(buff,AT QCOAPOPTION"=0,0,5,");
-	strcat(buff,(char*)user.uri6);
-	strcat(buff,"\r\n");
-
-	ATSendStr  = NULL;	
-	ATSendStr  = buff;
-	len_string = strlen(ATSendStr);
-	user_main_debug("NBTask[_AT_COAP_OPTION6].ATSendStr:%s",ATSendStr);
-	return nb_cmd_status;
-}
-	
-NB_TaskStatus nb_COAP_option6_get(const char* param)
-{
-	return nb_cmd_status;
-}
-
-NB_TaskStatus nb_COAP_option7_run(const char* param)
-{
-	try_num = 0;
-	NBTask[_AT_COAP_OPTION7].set(param);
-	
-		if(nb_at_send(&NBTask[_AT_COAP_OPTION7]) == NB_CMD_SUCC )
-		{
-			nb_cmd_status = NB_CMD_SUCC;
-		}
-		else
-		{
-			nb_cmd_status = NB_CMD_FAIL;
-		}
-	return nb_cmd_status;
-}
-
-NB_TaskStatus nb_COAP_option7_set(const char* param)
-{
-	memset(buff,0,sizeof(buff));
-	strcat(buff,AT QCOAPOPTION"=0,0,6,");
-	strcat(buff,(char*)user.uri7);
-	strcat(buff,"\r\n");
-
-	ATSendStr  = NULL;	
-	ATSendStr  = buff;
-	len_string = strlen(ATSendStr);
-	user_main_debug("NBTask[_AT_COAP_OPTION7].ATSendStr:%s",ATSendStr);
-	return nb_cmd_status;
-}
-	
-NB_TaskStatus nb_COAP_option7_get(const char* param)
-{
-	return nb_cmd_status;
-}
-
-NB_TaskStatus nb_COAP_option8_run(const char* param)
-{
-	try_num = 0;
-	NBTask[_AT_COAP_OPTION8].set(param);
-	
-		if(nb_at_send(&NBTask[_AT_COAP_OPTION8]) == NB_CMD_SUCC )
-		{
-			nb_cmd_status = NB_CMD_SUCC;
-		}
-		else
-		{
-			nb_cmd_status = NB_CMD_FAIL;
-		}
-	return nb_cmd_status;
-}
-
-NB_TaskStatus nb_COAP_option8_set(const char* param)
-{
-	memset(buff,0,sizeof(buff));
-	strcat(buff,AT QCOAPOPTION"=0,0,7,");
-	strcat(buff,(char*)user.uri8);
-	strcat(buff,"\r\n");
-
-	ATSendStr  = NULL;	
-	ATSendStr  = buff;
-	len_string = strlen(ATSendStr);
-	user_main_debug("NBTask[_AT_COAP_OPTION8].ATSendStr:%s",ATSendStr);
-	return nb_cmd_status;
-}
-	
-NB_TaskStatus nb_COAP_option8_get(const char* param)
-{
-	return nb_cmd_status;
-}
 /**
 	* @brief  COAP Send DATA Config
   * @param  Instruction parameter
@@ -452,7 +356,32 @@ NB_TaskStatus nb_COAP_send_config_run(const char* param)
 
 NB_TaskStatus nb_COAP_send_config_set(const char* param)
 {
-  pro_data();	
+
+   if(downlink_check_event==1)
+		downilnk_check_data();
+	 else if(received_dwonlink_flags==1)
+		downilnk_ack_data();
+	 else if(Datalog_uplink==1&&read_flag==1)
+		Uplink_serial_log();		
+	 else if(ota_upgrade_error==1)
+		Thingseye_mqtt_send_message_error_1();		
+	 else if(ota_upgrade_error==2)
+		Thingseye_mqtt_send_message_error_2();	
+	 else if(ota_upgrade_error==3)
+		Thingseye_mqtt_send_message_error_3();	
+	 else if(ota_upgrade_error==4)
+		Thingseye_mqtt_send_message_error_4();	
+	 else if(ota_upgrade_error==5)
+		Thingseye_mqtt_send_message_error_5();	
+	 else if(ota_upgrade_error==6)
+		Thingseye_mqtt_send_message_error_6();	
+	 else if(ota_upgrade_error==7)
+		Thingseye_mqtt_send_message_error_7();		
+	 else if(ota_upgrade_error==100)
+		Thingseye_mqtt_send_message_update();	
+	 else
+    pro_data();	
+  
 	memset(buff,0,sizeof(buff));
 	strcat(buff,AT QCOAPSEND"=0,1,2,255");
 	strcat(buff,"\r\n");
@@ -493,7 +422,30 @@ NB_TaskStatus nb_COAP_send_set(const char* param)
 	}
   else
 	{
-   pro_data();	
+   if(downlink_check_event==1)
+		downilnk_check_data();
+	 else if(received_dwonlink_flags==1)
+		downilnk_ack_data();
+	 else if(Datalog_uplink==1&&read_flag==1)
+		Uplink_serial_log();		
+	 else if(ota_upgrade_error==1)
+		Thingseye_mqtt_send_message_error_1();		
+	 else if(ota_upgrade_error==2)
+		Thingseye_mqtt_send_message_error_2();	
+	 else if(ota_upgrade_error==3)
+		Thingseye_mqtt_send_message_error_3();	
+	 else if(ota_upgrade_error==4)
+		Thingseye_mqtt_send_message_error_4();	
+	 else if(ota_upgrade_error==5)
+		Thingseye_mqtt_send_message_error_5();	
+	 else if(ota_upgrade_error==6)
+		Thingseye_mqtt_send_message_error_6();	
+	 else if(ota_upgrade_error==7)
+		Thingseye_mqtt_send_message_error_7();		
+	 else if(ota_upgrade_error==100)
+		Thingseye_mqtt_send_message_update();	 
+	 else
+    pro_data();	
 	 ATSendStr  = NULL;
 	 buff[strlen(buff)]=0x1A;
 	 ATSendStr  = buff;
@@ -508,7 +460,8 @@ NB_TaskStatus nb_COAP_read_run(const char* param)
 {
 	if(nb_COAP_read_get(param) == NB_READ_DATA)
 	{
-		rxPayLoadDeal(downlink_data);
+		if(downlink_check_event==0)
+		   rxPayLoadDeal(downlink_data);
 	}
 	return nb_cmd_status;
 }
@@ -520,6 +473,10 @@ NB_TaskStatus nb_COAP_read_get(const char* param)
 	{
 	 user_main_printf("Debug downlink data:%s",nb.usart.data);
 	}	
+	if(sys.platform==5 && strstr((char*)nb.usart.data,"Event:Status") != NULL)
+	{
+	  downlink_check_event=1;
+	}
 		char *pch; 
 	  char* start;	
 	  start  = strstr((char*)nb.usart.data,QCOAPRECV);
@@ -597,7 +554,14 @@ NB_TaskStatus nb_COAP_uri_run(const char* param)
 	{
 		nb_COAP_read_run(NULL);
 		nb_cmd_status = NB_RD_SUCC;
-	}
+	}	
+	else if(read_flag == 1)
+	{
+		if(Datalog_uplink==1)
+		 nb_cmd_status = NB_RD_SUCC;
+		else
+		 nb_cmd_status = NB_STA_SUCC;
+	}		
 	else
 		nb_cmd_status = NB_OTHER;	
 	

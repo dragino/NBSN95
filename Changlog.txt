@@ -1,3 +1,32 @@
+v1.3.0
+1.OTA wireless upgrade
+2. TLS Certificate Writing Function
+3. GETLOG serial port log upload to platform function, command to send: 0xF8 01 or AT+GETLOG=1
+4.The default QOS level of MQTT is set to 0
+5. Optimize DNS domain name resolution to prevent errors
+
+v1.2.1
+1.Modify the logic for collecting temperature and humidity data
+
+
+v1.2.0
+1. Add NTP function
+2. Add COPS function, which automatically sets the operator for each packet to prevent loss of operator code and signal loss
+3. Expand the stack size to prevent stack overflow
+4. Modify bugs where the signal exceeds the range
+5. Firmware upgrades will retain configurations with the same product ID, while configurations with different product IDs will be cleared
+6. Add automatic reset function for long-term undetected signals
+7. Unified JSON format downlink function
+8. Add a JSON format downlink command "Event: Status", which will send a device version data packet
+9. Add ACK sending function "Confirm=200" for UDP protocol, only for UDP
+10. Add AT+READPT command for the Datalog function of MQTT, TCP, UDP protocols to determine whether there is a signal or receive ACK retransmission
+11. Modify the storage method for the number of GETLOG groups
+12. When receiving a downlink in JSON format, a successful uplink packet will be returned
+13.Fix the issue of network disconnection caused by certain operators activating PDP in Europe
+14.Add SNI server name indication function
+15.Due to the COAP protocol client's inability to use excessively long path URI, the function of deleting 3 URI entries is necessary to save flash space
+
+
 v1.1.2
 1. Fix mode 8, the issue of packet sending failure interrupted by pb15 and pa4
 

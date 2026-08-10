@@ -11,27 +11,35 @@ extern uint8_t ipv46;
 extern uint8_t gps_flag;
 extern uint16_t gnss_timer;
 extern bool first_sample;
-extern uint8_t  mqtt_qos_flags;
+
+uint8_t received_dwonlink_flags=0;
 SYSTEM sys    = {.pwd=sys_pwd};
 SENSOR sensor ={.data=sensor_data};
 USER user={0};
 uint16_t fire_version=0;
 uint16_t fire_pro=0;
 uint8_t fdr_qsw=0;
+uint8_t debugss_qsw=0;
 uint16_t tem_store,hum_store=0;
 extern float ds1820_value;
 extern float ds1820_value2;
 extern float ds1820_value3;
 extern int32_t Weight_Shiwu;
-extern uint8_t record_log[512];
+extern char record_log[512];
 uint16_t 	adc0_datalog,adc1_datalog,adc4_datalog;
 uint16_t distance_datalog;
 static uint8_t mod5_init_flag = 0;
 uint8_t debugss=0;
 extern uint8_t at_downlink_flag;
 extern __IO bool ble_sleep_flags;
-static char at_downlink_data[220]={0};
+extern char downlink_data[1000];
+extern uint8_t  ota_upgrade_flag;
+extern uint8_t  Datalog_uplink;
 bool tmp117_connect_status=0;
+uint32_t rain_counter1=0;
+uint32_t rain_counter2=0;
+uint32_t rain_counter3=0;
+uint8_t firmware_flag=0;
 void product_information_print(void)
 {
 #ifdef NB_1D	
@@ -243,7 +251,7 @@ void BSP_sensor_Init( void  )
 {		
 	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_RESET);
 	HAL_Delay(1000);
-	if((sys.mod==model1)||(sys.mod==model3)||(sys.mod==model9))
+	if((sys.mod==model1)||(sys.mod==model3)||(sys.mod==model9)||(sys.mod==model11))
   {
 		MX_I2C1_Init();
 		if(sht2x_Detect() == 1)
@@ -338,6 +346,10 @@ void BSP_sensor_Init( void  )
 		}else{
 			 printf("No TMP117 detected\r\n");		 
 		 }		
+	}	
+	 else if(sys.mod==model11)
+	{
+		    printf("3 ADC ratiometric + I2C mode\r\n");		
 	}	
 	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_SET);	
 }
@@ -593,6 +605,30 @@ void txPayLoadDeal(SENSOR* Sensor)
 		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_level);
 		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->temSHT);
 	}	
+	else if(sys.mod == model11)
+	{
+		Sensor->adc1 = ADCModel(ADC_CHANNEL_4);
+		Sensor->adc2 = ADCModel(ADC_CHANNEL_1);
+		Sensor->adc3 = ADCModel(ADC_CHANNEL_0);
+	
+		MX_I2C1_Init();
+		if(detect_flags == 1)
+			sht20Data();
+		else if(detect_flags == 2)
+			sht31Data();
+    HAL_I2C_MspDeInit(&hi2c1);	
+		HAL_Delay(20);
+		
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc1);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_4));
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_state);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.2x", Sensor->exit_level);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc2);
+		sprintf(Sensor->data+strlen(Sensor->data), "%c", (Sensor->temSHT>=0)?'0':'F');
+		sprintf(Sensor->data+strlen(Sensor->data), "%.3x", (Sensor->temSHT>=0)?Sensor->temSHT:Sensor->temSHT*(-1));
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->humSHT);
+		sprintf(Sensor->data+strlen(Sensor->data), "%.4x", Sensor->adc3);			
+	}
 	sprintf(Sensor->data+strlen(Sensor->data), "%.8x", sensor.time_stamp);
 	  sprintf(Sensor->data+strlen(Sensor->data), "%.8x", (int)(Sensor->latitude*1000000));	
 	  sprintf(Sensor->data+strlen(Sensor->data), "%.8x", (int)(Sensor->longitude*1000000));			
@@ -609,12 +645,12 @@ void txPayLoadDeal(SENSOR* Sensor)
      {
 			 uint32_t r_ad0_data=*(__IO uint32_t *)(EEPROM_D1_AD0_START_ADD+num*0x04);
 			 sprintf(Sensor->data+strlen(Sensor->data), "%.4x", (r_ad0_data>>16)&0xFFFF);
-			  if((sys.mod!=model3))
+			  if((sys.mod!=model3 &&sys.mod!=model11))
 		   {
 				 sprintf(Sensor->data+strlen(Sensor->data), "%.4x", r_ad0_data&0xFFFF);
 			 }
 		 }
-			if((sys.mod==model1)||(sys.mod==model3)||(sys.mod==model9))
+			if((sys.mod==model1)||(sys.mod==model3)||(sys.mod==model9)||(sys.mod==model11))
      {
 			uint32_t r_sht_data=*(__IO uint32_t *)(EEPROM_SHT_START_ADD+num*0x04);
 			sprintf(Sensor->data+strlen(Sensor->data), "%.4x", (r_sht_data>>16)&0xFFFF);
@@ -625,7 +661,7 @@ void txPayLoadDeal(SENSOR* Sensor)
 			uint32_t r_distance_data=*(__IO uint32_t *)(EEPROM_DISTANCE_START_ADD+num*0x04);
 			sprintf(Sensor->data+strlen(Sensor->data), "%.4x", r_distance_data&0xFFFF);
 		}
-			if(sys.mod==model3)
+			if(sys.mod==model3 ||sys.mod==model11)
     {	
 			uint32_t r_ad1_ad4_data=*(__IO uint32_t *)(EEPROM_AD1_AD4_START_ADD+num*0x04);
 			sprintf(Sensor->data+strlen(Sensor->data), "%.4x", (r_ad1_ad4_data>>16)&0xFFFF);
@@ -700,12 +736,21 @@ void txPayLoadDeal(SENSOR* Sensor)
 	sys.exit_flag_pa0 = 0;
 	HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_SET);
 	HAL_IWDG_Refresh(&hiwdg);
+	if(rain_counter1!=sensor.exit_count ||rain_counter2!=sensor.exit_count_pa4 ||rain_counter3!=sensor.exit_count_pa0)
+	{
+	  rain_counter1=sensor.exit_count;
+	  rain_counter2=sensor.exit_count_pa4;
+	  rain_counter3=sensor.exit_count_pa0;			
+		config_Set();	
+	}
 }
 	
 void txPayLoadDeal2(SENSOR* Sensor)
 {	
-	user_main_printf("remaining battery =%d mv",Sensor->batteryLevel_mV);	
+	debugss_qsw=1;
+
 	Sensor->batteryLevel_mV = getVoltage();
+	user_main_printf("remaining battery =%d mv",Sensor->batteryLevel_mV);		
   get_sensorvalue();
 	if(sys.mod == model6)
 	{
@@ -720,6 +765,7 @@ void txPayLoadDeal2(SENSOR* Sensor)
 	   user_main_printf("count3 is %d ",sensor.exit_count_pa0);
 		}
 	}
+	debugss_qsw=0;
 }
 
 
@@ -734,173 +780,25 @@ void rxPayLoadDeal(char* payload)
 {
 	if(at_downlink_flag==1)
 	{
+		HAL_IWDG_Refresh(&hiwdg);
 		at_downlink_flag=0;
-		char* pos_start;
-		char* pos_end;
-	
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+SERVADDR\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+14],(pos_end-pos_start-16));		
-		memset(user.add,0,sizeof(user.add));
-	  memcpy(user.add,at_downlink_data,strlen(at_downlink_data));	
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+CLIENT\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-14));		
-		memset(user.client,0,sizeof(user.client));
-	  memcpy(user.client,at_downlink_data,strlen(at_downlink_data));	
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+UNAME\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+11],(pos_end-pos_start-13));		
-		memset(user.uname,0,sizeof(user.uname));
-	  memcpy(user.uname,at_downlink_data,strlen(at_downlink_data));	
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+PWD\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));		
-		memset(user.pwd,0,sizeof(user.pwd));
-	  memcpy(user.pwd,at_downlink_data,strlen(at_downlink_data));	
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+PUBTOPIC\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+14],(pos_end-pos_start-16));		
-		memset(user.pubtopic,0,sizeof(user.pubtopic));
-	  memcpy(user.pubtopic,at_downlink_data,strlen(at_downlink_data));	
-
-	  memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+SUBTOPIC\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+14],(pos_end-pos_start-16));		
-		memset(user.subtopic,0,sizeof(user.subtopic));
-	  memcpy(user.subtopic,at_downlink_data,strlen(at_downlink_data));	
-
-	  memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+CFGMOD\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-14));		
-    uint8_t mode = atoi(at_downlink_data);		
-   	sys.mod = mode;
+		char at_downlink_data[220]={0};
+		uint8_t len=0;
 		
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+TDC\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));	
-	  uint32_t tdc = atoi(at_downlink_data);		
-	  sys.tdc = tdc;
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+INTMOD\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-14));		
-		sys.inmod=atoi(at_downlink_data);
-		EX_GPIO_Init(sys.inmod);
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+APN\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));		
-		memset(user.apn,0,sizeof(user.apn));
-	  memcpy(user.apn,at_downlink_data,strlen(at_downlink_data));	
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+5VT\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));
-    uint16_t power_time = atoi(at_downlink_data);		
-		sys.power_time = power_time;	
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+PRO\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-11));		
-		uint8_t protocol = at_downlink_data[0]-0x30;
-	  sys.protocol = protocol;
-		sys.platform =at_downlink_data[2]-0x30;
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+TR\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+8],(pos_end-pos_start-10));		
-    uint16_t tr = atoi(at_downlink_data);		
-   	sys.tr_time = tr;
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+NOUD\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+10],(pos_end-pos_start-12));		
-    uint8_t noud = atoi(at_downlink_data);	
-	  sys.sht_noud = noud;
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+CSQTIME\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+13],(pos_end-pos_start-15));		
-    uint8_t csqtdc = atoi(at_downlink_data);	
-		sys.csq_time = csqtdc;
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+BKDNS\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+11],(pos_end-pos_start-13));		
-	  sys.ddns_flag = atoi(at_downlink_data);	
-		char* pp = strchr(at_downlink_data,',');
-		sys.ddns_time = atoi(at_downlink_data+(strchr(pp,',')-at_downlink_data)+1);	
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+GDNS\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+10],(pos_end-pos_start-12));		
-	  uint16_t dnstdc = atoi(at_downlink_data);	
-	 sys.dns_time = dnstdc;
-		
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+TLSMOD\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-14));	
-    sys.tlsmod = atoi(at_downlink_data);	
-		char* pos = strchr(at_downlink_data,',');
-		sys.cert = atoi(at_downlink_data+(strchr(pos,',')-at_downlink_data)+1);
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+MQOS\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+10],(pos_end-pos_start-12));		
-    mqtt_qos = atoi(at_downlink_data);	
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+IPTYPE\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+12],(pos_end-pos_start-14));		
-    ipv46 = atoi(at_downlink_data);	
-
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+GTDC\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+10],(pos_end-pos_start-12));		
-    sys.gps_tdc = atoi(at_downlink_data);	
-		
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+GNSST\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+11],(pos_end-pos_start-13));		
-    gnss_timer = atoi(at_downlink_data);	
-		
-		memset(at_downlink_data,0,220);		
-	  pos_start  = strstr((char*)payload,"AT+GPS\":\"");
-	  pos_end    = strchr(pos_start,'\n');	
-	  memcpy(at_downlink_data,&nb.usart.data[pos_start-((char*)nb.usart.data)+9],(pos_end-pos_start-10));		
-    gps_flag = atoi(at_downlink_data);
-	  config_Set();	
-	  if(strstr((char*)at_downlink_data,"ATZ") != NULL)
-		{
-		 user_main_printf("Reset the device after receiving the downlink...");		
-	   NVIC_SystemReset();
-		}
+			for(uint16_t i=1;i<strlen(downlink_data);i++)
+			{		
+				if((downlink_data[i]==';')||(i==(strlen(downlink_data)-1)&&(downlink_data[i]==']')))
+				{	
+					ATInsPro((char*)at_downlink_data);
+					memset(at_downlink_data,0,220);
+					len=0;						
+				}
+				else
+				{
+					at_downlink_data[len++]=downlink_data[i];				
+				}
+		 }	
+     received_dwonlink_flags=1;		
 	}
 	else
   {
@@ -972,7 +870,6 @@ void rxPayLoadDeal(char* payload)
 			if(dataCom_len == 2)
 			{
 				mqtt_qos = dataCom[1];
-				mqtt_qos_flags=1;
 				config_Set();
 			}
 			break;				
@@ -989,7 +886,6 @@ void rxPayLoadDeal(char* payload)
 		      sys.strat_time=bb;
 		      sys.tr_time=cc;
 		      sys.sht_noud=dd;
-		      first_sample=0;
 			 }
 				config_Set();
 			}
@@ -1070,7 +966,19 @@ void rxPayLoadDeal(char* payload)
 				sensor.exit_count_pa0=( dataCom[1]<<24 |dataCom[2]<<16 |dataCom[3]<<8 | dataCom[4] );
 				config_Set();
 			}
-			break;				
+			break;	
+		case 0xF8:
+					if( dataCom_len == 2 && (dataCom[1]==1) )
+					{
+							Datalog_uplink=1;						
+					}
+					break;						
+		case 0xF9:
+					if( dataCom_len == 2 && (dataCom[1]==1) )
+					{
+							ota_upgrade_flag=1;						
+					}
+					break;						
 		default:
 			printf("Downstream parameter error\n");
 			break;
@@ -1113,12 +1021,18 @@ void new_firmware_update(void)
 	fire_pro=product_id;
   if((config_ver!=fire_version)||(config_pro!=fire_pro))
 	{
-		fdr_qsw=1;
 		update_flags = (fire_version<<16)| fire_pro;
 		HAL_FLASHEx_DATAEEPROM_Unlock();
 		HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_USER_START_ADD,update_flags);//store hardversion
 		HAL_FLASHEx_DATAEEPROM_Lock();
-		at_fdr1_run(NULL);
+		firmware_flag=1;
+		if(config_pro!=fire_pro)
+		{
+		 fdr_qsw=1;	
+		 at_fdr1_run(NULL);
+		}
+		else
+		 Entersleep_Write(( uint32_t )0x12);	
 	}
 }
 void StrToHex(char *pbDest, char *pszSrc, int nLen)
@@ -1183,7 +1097,7 @@ uint8_t is_ipv4_addr(char *ip)
 		return 2;//Parameter error 
 	
 	char add_buf[50]={0};
-	memcpy(add_buf,ip,p-(char*)user.add);
+	memcpy(add_buf,ip,p-(char*)ip);
 	
 	for (uint8_t i = 0, count = 0; i < strlen(add_buf); i++) 
 	{
@@ -1214,7 +1128,7 @@ uint8_t is_ipv6_addr(char *ip)
 		return 2;//Parameter error 
 	
 	char add_buf[60]={0};
-	memcpy(add_buf,ip,p-(char*)user.add);	
+	memcpy(add_buf,ip,p-(char*)ip);	
 	
 	int len=strlen(add_buf);
 	int count=0;
@@ -1232,6 +1146,8 @@ uint8_t is_ipv6_addr(char *ip)
 	}
  if(count==7)
 	return 1;
+ if(count>=2)
+	return 3; 
 }
 
 char* Int2String(int num,char *str)
@@ -1293,7 +1209,7 @@ void shtDataWrite(void)
 {	
 	if(sys.sht_seq>=32)
 		sys.sht_seq = 0;
-  if(sys.mod == model1 ||sys.mod == model3||sys.mod == model9||sys.mod == model10)	
+  if(sys.mod == model1 ||sys.mod == model3||sys.mod == model9||sys.mod == model10||sys.mod == model11)	
 	{
 	uint32_t w_sht_data=tem_store<<16 | hum_store;	
 	user_main_debug("w_sht_data:%x",w_sht_data);
@@ -1318,7 +1234,7 @@ void shtDataWrite(void)
 	HAL_FLASHEx_DATAEEPROM_Program(FLASH_TYPEPROGRAMDATA_WORD,EEPROM_DISTANCE_START_ADD +sys.sht_seq * 0x04,w_distance_data);
 	HAL_FLASHEx_DATAEEPROM_Lock();			
 	}
-  	else if(sys.mod ==model3)	
+  	else if(sys.mod ==model3 ||sys.mod == model11)	
 	{
 	uint32_t w_ad14_data=adc1_datalog<<16 | adc4_datalog;	
 	user_main_debug("w_sht_data:%x",w_ad14_data);
@@ -1466,7 +1382,7 @@ void shtDataPrint(void)
 				printf("mod2: distance:%d ad1:%d ds18b20_1:%.1f  ",distance,ad0,(float)d1/10.0);
 			GetTime(r_time);	
       }
-				else if(sys.mod ==model3)
+				else if(sys.mod ==model3||sys.mod == model11)
 			{
 			uint32_t r_sht_data=*(__IO uint32_t *)(EEPROM_SHT_START_ADD+num*0x04);
 			uint32_t r_d1_ad0_data=*(__IO uint32_t *)(EEPROM_D1_AD0_START_ADD+num*0x04);
@@ -1479,7 +1395,10 @@ void shtDataPrint(void)
 			ad0 = ((r_d1_ad0_data>>16)&0xFFFF);
       ad1 = ((r_ad1_ad4_data>>16)&0xFFFF);
 			ad4 = (r_ad1_ad4_data&0xFFFF);
-			printf("mod3: tem:%.2f hum:%.2f ad1:%d ad2:%d ad3:%d  ",(float)tem/10.0,(float)hum/10.0,ad0,ad1,ad4);
+			if(sys.mod ==model3)
+			  printf("mod3: tem:%.2f hum:%.2f ad1:%d ad2:%d ad3:%d  ",(float)tem/10.0,(float)hum/10.0,ad0,ad1,ad4);
+			else if(sys.mod ==model11)
+				printf("mod11: tem:%.2f hum:%.2f ad1:%d ad2:%d ad3:%d  ",(float)tem/10.0,(float)hum/10.0,ad0,ad1,ad4);
 			GetTime(r_time);	
       }
 				else if(sys.mod ==model4)
@@ -1635,11 +1554,110 @@ void DatalogClear(void)
 	FLASH_erase(FLASH_USER_START_DATALOG,(FLASH_USER_END_DATALOG - FLASH_USER_START_DATALOG) / FLASH_PAGE_SIZE);	
 }
 
+void Datalog_request(SENSOR* Sensor)
+{
+  char serial_log[512];	
+	if(Datalog_uplink==1)
+	{
+    uint32_t add_log = 0;		
+		memset(Sensor->data,0,sizeof((char*)Sensor->data));
+		
+		for(uint8_t num=0;num<20;num++)
+		{
+			HAL_IWDG_Refresh(&hiwdg);	
+			add_log= FLASH_USER_START_DATALOG+num*FLASH_PAGE_SIZE*4;
+			memset(serial_log,0,sizeof(serial_log));
+			for(uint16_t i=0,j=0;i<128;i++,j=j+4)
+			{
+				uint32_t temp  = FLASH_read(add_log+i*4);
+				serial_log[j] 	 = (temp>>24) & 0x000000FF;
+				serial_log[j+1] 	 = (temp>>16) & 0x000000FF;
+				serial_log[j+2] 	 = (temp>>8)  & 0x000000FF;
+				serial_log[j+3] 		 = (temp)     & 0x000000FF;
+			}
+			if(strlen(serial_log)!=0 ||num>=19)
+			{
+				if(strlen(Sensor->data)+strlen(serial_log)<986)
+				{
+					sprintf(Sensor->data+strlen(Sensor->data), "%s",  serial_log);
+					if(num>=19 && strlen(Sensor->data)!=0)
+					{
+						if(sys.protocol == COAP_PRO)
+						{					
+							 if(NBTask[_AT_COAP_SEND_CONFIG].run(NULL) == NB_CMD_SUCC)
+							 {
+									NBTask[_AT_COAP_SEND].run(NULL);
+							 }
+						}
+						else if(sys.protocol == UDP_PRO)
+						{
+							 if(NBTask[_AT_UDP_SEND].run(NULL) == NB_CMD_SUCC)
+							{
+							  NBTask[_AT_UDP_DATA].run(NULL);
+							}
+						}
+						else if(sys.protocol == MQTT_PRO)
+						{
+							 if(NBTask[_AT_MQTT_PUB5].run(NULL) == NB_CMD_SUCC)
+							{
+								NBTask[_AT_MQTT_SEND].run(NULL);
+							}		
+						}
+						else if(sys.protocol == TCP_PRO)
+						{
+							 if(NBTask[_AT_TCP_SEND].run(NULL) == NB_CMD_SUCC)
+							{
+							  NBTask[_AT_TCP_DATA].run(NULL);
+							}
+						}
+						HAL_Delay(2000);		
+						memset(Sensor->data,0,sizeof((char*)Sensor->data));					
+					}
+				}
+				else
+				{
+					if(sys.protocol == COAP_PRO)
+					{					
+						 if(NBTask[_AT_COAP_SEND_CONFIG].run(NULL) == NB_CMD_SUCC)
+						 {
+								NBTask[_AT_COAP_SEND].run(NULL);
+						 }
+					}
+					else if(sys.protocol == UDP_PRO)
+					{
+						 if(NBTask[_AT_UDP_SEND].run(NULL) == NB_CMD_SUCC)
+						{
+							NBTask[_AT_UDP_DATA].run(NULL);
+						}
+					}
+					else if(sys.protocol == MQTT_PRO)
+					{
+						 if(NBTask[_AT_MQTT_PUB5].run(NULL) == NB_CMD_SUCC)
+						{
+							NBTask[_AT_MQTT_SEND].run(NULL);
+						}		
+					}
+					else if(sys.protocol == TCP_PRO)
+					{
+						 if(NBTask[_AT_TCP_SEND].run(NULL) == NB_CMD_SUCC)
+						{
+							NBTask[_AT_TCP_DATA].run(NULL);
+						}
+					}					
+					HAL_Delay(2000);		
+					memset(Sensor->data,0,sizeof((char*)Sensor->data));
+					num--;
+				}		
+			}			
+		}			
+	}
+}
+
 void get_sensorvalue(void)
 {
 		HAL_GPIO_WritePin(Power_5v_GPIO_Port, Power_5v_Pin, GPIO_PIN_RESET);	
 	  HAL_Delay(500+sys.power_time);
-			if((sys.mod==model1)||(sys.mod==model3))
+			if((sys.mod==model1)||(sys.mod==model3)||(sys.mod==model11))
   {
 		MX_I2C1_Init();
     if(detect_flags == 1)
@@ -1652,7 +1670,7 @@ void get_sensorvalue(void)
 			if((sys.mod!=model6)&&(sys.mod!=model9))
   {
 		adc0_datalog = ADCModel(ADC_CHANNEL_4);
-		if((sys.mod!=model3))
+		if((sys.mod!=model3 &&sys.mod!=model11))
 		{
 		 DS18B20_GetTemp_SkipRom(1);
 		 DS18B20_IoDeInit(1);
@@ -1687,7 +1705,7 @@ void get_sensorvalue(void)
 			distance_datalog = 0;			
 		}
 	}
-			if(sys.mod==model3)
+			if(sys.mod==model3 ||sys.mod==model11)
   {
 	  adc1_datalog = ADCModel(ADC_CHANNEL_1);
 		adc4_datalog = ADCModel(ADC_CHANNEL_0);

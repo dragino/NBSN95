@@ -53,15 +53,13 @@
 #define TLSMOD     "+TLSMOD"
 #define SLEEP     "+SLEEP"
 #define MQOS      "+MQOS"
+#define SNI      "+SNI"
 #define IPTYPE      "+IPTYPE"
 #define URI1    "+URI1"
 #define URI2    "+URI2"
 #define URI3    "+URI3"
 #define URI4    "+URI4"
 #define URI5    "+URI5"
-#define URI6    "+URI6"
-#define URI7    "+URI7"
-#define URI8    "+URI8"
 #define QSW       "+QSW"
 #define GNSST       "+GNSST"
 #define GPS       "+GPS"
@@ -71,6 +69,16 @@
 #define QBAND    "+QBAND"
 #define IOTMOD    "+IOTMOD"
 #define DOWNTE     "+DOWNTE"
+#define NTP    "+NTP"
+#define QCOPS    "+QCOPS"
+#define CERTMOD    "+CERTMOD"
+#define UPGRADE     "+UPGRADE"
+#define OTASER   "+OTASER"
+#define OTACLT	 	 "+OTACLT"
+#define OTAUNAME			 "+OTAUNAME"
+#define OTAPWD				 "+OTAPWD"
+#define OTATITLE	 "+OTATITLE"
+#define OTAVER	 "+OTAVER"
 /**********************************************/
 
 typedef enum
@@ -170,6 +178,8 @@ ATEerror_t at_sleep_set(const char *param);
 ATEerror_t at_sleep_get(const char *param);
 ATEerror_t at_mqos_set(const char *param);
 ATEerror_t at_mqos_get(const char *param);
+ATEerror_t at_sni_set(const char *param);
+ATEerror_t at_sni_get(const char *param);
 ATEerror_t at_iptype_set(const char *param);
 ATEerror_t at_iptype_get(const char *param);
 
@@ -187,15 +197,6 @@ ATEerror_t at_uri4_set(const char *param);
 
 ATEerror_t at_uri5_get(const char *param);
 ATEerror_t at_uri5_set(const char *param);
-
-ATEerror_t at_uri6_get(const char *param);
-ATEerror_t at_uri6_set(const char *param);
-
-ATEerror_t at_uri7_get(const char *param);
-ATEerror_t at_uri7_set(const char *param);
-
-ATEerror_t at_uri8_get(const char *param);
-ATEerror_t at_uri8_set(const char *param);
 
 ATEerror_t at_qsw_run(const char *param);
 ATEerror_t at_gnsst_set(const char *param);
@@ -220,6 +221,26 @@ ATEerror_t at_iotmod_set(const char *param);
 ATEerror_t at_iotmod_get(const char *param);
 ATEerror_t at_down1t_set(const char *param);
 ATEerror_t at_down1t_get(const char *param);
+ATEerror_t at_ntp_set(const char *param);
+ATEerror_t at_ntp_get(const char *param);
+ATEerror_t at_cops_set(const char *param);
+ATEerror_t at_cops_get(const char *param);
+ATEerror_t at_certmod_run(const char *param);
+ATEerror_t at_upgrade_run(const char *param);
+ATEerror_t at_otaservaddr_get(const char *param);
+ATEerror_t at_otaservaddr_set(const char *param);
+
+ATEerror_t at_otaclient_get(const char *param);
+ATEerror_t at_otaclient_set(const char *param);
+ATEerror_t at_otauname_get(const char *param);
+ATEerror_t at_otauname_set(const char *param);
+ATEerror_t at_otapwd_get(const char *param);
+ATEerror_t at_otapwd_set(const char *param);
+ATEerror_t at_otafirmwaretitle_get(const char *param);
+ATEerror_t at_otafirmwaretitle_set(const char *param);
+ATEerror_t at_otafirmwarever_get(const char *param);
+ATEerror_t at_otafirmwarever_set(const char *param);
+
 /*Other*/
 char *rtrim(char *str);
 uint8_t hexDetection(char* str);
@@ -460,6 +481,28 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_rxdl_set,
     .run = at_return_error,
   },
+			/** AT+WEIGAP **/	
+	{
+    .string = AT WEIGAP,
+		.size_string = sizeof(WEIGAP) - 1,
+#ifndef NO_HELP
+    .help_string = AT WEIGAP "  : Get or Set the GapValue of weight",
+#endif
+    .get = at_weight_GapValue_get,
+    .set = at_weight_GapValue_set,
+    .run = at_return_error,
+  },
+			/** AT+WEIGRE **/	
+	{
+    .string = AT WEIGRE,
+		.size_string = sizeof(WEIGRE) - 1,
+#ifndef NO_HELP
+    .help_string = AT WEIGRE "  : Get weight or set weight to 0g",
+#endif
+    .get = at_weight_get,
+    .set = at_return_error,
+    .run = at_weight_reset,
+  },
 			/** AT+EXT **/	
 	{
     .string = AT EXT,
@@ -581,6 +624,17 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_mqos_set,
     .run = at_return_error,
   },
+				/** AT+SNI **/	
+	{
+    .string = AT SNI,
+		.size_string = sizeof(SNI) - 1,
+#ifndef NO_HELP
+    .help_string = AT SNI "  : Enable or disable Server Name Indication feature",
+#endif
+    .get = at_sni_get,
+    .set = at_sni_set,
+    .run = at_return_error,
+  },
 				/** AT+IPTYPE **/	
 	{
     .string = AT IPTYPE,
@@ -641,36 +695,6 @@ static const struct ATCommand_s ATCommand[] =
 #endif
     .get = at_uri5_get,
     .set = at_uri5_set,
-    .run = at_return_error,
-	},
-	{
-	  .string = AT URI6,
-    .size_string = sizeof(AT URI6) - 1,
-#ifndef NO_HELP
-    .help_string = AT URI6 ": Get or set CoAP option 6",
-#endif
-    .get = at_uri6_get,
-    .set = at_uri6_set,
-    .run = at_return_error,
-	},
-	{
-	  .string = AT URI7,
-    .size_string = sizeof(AT URI7) - 1,
-#ifndef NO_HELP
-    .help_string = AT URI7 ": Get or set CoAP option 7",
-#endif
-    .get = at_uri7_get,
-    .set = at_uri7_set,
-    .run = at_return_error,
-	},
-	{
-	  .string = AT URI8,
-    .size_string = sizeof(AT URI8) - 1,
-#ifndef NO_HELP
-    .help_string = AT URI8 ": Get or set CoAP option 8",
-#endif
-    .get = at_uri8_get,
-    .set = at_uri8_set,
     .run = at_return_error,
 	},
 				/** AT+QSW **/	
@@ -771,6 +795,113 @@ static const struct ATCommand_s ATCommand[] =
     .set = at_down1t_set,
     .run = at_return_error,
 	},	
+	{
+	  .string = AT NTP,
+    .size_string = sizeof(AT NTP) - 1,
+#ifndef NO_HELP
+    .help_string = AT NTP ": Get or set NTP Server",
+#endif
+    .get = at_ntp_get,
+    .set = at_ntp_set,
+    .run = at_return_error,
+	},
+	{
+	  .string = AT QCOPS,
+    .size_string = sizeof(AT QCOPS) - 1,
+#ifndef NO_HELP
+    .help_string = AT QCOPS ": Get or set operator code",
+#endif
+    .get = at_cops_get,
+    .set = at_cops_set,
+    .run = at_return_error,
+	},
+	{
+	  .string = AT CERTMOD,
+    .size_string = sizeof(AT CERTMOD) - 1,
+#ifndef NO_HELP
+    .help_string = AT CERTMOD ": Enter certificate mode",
+#endif
+    .get = at_return_error,
+    .set = at_return_error,
+    .run = at_certmod_run,
+	},	
+				/** AT+UPGRADE **/	
+	{
+    .string = AT UPGRADE,
+		.size_string = sizeof(UPGRADE) - 1,
+#ifndef NO_HELP
+    .help_string = AT UPGRADE "  : OTA upgrade. ",
+#endif
+    .get = at_return_error,
+    .set = at_return_error,
+    .run = at_upgrade_run,
+  },
+		/** AT+OTASER **/	
+	{
+    .string = AT OTASER,
+		.size_string = sizeof(OTASER) - 1,
+#ifndef NO_HELP
+    .help_string = AT OTASER ": Get or Set the OTA Server address",
+#endif
+    .get = at_otaservaddr_get,
+    .set = at_otaservaddr_set,
+    .run = at_return_error,
+  },
+		/** AT+OTACLT **/	
+	{
+    .string = AT OTACLT,
+		.size_string = sizeof(OTACLT) - 1,
+#ifndef NO_HELP
+    .help_string = AT OTACLT "  : Get or Set the OTA MQTT clientID",
+#endif
+    .get = at_otaclient_get,
+    .set = at_otaclient_set,
+    .run = at_return_error,
+  },	
+	/** AT+OTAUNAME **/	
+	{
+    .string = AT OTAUNAME,
+		.size_string = sizeof(OTAUNAME) - 1,
+#ifndef NO_HELP
+    .help_string = AT OTAUNAME "   : Get or Set the OTA MQTT Username",
+#endif
+    .get = at_otauname_get,
+    .set = at_otauname_set,
+    .run = at_return_error,
+  },
+	/** AT+OTAPWD **/	
+	{
+    .string = AT OTAPWD,
+		.size_string = sizeof(OTAPWD) - 1,
+#ifndef NO_HELP
+    .help_string = AT OTAPWD "     : Get or Set the OTA MQTT password",
+#endif
+    .get = at_otapwd_get,
+    .set = at_otapwd_set,
+    .run = at_return_error,
+  },
+	/** AT+OTATITLE **/	
+	{
+    .string = AT OTATITLE,
+		.size_string = sizeof(OTATITLE) - 1,
+#ifndef NO_HELP
+    .help_string = AT OTATITLE ": Get or set OTA firmware title",
+#endif
+    .get = at_otafirmwaretitle_get,
+    .set = at_otafirmwaretitle_set,
+    .run = at_return_error,
+  },
+	/** AT+OTAVER **/	
+	{
+    .string = AT OTAVER,
+		.size_string = sizeof(OTAVER) - 1,
+#ifndef NO_HELP
+    .help_string = AT OTAVER ": Get or set OTA firmware version",
+#endif
+    .get = at_otafirmwarever_get,
+    .set = at_otafirmwarever_set,
+    .run = at_return_error,
+  },
 };
 
 ATEerror_t ATInsPro( char* at);

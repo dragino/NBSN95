@@ -1,13 +1,11 @@
 #include "nb_tcp.h"
 #include "time.h"
 #include <time.h>
+#include "nb_payload.h"
 extern char buff[2000];
 extern char downlink_data[1000];
 extern float hum_value;
 extern float tem_value;
-extern float ds1820_value;
-extern float ds1820_value2;
-extern float ds1820_value3;
 extern void pro_data(void);
 extern char record_log[512];
 extern char 	*ATSendStr;
@@ -15,6 +13,14 @@ extern int 	len_string;
 extern uint8_t  try_num;
 extern NB_TaskStatus  nb_cmd_status;
 extern uint16_t pro_data_num;
+extern uint8_t read_flag;
+extern uint8_t at_downlink_flag;
+extern uint8_t downlink_check_event;
+extern uint8_t received_dwonlink_flags;
+extern uint8_t  ota_upgrade_error;
+extern uint8_t  Datalog_uplink;
+extern void downilnk_check_data(void);
+extern void downilnk_ack_data(void);
 /**
 	* @brief  Open TCP port operation
   * @param  Instruction parameter
@@ -87,7 +93,30 @@ NB_TaskStatus nb_TCP_send_run(const char* param)
 
 NB_TaskStatus nb_TCP_send_set(const char* param)
 {
-  pro_data();	
+		if(downlink_check_event==1)
+			downilnk_check_data();
+	  else if(received_dwonlink_flags==1)
+			downilnk_ack_data();
+		else if(Datalog_uplink==1&&read_flag==1)
+			Uplink_serial_log();			
+		else if(ota_upgrade_error==1)
+			Thingseye_mqtt_send_message_error_1();		
+		else if(ota_upgrade_error==2)
+			Thingseye_mqtt_send_message_error_2();	
+		else if(ota_upgrade_error==3)
+			Thingseye_mqtt_send_message_error_3();	
+		else if(ota_upgrade_error==4)
+			Thingseye_mqtt_send_message_error_4();	
+		else if(ota_upgrade_error==5)
+			Thingseye_mqtt_send_message_error_5();	
+		else if(ota_upgrade_error==6)
+			Thingseye_mqtt_send_message_error_6();	
+		else if(ota_upgrade_error==7)
+			Thingseye_mqtt_send_message_error_7();		
+		else if(ota_upgrade_error==100)
+			Thingseye_mqtt_send_message_update();		
+		else	
+      pro_data();
 	memset(buff,0,sizeof(buff));
 	strcat(buff,AT QISEND "=");
 	strcat(buff,"0,");
@@ -125,7 +154,30 @@ NB_TaskStatus nb_TCP_data_run(const char* param)
 
 NB_TaskStatus nb_TCP_data_set(const char* param)
 {	
-  pro_data();	
+		if(downlink_check_event==1)
+			downilnk_check_data();
+	  else if(received_dwonlink_flags==1)
+			downilnk_ack_data();
+		else if(Datalog_uplink==1&&read_flag==1)
+			Uplink_serial_log();			
+		else if(ota_upgrade_error==1)
+			Thingseye_mqtt_send_message_error_1();		
+		else if(ota_upgrade_error==2)
+			Thingseye_mqtt_send_message_error_2();	
+		else if(ota_upgrade_error==3)
+			Thingseye_mqtt_send_message_error_3();	
+		else if(ota_upgrade_error==4)
+			Thingseye_mqtt_send_message_error_4();	
+		else if(ota_upgrade_error==5)
+			Thingseye_mqtt_send_message_error_5();	
+		else if(ota_upgrade_error==6)
+			Thingseye_mqtt_send_message_error_6();	
+		else if(ota_upgrade_error==7)
+			Thingseye_mqtt_send_message_error_7();		
+		else if(ota_upgrade_error==100)
+			Thingseye_mqtt_send_message_update();		
+		else	
+      pro_data();
 	ATSendStr  = buff;
 	len_string = strlen(ATSendStr);
 	user_main_debug("NBTask[_AT_TCP_DATA].ATSendStr:%s",ATSendStr);
@@ -209,25 +261,48 @@ NB_TaskStatus nb_TCP_read_run(const char* param)
 {
 		if(NBTask[_AT_TCP_READ].get(param) == NB_READ_DATA)
 		{			
-			rxPayLoadDeal(downlink_data);
+			if(downlink_check_event==0)
+			  rxPayLoadDeal(downlink_data);
 		}
 	return nb_cmd_status;
 }
 
 NB_TaskStatus nb_TCP_read_get(const char* param)
 {
+	uint8_t downlink_code=0;
+	char *pch,*pch3,*pch4; 
+	char* start;
+	char strings[200];	
+	memset(downlink_data,0,sizeof(downlink_data));	
 	if(sys.downlink_debug==1)
 	{
 	 user_main_printf("Debug downlink data:%s",nb.usart.data);
 	}	
-		memset(downlink_data,0,sizeof(downlink_data));
-		char *pch,*pch3,*pch4; 
-	  char* start;
-	  char strings[200];
+	if(strstr((char*)nb.usart.data,"{\"Config\":\"[") != NULL)
+	{
+	  downlink_code=1;
+	}		
+	if(sys.platform==5 && strstr((char*)nb.usart.data,"Event:Status") != NULL)
+	{
+	  downlink_check_event=1;
+	}
+	if(downlink_code==1)
+	{
+	      pch = strchr((char*)nb.usart.data,'{'); 	
+		    pch3    = pch;
+		    start  = strrchr((char*)nb.usart.data,'}'); 
+		    memcpy(downlink_data,&nb.usart.data[pch3-((char*)nb.usart.data)+11],(start-pch3)-12);	
+			  at_downlink_flag=1;	
+		    user_main_printf("Received downlink data:%s",downlink_data);
+		    sprintf(record_log+strlen(record_log), "Received downlink data:%s\r\n",downlink_data);			 
+
+		    nb_cmd_status = NB_READ_DATA;	
+	      return nb_cmd_status;		
+	}	 	
 	  pch4 = strstr((char*)nb.usart.data,"QIRD"); 
 	  pch3  = strrchr((char*)pch4,'K'); 
 	  memcpy(strings,&nb.usart.data[pch4 - ((char*)nb.usart.data)],pch3-pch4);
-		pch = strrchr((char*)strings,':'); 
+		pch = strchr((char*)strings,':'); 
 	  start  = strrchr((char*)strings,'\n'); 
 		memcpy(downlink_data,&strings[pch - ((char*)strings)+2],start-pch-5);
 	if(downlink_data[0]=='0')

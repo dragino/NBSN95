@@ -10,12 +10,14 @@ typedef enum
 	running,
 	no_status,
 	invalid,
+	writing,
+	upgrading,	
 	effective 
 }NBState;
 
 #include "common.h"
 
-#define stack 							"D-BG95-002"
+#define stack 							"D-BG95-004"
 #define COAP_PRO  0x01
 #define UDP_PRO   0x02
 #define MQTT_PRO  0x03
@@ -37,12 +39,13 @@ typedef enum
  * @retval None
  */
 
-#define NB_RX_SIZE  512  										    /* NB Serial port receive buffer size  */
+#define NB_RX_SIZE  1300  										    /* NB Serial port receive buffer size  */
 
 #define NEWLINE   	"\r\n"  										  /* Line break */
 
 #define AT  				"AT"                     		/* state */
 #define ATE  				"ATE"                     	/* Echo Mode */
+#define COPS  	    "+COPS"  
 #define CSQ   			"+CSQ"               				/* singel */
 #define QGPS   			"+QGPS"  
 #define QRST			  "+QRST"											/* restart */
@@ -67,6 +70,7 @@ typedef enum
 #define QIACT 				"+QIACT"		
 #define QDNS 				"+QIDNSGIP"											/* QDNS. */
 #define QIDNSCFG		"+QIDNSCFG"									/* QDNS config. */
+#define QNTP		    "+QNTP"	
 #define QGPSLOC		"+QGPSLOC"	
 #define QGPSEND		"+QGPSEND"	
 #define QCOAPHEADER "+QCOAPHEADER"							/* Create the CoAP context. */
@@ -97,30 +101,33 @@ typedef enum
 #define QMTSTAT5			"+QMTSTAT: 0,5"		
 
 #define QSSLCFG			"+QSSLCFG"									/* Manage server and client authentication. */
-#define CACERT			"+QSSLCFG"	
-#define CLICERT			"+QSSLCFG"	
-#define CLIKEY			"+QSSLCFG"	
+		
 #define QCFG		  	"+QCFG"	
+#define CFUN         "+CFUN"
 typedef enum
 {
 	_AT = 0,					 	//
 	_ATE,						//Set Command Echo Mode
+	_AT_CGATT,		
 	_AT_IMEI,			 	//(AT+CGSN=1)
 	_AT_IMSI,      	//(AT+CIMI)
 	_AT_QICFG,	
 	_AT_CGMM,       // Request Manufacturer Model 
 	_AT_QBAND, 
 	_AT_IOTM, 
+  _AT_CFUN,                 //AT+CFUN
 	_AT_CCLK,				//AT+CCLK?
 	_AT_CCLK2,				//AT+CCLK?
 	_AT_CGDCONT,		//SET APN
-	_AT_QGPS,       	
+	_AT_QGPS, 
+	_AT_COPS,   	
 	_AT_CSQ,       	//Singal
 	_AT_QNWINFO,
 	_AT_QICSGP,       	
 	_AT_QIDEACT,       
 	_AT_QIACT,       	//Activate a PDP Context
 	_AT_QDNSCFG,    //DNSCFG
+	_AT_QNTP, 
 	_AT_QDNS,       //DNS
 	_AT_QGPSLOC, 
 	_AT_QGPSEND,
@@ -133,9 +140,6 @@ typedef enum
 	_AT_COAP_OPTION3,//Configure CoAP Options
 	_AT_COAP_OPTION4,//Configure CoAP Options
 	_AT_COAP_OPTION5,//Configure CoAP Options
-	_AT_COAP_OPTION6,//Configure CoAP Options
-	_AT_COAP_OPTION7,//Configure CoAP Options
-	_AT_COAP_OPTION8,//Configure CoAP Options
 	_AT_COAP_SEND_CONFIG,  //SEND DATA
 	_AT_COAP_SEND,  //SEND DATA
 	_AT_COAP_READ,  //READ DATA	
@@ -152,6 +156,7 @@ typedef enum
 	_AT_UDP_URI,
 /*MQTT*/
 	_AT_QSSLCFG,//MQTT configuration
+	_AT_SNI,//MQTT configuration
 	_AT_QMTCFG_SSL,//Use SSL/TLS TCP secure connection
 	_AT_CACERT,
 	_AT_CLICERT,
@@ -179,8 +184,19 @@ typedef enum
 	_AT_TCP_READ,   //READ DATA	
 	_AT_TCP_CLOSE,  //CLOSE TCP PORT	
 	_AT_TCP_URI,
+	_AT_OTAOPEN,
+	_AT_OTACONN,
+	_AT_OTAPUB,
+  _AT_OTASEND,
+	_AT_OTA_URI,	
 	
 	_AT_QRST,			  //restart
+	_AT_OTAPUB_current_fw_info,
+	_AT_OTAPUB_request_fw_info,
+	_AT_OTAPUB_fw_downloading,
+	_AT_OTAPUB_request_fw_chunk,
+	_AT_OTAPUB_updated,
+	_AT_OTACLOSE,		
 	_AT_URI,
 	_AT_ERROR,
   _AT_IDLE,
@@ -191,7 +207,7 @@ typedef enum
 	_AT_UPLOAD_FAIL,
 	_AT_UPLOAD_END,
 	_AT_CFUNOFF,
-	_AT_QSCLK,			
+	_AT_QSCLK,		
 }ATCmdNum;
 
 typedef struct
@@ -260,12 +276,12 @@ NB_TaskStatus nb_cgsn_get(const char* param);
 NB_TaskStatus nb_ate_run(const char* param);
 NB_TaskStatus nb_cimi_get(const char* param);
 
+NB_TaskStatus nb_cgatt_run(const char* param);
+NB_TaskStatus nb_cgatt_set(const char* param);
+
 NB_TaskStatus nb_cfun_run(const char* param);
 NB_TaskStatus nb_cfun_set(const char* param);
-NB_TaskStatus nb_cfun_get(const char* param);
-NB_TaskStatus nb_cfunoff_run(const char* param);
-NB_TaskStatus nb_cfunoff_set(const char* param);
-NB_TaskStatus nb_cfunoff_get(const char* param);
+
 NB_TaskStatus nb_qsclk_run(const char* param);
 NB_TaskStatus nb_qsclk_set(const char* param);
 NB_TaskStatus nb_qsclk_get(const char* param);
@@ -314,8 +330,14 @@ NB_TaskStatus nb_qiact_run(const char* param);
 NB_TaskStatus nb_qiact_set(const char* param);
 NB_TaskStatus nb_qiact_get(const char* param);
 
+NB_TaskStatus nb_cops_run(const char* param);
+NB_TaskStatus nb_cops_set(const char* param);
+
 NB_TaskStatus nb_qdnscfg_run(const char* param);
 NB_TaskStatus nb_qdnscfg_set(const char* param);
+
+NB_TaskStatus nb_qntp_run(const char* param);
+NB_TaskStatus nb_qntp_set(const char* param);
 
 NB_TaskStatus nb_qdns_run(const char* param);
 NB_TaskStatus nb_qdns_set(const char* param);
@@ -365,18 +387,6 @@ NB_TaskStatus nb_COAP_option5_run(const char* param);
 NB_TaskStatus nb_COAP_option5_set(const char* param);
 NB_TaskStatus nb_COAP_option5_get(const char* param);
 
-NB_TaskStatus nb_COAP_option6_run(const char* param);
-NB_TaskStatus nb_COAP_option6_set(const char* param);
-NB_TaskStatus nb_COAP_option6_get(const char* param);
-
-NB_TaskStatus nb_COAP_option7_run(const char* param);
-NB_TaskStatus nb_COAP_option7_set(const char* param);
-NB_TaskStatus nb_COAP_option7_get(const char* param);
-
-NB_TaskStatus nb_COAP_option8_run(const char* param);
-NB_TaskStatus nb_COAP_option8_set(const char* param);
-NB_TaskStatus nb_COAP_option8_get(const char* param);
-
 NB_TaskStatus nb_COAP_send_config_run(const char* param);
 NB_TaskStatus nb_COAP_send_config_set(const char* param);
 
@@ -419,6 +429,8 @@ NB_TaskStatus nb_UDP_uri_run(const char* param);
 NB_TaskStatus nb_QSSLCFG_run(const char* param);
 NB_TaskStatus nb_QSSLCFG_set(const char* param);
 
+NB_TaskStatus nb_SNI_run(const char* param);
+NB_TaskStatus nb_SNI_set(const char* param);
 
 NB_TaskStatus nb_QMTCFGSSL_run(const char* param);
 NB_TaskStatus nb_QMTCFGSSL_set(const char* param);
@@ -469,6 +481,23 @@ NB_TaskStatus nb_MQTT_disc_set(const char* param);
 
 NB_TaskStatus nb_MQTT_close_run(const char* param);
 NB_TaskStatus nb_MQTT_close_set(const char* param);
+
+NB_TaskStatus ota_MQTT_open_run(const char* param);
+NB_TaskStatus ota_MQTT_open_set(const char* param);
+
+NB_TaskStatus ota_MQTT_conn_run(const char* param);
+NB_TaskStatus ota_MQTT_conn_set(const char* param);
+
+NB_TaskStatus ota_MQTT_sub_run(const char* param);
+NB_TaskStatus ota_MQTT_sub_set(const char* param);
+
+NB_TaskStatus ota_MQTT_pub_run(const char* param);
+NB_TaskStatus ota_MQTT_pub_set(const char* param);
+
+NB_TaskStatus ota_MQTT_send_run(const char* param);
+NB_TaskStatus ota_MQTT_send_set(const char* param);
+
+NB_TaskStatus ota_uri_run(const char* param);
 
 NB_TaskStatus nb_MQTT_uri_run(const char* param);
 
@@ -542,6 +571,20 @@ static const struct NBTASK NBTask[] =
 		.get						= nb_null_run,
 
   },
+/**************** CGATT	****************/
+	{		
+
+		.ATRecStrOK  		= "+CGATT: 1",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_CGATT,
+
+		.time_out 			= 300,
+		
+    .run 						= nb_cgatt_run,
+		.set						= nb_cgatt_set,
+		.get						= nb_null_run,
+
+  },	
 /**************** CGSN	****************/
 	{		
 
@@ -620,6 +663,19 @@ static const struct NBTASK NBTask[] =
 		.get						= nb_iotm_get,
 
   },
+/**************** _AT_CFUN    ****************/
+  {        
+
+    .ATRecStrOK     = "OK",
+    .ATRecStrError  = "ERROR",
+    .cmd_num        = _AT_CFUN,
+
+    .time_out       = 2000,
+    .run            = nb_cfun_run,
+    .set            = nb_cfun_set,
+    .get            = nb_null_run,
+
+  },
 /**************** CCLK	****************/
 	{		
 
@@ -670,6 +726,20 @@ static const struct NBTASK NBTask[] =
 
     .run 						= nb_qgps_run,
 		.set						= nb_qgps_set,
+		.get						= nb_null_run,
+
+  },
+/**************** COPS	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_COPS,
+
+		.time_out 			= 300,
+
+    .run 						= nb_cops_run,
+		.set						= nb_cops_set,
 		.get						= nb_null_run,
 
   },
@@ -753,6 +823,20 @@ static const struct NBTASK NBTask[] =
 
     .run 						= nb_qdnscfg_run,
 		.set						= nb_qdnscfg_set,
+		.get						= nb_null_run,
+
+  },
+  /**************** QNTP	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_QNTP,
+
+		.time_out 			= 2000,
+
+    .run 						= nb_qntp_run,
+		.set						= nb_qntp_set,
 		.get						= nb_null_run,
 
   },
@@ -908,48 +992,6 @@ static const struct NBTASK NBTask[] =
     .run 						= nb_COAP_option5_run,
 		.set						= nb_COAP_option5_set,
 		.get						= nb_COAP_option5_get,
-
-  },
-/**************** COAP_QCOAPOPTION6	****************/
-	{		
-
-		.ATRecStrOK  		= "OK",
-		.ATRecStrError  = "ERROR",
-		.cmd_num        = _AT_COAP_OPTION6,
-
-		.time_out 			= 500,
-
-    .run 						= nb_COAP_option6_run,
-		.set						= nb_COAP_option6_set,
-		.get						= nb_COAP_option6_get,
-
-  },
-/**************** COAP_QCOAPOPTION7	****************/
-	{		
-
-		.ATRecStrOK  		= "OK",
-		.ATRecStrError  = "ERROR",
-		.cmd_num        = _AT_COAP_OPTION7,
-
-		.time_out 			= 500,
-
-    .run 						= nb_COAP_option7_run,
-		.set						= nb_COAP_option7_set,
-		.get						= nb_COAP_option7_get,
-
-  },
-/**************** COAP_QCOAPOPTION8	****************/
-	{		
-
-		.ATRecStrOK  		= "OK",
-		.ATRecStrError  = "ERROR",
-		.cmd_num        = _AT_COAP_OPTION8,
-
-		.time_out 			= 500,
-
-    .run 						= nb_COAP_option8_run,
-		.set						= nb_COAP_option8_set,
-		.get						= nb_COAP_option8_get,
 
   },	
 /**************** COAP_SEND_CONFIG	****************/
@@ -1149,6 +1191,20 @@ static const struct NBTASK NBTask[] =
 		.get						= nb_null_run,
 
   },	
+/**************** SNI	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_SNI,
+
+		.time_out 			= 300,
+
+    .run 						= nb_SNI_run,
+		.set						= nb_SNI_set,
+		.get						= nb_null_run,
+
+  },
 /**************** QMTCFGSSL	****************/
 	{		
 
@@ -1504,13 +1560,84 @@ static const struct NBTASK NBTask[] =
 		.get						= nb_null_run,
 
   },
+	
+/**************** OTA_OPEN	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_OTAOPEN,
+
+		.time_out 			= 1000,
+
+    .run 						= ota_MQTT_open_run,
+		.set						= ota_MQTT_open_set,
+		.get						= nb_null_run,
+
+  },
+/**************** OTA_CONN	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_OTACONN,
+
+		.time_out 			= 500,
+
+    .run 						= ota_MQTT_conn_run,
+		.set						= ota_MQTT_conn_set,
+		.get						= nb_null_run,
+
+  },
+/**************** OTA_PUB	****************/
+	{		
+
+		.ATRecStrOK  		= ">",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_OTAPUB,
+
+		.time_out 			= 300,
+    .run 						= ota_MQTT_pub_run,
+		.set						= ota_MQTT_pub_set,
+		.get						= nb_null_run,
+
+  },	
+/**************** OTA_SEND	****************/
+	{		
+
+		.ATRecStrOK  		= "OK",
+		.ATRecStrError  = "ERROR",
+		.cmd_num        = _AT_OTASEND,
+
+		.time_out 			= 300,
+    .run 						= ota_MQTT_send_run,
+		.set						= ota_MQTT_send_set,
+		.get						= nb_null_run,
+
+  },	
+/**************** OTA_URI	****************/
+	{		
+
+		.ATRecStrOK  		= NULL,
+		.ATRecStrError  = NULL,
+		.cmd_num        = _AT_OTA_URI,
+
+		.time_out 			= 0,
+
+    .run 						= ota_uri_run,
+		.set						= nb_null_run,
+		.get						= nb_null_run,
+
+  },	
 };
 
 #ifdef __cplusplus
 }
 #endif
 void stored_datalog(void);
+void ota_getlog_uplink(void);
 NB_TaskStatus nb_at_send(const struct NBTASK *NB_Task);
 ATCmdNum NBTASK(uint8_t *task);
+char *strrstr(char *s, char *str);
 #endif 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
